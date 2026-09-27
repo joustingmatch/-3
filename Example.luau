@@ -6915,6 +6915,15 @@ function Tab:ThemeManager(opts)
             end,
         })
     end
+    if window._backdrop and opts.Dim ~= false then
+        host:Toggle({
+            Name = "Dim",
+            Default = window._backdropDim,
+            Callback = function(value)
+                window:SetDim(value)
+            end,
+        })
+    end
     local nameInput = actionInput(host, opts.Placeholder or "theme name", "Create", function(text)
         manager:Create(text)
     end)
@@ -9812,6 +9821,8 @@ function Window:_buildBackdrop(opts)
     self._backdropShown = false
     self._backdropEnabled = opts.Enabled ~= false
     self._backdropTint = math.clamp(tonumber(opts.Tint) or 0.45, 0, 1)
+    self._backdropDim = opts.Dim ~= false
+    self._dimLevel = self._backdropDim and 1 or 0
     self._weatherDensity = math.clamp(tonumber(opts.Density) or 1, 0, 3)
     self._weatherSpeed = math.clamp(tonumber(opts.Speed) or 1, 0.1, 3)
     self.Weather = weatherName(opts.Weather == nil and "Snow" or opts.Weather)
@@ -9866,7 +9877,15 @@ function Window:_stepBackdrop(deltaTime)
     end
     local eased = 1 - (1 - fade) ^ 3
     local kind = self.Weather
-    self._backdropTintFrame.BackgroundTransparency = 1 - self._backdropTint * eased
+    -- The dim eases on its own so turning it off doesn't touch the weather.
+    local dim = self._dimLevel
+    if self._backdropDim then
+        dim = math.min(dim + deltaTime / 0.3, 1)
+    else
+        dim = math.max(dim - deltaTime / 0.3, 0)
+    end
+    self._dimLevel = dim
+    self._backdropTintFrame.BackgroundTransparency = 1 - self._backdropTint * eased * dim
     self._backdropHeat.BackgroundTransparency = kind == "Ember"
         and 1 - (0.22 + math.sin(os.clock() * 2.1) * 0.05) * eased
         or 1
@@ -9942,6 +9961,14 @@ function Window:SetBackdropTint(amount)
     self._backdropTint = math.clamp(tonumber(amount) or 0.45, 0, 1)
 end
 
+-- Turns the black tint on or off, leaving the weather running.
+function Window:SetDim(enabled)
+    if not self._backdrop then
+        return
+    end
+    self._backdropDim = enabled ~= false
+end
+
 function Window:SetWeather(name)
     if not self._backdrop then
         return
@@ -9972,11 +9999,11 @@ function Window:SetWeatherSpeed(speed)
     self._weatherSpeed = math.clamp(tonumber(speed) or 1, 0.1, 3)
 end
 
--- Minimize: the window folds into a floating bar that keeps the essentials in
--- view (current tab, running toggles, pinned statuses) and unfolds back into
--- the window from wherever the bar was dragged.
+-- Minimize: the window folds into a small floating box that keeps the
+-- essentials in view (current tab, running toggles, pinned statuses) and
+-- unfolds back into the window from wherever the box was dragged.
 
-local MINI_HEIGHT = 46
+local MINI_WIDTH = 220
 local MAX_PINNED = 3
 
 -- The morph is carried by a plain "ghost" panel drawn over the window. The
@@ -10027,8 +10054,8 @@ function Window:_buildMiniBar()
     end
     local gui = self.Gui
     local bar = create("CanvasGroup", {
-        Size = UDim2.fromOffset(0, MINI_HEIGHT),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(MINI_WIDTH, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
         GroupTransparency = 1,
@@ -10039,46 +10066,41 @@ function Window:_buildMiniBar()
     corner(bar, UDim.new(0, 12))
     local barStroke = stroke(bar, Theme.Stroke)
     edgeHighlight(bar)
-    -- Thin accent line along the bottom edge that fades out at both ends.
-    local accentLine = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.fromScale(0.5, 1),
-        Size = UDim2.new(0.8, 0, 0, 1),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 0.35,
-        BorderSizePixel = 0,
-        ZIndex = 2,
-        Parent = bar,
-    })
-    create("UIGradient", {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.5, 0),
-            NumberSequenceKeypoint.new(1, 1),
-        }),
-        Parent = accentLine,
-    })
-    local row = create("Frame", {
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
+    -- Accent brackets in the four corners.
+    local brackets = {}
+    for _, spot in ipairs({ Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) }) do
+        local inset = UDim2.new(spot.X, spot.X == 0 and 5 or -5, spot.Y, spot.Y == 0 and 5 or -5)
+        for _, size in ipairs({ UDim2.fromOffset(10, 2), UDim2.fromOffset(2, 10) }) do
+            table.insert(brackets, create("Frame", {
+                AnchorPoint = spot,
+                Position = inset,
+                Size = size,
+                BackgroundColor3 = Theme.Accent,
+                BackgroundTransparency = 0.35,
+                BorderSizePixel = 0,
+                ZIndex = 2,
+                Parent = bar,
+            }))
+        end
+    end
+    local column = create("Frame", {
+        Size = UDim2.fromScale(1, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         Parent = bar,
     })
-    padding(row, 14, 8)
+    padding(column, 14, 14, 14, 14)
     create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 10),
-        Parent = row,
+        Padding = UDim.new(0, 8),
+        Parent = column,
     })
-    local function inline(order, gap)
+    local function inline(order, height, gap)
         local frame = create("Frame", {
-            Size = UDim2.new(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
+            Size = UDim2.new(1, 0, 0, height),
             BackgroundTransparency = 1,
             LayoutOrder = order,
-            Parent = row,
+            Parent = column,
         })
         create("UIListLayout", {
             FillDirection = Enum.FillDirection.Horizontal,
@@ -10091,37 +10113,61 @@ function Window:_buildMiniBar()
     end
     local function divider(order)
         return create("Frame", {
-            Size = UDim2.fromOffset(1, 18),
+            Size = UDim2.new(1, 0, 0, 1),
             BackgroundColor3 = Theme.Stroke,
             BorderSizePixel = 0,
             LayoutOrder = order,
-            Parent = row,
+            Parent = column,
         })
     end
 
-    local brand = inline(1, 8)
+    local header = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 28),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Parent = column,
+    })
     local logo = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.fromScale(0, 0.5),
         Size = UDim2.fromOffset(24, 24),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
-        LayoutOrder = 1,
-        Parent = brand,
+        Parent = header,
     })
     applyIcon(logo, self._logoIcon, true)
     label({
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Position = UDim2.fromOffset(32, 0),
+        Size = UDim2.new(1, -68, 1, 0),
         Text = self.Title,
         TextSize = 14,
         FontFace = Fonts.Bold,
-        TextTruncate = Enum.TextTruncate.None,
-        LayoutOrder = 2,
-        Parent = brand,
+        Parent = header,
     })
+    local expand = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.fromScale(1, 0.5),
+        Size = UDim2.fromOffset(28, 28),
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Parent = header,
+    })
+    corner(expand, UDim.new(0, 8))
+    local expandIcon = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(14, 14),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = expand,
+    })
+    applyIcon(expandIcon, "maximize-2")
 
     divider(2)
-    local where = inline(3, 6)
+    local where = inline(3, 18, 6)
     local tabIcon = create("ImageLabel", {
         Size = UDim2.fromOffset(14, 14),
         BackgroundTransparency = 1,
@@ -10131,24 +10177,21 @@ function Window:_buildMiniBar()
         Parent = where,
     })
     local tabName = label({
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.new(1, -20, 1, 0),
         TextSize = 12,
         TextColor3 = Theme.Muted,
-        TextTruncate = Enum.TextTruncate.None,
         LayoutOrder = 2,
         Parent = where,
     })
 
+    local activeRow = inline(4, 24, 0)
     local active = create("Frame", {
         Size = UDim2.fromOffset(0, 24),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = Theme.Accent,
         BackgroundTransparency = 0.88,
         BorderSizePixel = 0,
-        LayoutOrder = 4,
-        Visible = false,
-        Parent = row,
+        Parent = activeRow,
     })
     corner(active, UDim.new(1, 0))
     stroke(active, Theme.Accent, 0.65)
@@ -10182,18 +10225,43 @@ function Window:_buildMiniBar()
     })
 
     local pinnedDivider = divider(5)
-    local pinned = inline(6, 12)
+    local pinned = create("Frame", {
+        Size = UDim2.fromScale(1, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        LayoutOrder = 6,
+        Parent = column,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 4),
+        Parent = pinned,
+    })
 
     -- Reminds PC players which key brings the window back.
+    local keyRow = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 22),
+        BackgroundTransparency = 1,
+        LayoutOrder = 7,
+        Visible = false,
+        Parent = column,
+    })
+    label({
+        Size = UDim2.new(1, -60, 1, 0),
+        Text = "Show window",
+        TextSize = 11,
+        TextColor3 = Theme.Muted,
+        Parent = keyRow,
+    })
     local keyChip = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.fromScale(1, 0),
         Size = UDim2.fromOffset(0, 22),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = Theme.Surface3,
         BackgroundTransparency = 0.4,
         BorderSizePixel = 0,
-        LayoutOrder = 7,
-        Visible = false,
-        Parent = row,
+        Parent = keyRow,
     })
     corner(keyChip, UDim.new(0, 6))
     stroke(keyChip, Theme.Stroke, 1)
@@ -10207,27 +10275,7 @@ function Window:_buildMiniBar()
         Parent = keyChip,
     })
 
-    local expand = create("Frame", {
-        Size = UDim2.fromOffset(30, 30),
-        BackgroundColor3 = Theme.Surface3,
-        BackgroundTransparency = 0.5,
-        BorderSizePixel = 0,
-        LayoutOrder = 8,
-        Parent = row,
-    })
-    corner(expand, UDim.new(0, 8))
-    local expandIcon = create("ImageLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(14, 14),
-        BackgroundTransparency = 1,
-        ImageColor3 = Theme.Muted,
-        ScaleType = Enum.ScaleType.Fit,
-        Parent = expand,
-    })
-    applyIcon(expandIcon, "maximize-2")
-
-    -- One invisible button over the whole bar: click restores, drag moves.
+    -- One invisible button over the whole box: click restores, drag moves.
     local hit = create("TextButton", {
         Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
@@ -10243,6 +10291,9 @@ function Window:_buildMiniBar()
         tween(expand, { BackgroundTransparency = 0.1 }, 0.15)
         tween(expandIcon, { ImageColor3 = Theme.Accent }, 0.15)
         tween(barScale, { Scale = 1.02 }, 0.25, Enum.EasingStyle.Quint)
+        for _, bracket in ipairs(brackets) do
+            tween(bracket, { BackgroundTransparency = 0 }, 0.15)
+        end
     end)
     -- Also run on restore: the bar hides under the pointer, so MouseLeave
     -- never fires and the hover look would stick for the next minimize.
@@ -10251,6 +10302,9 @@ function Window:_buildMiniBar()
         tween(expand, { BackgroundTransparency = 0.5 }, 0.25)
         tween(expandIcon, { ImageColor3 = Theme.Muted }, 0.25)
         tween(barScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
+        for _, bracket in ipairs(brackets) do
+            tween(bracket, { BackgroundTransparency = 0.35 }, 0.25)
+        end
     end
     hit.MouseLeave:Connect(unhover)
     self._miniUnhover = unhover
@@ -10322,10 +10376,10 @@ function Window:_buildMiniBar()
                 running += 1
             end
         end
-        active.Visible = running > 0
+        activeRow.Visible = running > 0
         activeLabel.Text = running .. " on"
-        keyChip.Visible = not TOUCH and typeof(self.Keybind) == "EnumItem"
-        if keyChip.Visible then
+        keyRow.Visible = not TOUCH and typeof(self.Keybind) == "EnumItem"
+        if keyRow.Visible then
             keyLabel.Text = keyName(self.Keybind)
         end
 
@@ -10343,35 +10397,25 @@ function Window:_buildMiniBar()
             local chip = chips[index]
             if index <= shown then
                 if not chip then
+                    -- Name on the left, live value on the right.
                     local frame = create("Frame", {
-                        Size = UDim2.new(0, 0, 1, 0),
-                        AutomaticSize = Enum.AutomaticSize.X,
+                        Size = UDim2.new(1, 0, 0, 18),
                         BackgroundTransparency = 1,
                         LayoutOrder = index,
                         Parent = pinned,
                     })
-                    create("UIListLayout", {
-                        FillDirection = Enum.FillDirection.Horizontal,
-                        VerticalAlignment = Enum.VerticalAlignment.Center,
-                        SortOrder = Enum.SortOrder.LayoutOrder,
-                        Padding = UDim.new(0, 5),
-                        Parent = frame,
-                    })
                     local key = label({
-                        Size = UDim2.new(0, 0, 1, 0),
-                        AutomaticSize = Enum.AutomaticSize.X,
+                        Size = UDim2.fromScale(0.5, 1),
                         TextSize = 11,
                         TextColor3 = Theme.Muted,
-                        TextTruncate = Enum.TextTruncate.None,
-                        LayoutOrder = 1,
                         Parent = frame,
                     })
                     local value = label({
-                        Size = UDim2.new(0, 0, 1, 0),
-                        AutomaticSize = Enum.AutomaticSize.X,
+                        AnchorPoint = Vector2.new(1, 0),
+                        Position = UDim2.fromScale(1, 0),
+                        Size = UDim2.new(0.5, -6, 1, 0),
                         TextSize = 12,
-                        TextTruncate = Enum.TextTruncate.None,
-                        LayoutOrder = 2,
+                        TextXAlignment = Enum.TextXAlignment.Right,
                         Parent = frame,
                     })
                     chip = { Frame = frame, Key = key, Value = value }
@@ -11064,7 +11108,7 @@ BossSettings:CreateColorPicker({
     end,
 })
 
--- Status labels in every style. Pin = true also shows one on the minimized bar.
+-- Status labels in every style. Pin = true also shows one on the minimized box.
 local Run = Farm:CreateSubTab({ Name = "Run" })
 
 local RunInfo = Run:AddLeftGroupbox({ Name = "Run Info", Icon = "activity" })

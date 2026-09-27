@@ -55,7 +55,7 @@ Window:Toggle(false)
 
 Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport.
 
-The button in the top-right minimizes the window: it folds into a small floating bar with the logo, the current tab, how many toggles are on, and up to three pinned [statuses](#status) with live values. Drag the bar anywhere; click it (or press the hide key) and it unfolds back into the window. The bar remembers where you left it.
+The button in the top-right minimizes the window: it folds into a small floating box with accent corners, holding the logo, the current tab, how many toggles are on, and up to three pinned [statuses](#status) with live values. Drag the box anywhere; click it (or press the hide key) and it unfolds back into the window. The box remembers where you left it.
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
@@ -83,6 +83,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Backdrop` | boolean \| table | `{ Weather = "Snow" }` | Black tint over the game while the window is up, with weather drifting through it. It fades out when the window is minimized or hidden and sweeps back in with a gust on restore. `false` removes it. |
 | `Backdrop.Weather` | string | `"Snow"` | `"Snow"`, `"Rain"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
 | `Backdrop.Tint` | number | `0.45` | Tint strength, `0` to `1`. |
+| `Backdrop.Dim` | boolean | `true` | `false` starts with the tint off and only the weather showing. |
 | `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
 | `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
@@ -108,8 +109,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `.Home` | The home tab, unless `Home = false`. |
 | `.SearchBox` | The search TextBox. |
 | `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
-| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the floating bar and back. |
-| `.Minimized` / `.MiniBar` | Whether it's minimized, and the bar itself. |
+| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the floating box and back. |
+| `.Minimized` / `.MiniBar` | Whether it's minimized, and the box itself. |
 | `SetToggleButton(enabled)` | Show or hide the toggle button. |
 | `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
 | `SetToggleButtonIcon(icon)` | Swap its icon. |
@@ -117,6 +118,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetBackdrop(enabled)` | Turn the tint and weather on or off. |
 | `SetWeather(name)` / `.Weather` | `"Rain"`, `"Snow"`, `"Hell Fire"` or `"None"`. |
 | `SetBackdropTint(amount)` | Tint strength, `0` to `1`. |
+| `SetDim(bool)` | Turn the tint on or off. The weather keeps running. |
 | `SetWeatherDensity(n)` / `SetWeatherSpeed(n)` | Particle count and speed multipliers. |
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
@@ -317,7 +319,7 @@ Charge = Box:CreateSlider({ Name = "Charge Distance", Range = { 5, 60 }, Visible
 - Search never reveals something you hid, and clearing the search leaves it hidden.
 - Hidden elements keep their flag. They still save, load and run callbacks, so loading a config with `HoldSkills` on shows `Charge`. Visibility itself is not saved.
 - Hiding an open dropdown or colour picker closes it, and hiding a keybind stops a capture.
-- A hidden pinned status leaves the minimized bar until it is shown again.
+- A hidden pinned status leaves the minimized box until it is shown again.
 
 ---
 
@@ -435,7 +437,7 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | `Prefix` / `Suffix` | string | — | Text around the value. |
 | `Placeholder` | string | `"-"` | Shown while the value is `nil`. |
 | `Update` / `UpdateRate` | function / number | — / `1` | Refresh on a timer. |
-| `Pin` | boolean | `false` | Also show it on the minimized bar. |
+| `Pin` | boolean | `false` | Also show it on the minimized box. |
 | `Pulse` / `Flash` | boolean | `true` | The `Dot` pulse and the change flash. |
 
 ### Handle
@@ -1231,6 +1233,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown). |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle). |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
