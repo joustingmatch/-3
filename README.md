@@ -117,7 +117,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Notify(opts)` | See [Notification](#notification). |
 | `Confirm(opts)` / `Dialog(opts)` | See [Confirm](#confirm). |
 | `SaveConfig / LoadConfig / DeleteConfig / ListConfigs` | See [Configs](#configs). |
-| `Destroy()` | Fade out, disconnect everything, remove the gui. |
+| `Destroy()` / `Unload()` | Fade out, disconnect everything, remove the gui. `Library:Destroy()` unloads every window. |
 
 ---
 

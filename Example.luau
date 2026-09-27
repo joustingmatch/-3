@@ -3932,7 +3932,7 @@ function Window:_revealCards(tab, baseDelay)
 end
 
 function Window:_playIntro(morph)
-    if self._introDone then
+    if self._introDone or self._destroyed then
         return
     end
     self._introDone = true
@@ -4013,6 +4013,21 @@ function Window:_showLoader(opts)
         BackgroundTransparency = 1,
         Parent = loader,
     })
+    -- A soft accent halo that breathes behind the logo while loading.
+    local halo = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromScale(0.6, 0.6),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = logoHolder,
+    })
+    corner(halo, UDim.new(1, 0))
+    local haloBreath = TweenService:Create(halo, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        Size = UDim2.fromScale(1.35, 1.35),
+        BackgroundTransparency = 0.94,
+    })
     local logo = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
@@ -4027,6 +4042,8 @@ function Window:_showLoader(opts)
     applyIcon(logo, opts.Icon or Assets.Logo)
     task.delay(0.15, function()
         tween(logo, { Size = UDim2.fromScale(0.85, 0.85), Rotation = 0, ImageTransparency = 0 }, 0.6, Enum.EasingStyle.Back)
+        halo.BackgroundTransparency = 0.8
+        haloBreath:Play()
     end)
     label({
         Position = UDim2.fromOffset(78, 30),
@@ -4037,11 +4054,21 @@ function Window:_showLoader(opts)
     })
     local statusLabel = label({
         Position = UDim2.fromOffset(78, 52),
-        Size = UDim2.new(1, -100, 0, 16),
+        Size = UDim2.new(1, -150, 0, 16),
         Text = opts.LoadingText or opts.Subtitle or "Loading",
         TextSize = 13,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
+        Parent = loader,
+    })
+    local percentLabel = label({
+        Position = UDim2.new(1, -64, 0, 52),
+        Size = UDim2.fromOffset(40, 16),
+        Text = "0%",
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Right,
         Parent = loader,
     })
     local track = create("Frame", {
@@ -4086,15 +4113,38 @@ function Window:_showLoader(opts)
     })
     sweep:Play()
     tween(fill, { Size = UDim2.fromScale(0.85, 1) }, duration * 0.8, Enum.EasingStyle.Quart)
+    -- The percentage simply follows the bar.
+    local percentStep
+    percentStep = RunService.RenderStepped:Connect(function()
+        if not loader.Parent then
+            percentStep:Disconnect()
+            return
+        end
+        percentLabel.Text = math.floor(fill.Size.X.Scale * 100 + 0.5) .. "%"
+    end)
 
     task.spawn(loadLucide)
 
     local steps = opts.LoadingSteps or { "Preparing interface", "Loading icons", "Almost there" }
     for index, text in ipairs(steps) do
         task.delay(duration * (index - 1) / #steps, function()
-            if loader.Parent then
-                statusLabel.Text = text
+            if not loader.Parent then
+                return
             end
+            if index == 1 then
+                statusLabel.Text = text
+                return
+            end
+            -- Old step drifts up and out, the new one rises in under it.
+            tween(statusLabel, { TextTransparency = 1, Position = UDim2.fromOffset(78, 48) }, 0.12)
+            task.delay(0.12, function()
+                if not loader.Parent then
+                    return
+                end
+                statusLabel.Text = text
+                statusLabel.Position = UDim2.fromOffset(78, 56)
+                tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(78, 52) }, 0.22, Enum.EasingStyle.Quint)
+            end)
         end)
     end
 
@@ -4102,13 +4152,17 @@ function Window:_showLoader(opts)
         tween(fill, { Size = UDim2.fromScale(1, 1) }, 0.25, Enum.EasingStyle.Quint)
         task.delay(0.25, function()
             sweep:Cancel()
+            haloBreath:Cancel()
+            tween(halo, { BackgroundTransparency = 1 }, 0.15)
             for _, item in ipairs(loader:GetChildren()) do
                 if item:IsA("TextLabel") then
                     tween(item, { TextTransparency = 1 }, 0.15)
                 end
             end
             for _, item in ipairs(logoHolder:GetChildren()) do
-                tween(item, { ImageTransparency = 1 }, 0.15)
+                if item:IsA("ImageLabel") then
+                    tween(item, { ImageTransparency = 1 }, 0.15)
+                end
             end
             tween(track, { BackgroundTransparency = 1 }, 0.15)
             tween(fill, { BackgroundTransparency = 1 }, 0.15)
@@ -9349,6 +9403,25 @@ function Window:_buildMiniBar()
     corner(bar, UDim.new(0, 12))
     local barStroke = stroke(bar, Theme.Stroke)
     edgeHighlight(bar)
+    -- Thin accent line along the bottom edge that fades out at both ends.
+    local accentLine = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.fromScale(0.5, 1),
+        Size = UDim2.new(0.8, 0, 0, 1),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.35,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = bar,
+    })
+    create("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+        Parent = accentLine,
+    })
     local row = create("Frame", {
         Size = UDim2.new(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -9475,12 +9548,35 @@ function Window:_buildMiniBar()
     local pinnedDivider = divider(5)
     local pinned = inline(6, 12)
 
+    -- Reminds PC players which key brings the window back.
+    local keyChip = create("Frame", {
+        Size = UDim2.fromOffset(0, 22),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        LayoutOrder = 7,
+        Visible = false,
+        Parent = row,
+    })
+    corner(keyChip, UDim.new(0, 6))
+    stroke(keyChip, Theme.Stroke, 1)
+    padding(keyChip, 7, 7)
+    local keyLabel = label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        TextSize = 11,
+        TextColor3 = Theme.Muted,
+        TextTruncate = Enum.TextTruncate.None,
+        Parent = keyChip,
+    })
+
     local expand = create("Frame", {
         Size = UDim2.fromOffset(30, 30),
         BackgroundColor3 = Theme.Surface3,
         BackgroundTransparency = 0.5,
         BorderSizePixel = 0,
-        LayoutOrder = 7,
+        LayoutOrder = 8,
         Parent = row,
     })
     corner(expand, UDim.new(0, 8))
@@ -9505,6 +9601,7 @@ function Window:_buildMiniBar()
         Parent = bar,
     })
     local barScale = create("UIScale", { Parent = bar })
+    self._miniScale = barScale
     hit.MouseEnter:Connect(function()
         tween(barStroke, { Color = Theme.StrokeHover }, 0.15)
         tween(expand, { BackgroundTransparency = 0.1 }, 0.15)
@@ -9575,6 +9672,10 @@ function Window:_buildMiniBar()
         end
         active.Visible = running > 0
         activeLabel.Text = running .. " on"
+        keyChip.Visible = not TOUCH and typeof(self.Keybind) == "EnumItem"
+        if keyChip.Visible then
+            keyLabel.Text = keyName(self.Keybind)
+        end
 
         local list = {}
         for _, handle in ipairs(self._pinned) do
@@ -9676,6 +9777,8 @@ function Window:Minimize()
             self.Root.Visible = false
             bar.Position = UDim2.fromOffset(target.X, target.Y)
             bar.Visible = true
+            self._miniScale.Scale = 0.96
+            tween(self._miniScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
             tween(bar, { GroupTransparency = 0 }, 0.18)
             dissolve(ghost, ghostStroke, 0.18)
         end)
@@ -9963,21 +10066,70 @@ function Window:Destroy()
         end
     end
     for _, connection in ipairs(self._connections) do
-        connection:Disconnect()
+        pcall(function()
+            connection:Disconnect()
+        end)
     end
     self._connections = {}
-    tween(self.Scale, { Scale = 0.9 }, 0.2)
-    self:_closePopups()
-    self:_fade(1, 0.2)
-    tween(self.BodyStroke, { Transparency = 1 }, 0.12)
-    tween(self.Shadow, { ImageTransparency = 1 }, 0.2)
-    if self.ToggleButton then
-        tween(self.ToggleButton, { Size = UDim2.fromOffset(0, 0) }, 0.2)
+    self._inputListeners = { Began = {}, Changed = {}, Ended = {}, Render = {} }
+    self._frameSteps = {}
+
+    local gui = self.Gui
+    local removed = false
+    local function remove()
+        if removed then
+            return
+        end
+        removed = true
+        if not pcall(gui.Destroy, gui) then
+            pcall(function()
+                gui.Enabled = false
+            end)
+        end
     end
-    task.delay(0.22, function()
-        self.Gui:Destroy()
+    -- The fade out is decoration only. Input is already cut at this point, so
+    -- if any of it fails the gui is removed straight away instead of being
+    -- left frozen on screen.
+    local ok, err = pcall(function()
+        if self._dialog then
+            self._dialog.Close()
+        end
+        self:_closePopups()
+        local fit = self._fitScale or 1
+        tween(self.Scale, { Scale = fit * 0.92 }, 0.22, Enum.EasingStyle.Quint)
+        self:_fade(1, 0.2)
+        tween(self.BodyStroke, { Transparency = 1 }, 0.12)
+        tween(self.Shadow, { ImageTransparency = 1 }, 0.2)
+        if self.MiniBar and self.MiniBar.Visible then
+            tween(self.MiniBar, { GroupTransparency = 1 }, 0.18)
+        end
+        for _, button in ipairs({ self.ToggleButton, self.OpenButton }) do
+            if typeof(button) == "Instance" and button:IsA("GuiObject") then
+                tween(button, { Size = UDim2.fromOffset(0, 0) }, 0.2, Enum.EasingStyle.Quint)
+            end
+        end
     end)
+    if not ok then
+        warn("[AirFlow] unload animation failed, removing the window directly: " .. tostring(err))
+        remove()
+        return
+    end
+    task.delay(0.24, remove)
 end
+
+Window.Unload = Window.Destroy
+
+-- Unloads every window the library created.
+function Library:Destroy()
+    for index = #Library.Windows, 1, -1 do
+        local window = Library.Windows[index]
+        if window then
+            window:Destroy()
+        end
+    end
+end
+
+Library.Unload = Library.Destroy
 
 local Airflow = Library
 
