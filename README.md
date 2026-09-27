@@ -1,6 +1,6 @@
 # Airflow UI
 
-> A UI library for Roblox. Windows, tabs and thirteen elements with lucide icons and eased motion.
+> A UI library for Roblox. Windows, tabs, sub tabs, collapsible groupboxes and thirteen elements with lucide icons and eased motion.
 
 ```lua
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
@@ -12,7 +12,7 @@ Every constructor also works without the `Create` prefix. `Tab:Toggle` is the sa
 
 ## Window
 
-> The root container. Sidebar with tabs, a content area, the close button and the notification stack.
+> The root container. Sidebar with tabs and your profile, a content area with search, the close button and the notification stack.
 
 ```lua
 local Window = Airflow:CreateWindow({
@@ -20,12 +20,14 @@ local Window = Airflow:CreateWindow({
     LoadingSubtitle = "by Pookie",
     Icon = "wind",
     ToggleUIKeybind = "RightControl",
-    Size = UDim2.fromOffset(640, 480),
+    Size = UDim2.fromOffset(760, 520),
     MinSize = Vector2.new(480, 360),
-    MaxSize = Vector2.new(1000, 700),
+    MaxSize = Vector2.new(1100, 800),
     MaxNotifications = 4,
     KeepOnScreen = true,
     OpenButton = { Title = "Airflow", Icon = "wind" },
+    Profile = true,
+    Search = true,
     Loading = {
         Enabled = true,
         Title = "Airflow",
@@ -39,19 +41,9 @@ local Window = Airflow:CreateWindow({
         FileName = "default",
     },
     Home = {
-        Name = "Home",
-        Welcome = "Hello, ",
-        Stats = { "FPS", "Ping", "Executor", "Game", "Region", "Time" },
-        Pages = {
-            {
-                Name = "Changelog",
-                Icon = "scroll-text",
-                Entries = {
-                    { Title = "v1.2", Tag = "Latest", Changes = { "Added the home tab", "Faster dropdowns" } },
-                },
-            },
-            { Name = "Info", Icon = "info", Content = "Any text you want on its own tab." },
-        },
+        Tier = "Free",
+        Discord = "dsc.gg/myhub",
+        Website = "myhub.com",
     },
     Parent = game:GetService("CoreGui"),
 })
@@ -59,7 +51,9 @@ local Window = Airflow:CreateWindow({
 Window:Toggle(false)
 ```
 
-Drag any empty area to move it and the grip in the bottom-right corner to resize it. It scales itself down on small screens and stays inside the viewport.
+Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. It scales itself down on small screens and stays inside the viewport.
+
+The bottom of the sidebar shows the player's headshot, display name and the current game. Clicking it opens the home tab.
 
 ### Properties
 
@@ -69,19 +63,21 @@ Drag any empty area to move it and the grip in the bottom-right corner to resize
 | `LoadingSubtitle` | string | — | Small line under the title. |
 | `Icon` | string \| table | bird logo | Lucide name, `rbxassetid://` string, or `{ Image, RectOffset, RectSize }`. |
 | `ToggleUIKeybind` | string \| KeyCode | `"RightControl"` | Hides and shows the window. `"RightShift"`, `"LeftAlt"`, `"Insert"`, `"F1"`, or an `Enum.KeyCode`. |
-| `Size` | UDim2 | `640 × 480` | Starting size. |
+| `Size` | UDim2 | `760 × 520` | Starting size. |
 | `MinSize` | Vector2 | `480 × 360` | Smallest size the resize grip allows. |
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
 | `OpenButton` | boolean \| table | touch-only devices | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
+| `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
+| `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
 | `Loading.Title` | string | `Name` | Title on the card. |
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
 | `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |
 | `Loading.Duration` | number | `1.6` | Seconds before the window appears. |
 | `ConfigurationSaving` | table | — | See [Configs](#configs). |
-| `Home` | boolean \| table | — | Adds a first tab with a greeting and live session stats. See [Home](#home). |
+| `Home` | boolean \| table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
 | `Parent` | Instance | `gethui()` / CoreGui | Where the ScreenGui goes. Falls back to PlayerGui. |
 
 ### Handle
@@ -91,12 +87,16 @@ Drag any empty area to move it and the grip in the bottom-right corner to resize
 | `.Open` | Whether the window is shown. |
 | `.CurrentTab` | The selected tab. |
 | `.Tabs` | Array of tabs. |
-| `.Home` | The home tab, when one was created. |
+| `.Home` | The home tab, unless `Home = false`. |
+| `.SearchBox` | The search TextBox. |
 | `Toggle(open?)` | Show, hide, or flip. |
-| `SetKeybind(keyCode)` | Change the hide key. Updates the footer chip. |
+| `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
+| `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
 | `SelectTab(tab)` | Switch tabs from code. |
 | `CreateTab(opts)` | See [Tab](#tab). |
+| `Rejoin()` / `ServerHop()` / `JoinLowestServer()` | Teleport to this server, a random open one, or the emptiest one. |
+| `CopyToClipboard(text, what?)` | Copy and show a toast. |
 | `Notify(opts)` | See [Notification](#notification). |
 | `Confirm(opts)` / `Dialog(opts)` | See [Confirm](#confirm). |
 | `SaveConfig / LoadConfig / DeleteConfig / ListConfigs` | See [Configs](#configs). |
@@ -106,57 +106,74 @@ Drag any empty area to move it and the grip in the bottom-right corner to resize
 
 ## Home
 
-> An optional first tab: a greeting card, live session stats, and pages of your own.
+> A built-in first tab: the player card with privacy switches, live stats, the current game with server actions, an executor check, and your community links.
 
 ```lua
 Home = {
     Name = "Home",
-    Desc = "Session",
-    Icon = "layout-dashboard",
-    Welcome = "Hello, ",
-    Greeting = "Good to see you.",
-    SectionName = "System info",
-    Stats = { "FPS", "Ping", "Executor", "Game", "Region", "Time", "Players", "Uptime" },
-    TimeFormat = "%H:%M",
+    Title = "Welcome to My Hub!",
+    Welcome = "Welcome back,",
+    Tier = "Premium",
+    TierIcon = "crown",
+    Expiry = os.time() + 3600 * 12,
+    Stats = { "Players", "Friends", "Execs", "Session", "FPS", "Ping" },
+    SupportedExecutors = { "Potassium", "Wave", "Volt" },
+    Discord = "dsc.gg/myhub",
+    Website = "myhub.com",
+    Links = {
+        { Icon = "youtube", Title = "Showcase", Text = "youtube.com/@myhub", Button = "Copy Link" },
+    },
+    HideName = false,
+    HideAvatar = false,
     Pages = {
         {
             Name = "Changelog",
             Icon = "scroll-text",
             Entries = {
-                { Title = "v1.2", Tag = "Latest", Changes = { "Added the home tab" } },
-                { Title = "v1.1", Date = "Aug 30", Content = "Plain text instead of bullets." },
+                { Title = "v1.3", Tag = "Latest", Changes = { "Sub tabs", "Groupboxes" } },
+                { Title = "v1.2", Date = "Aug 30", Content = "Plain text instead of bullets." },
             },
         },
         { Name = "Info", Icon = "info", Content = "Wrapped text in a card." },
-        { Name = "Custom", Icon = "wrench", Build = function(frame) end },
+        { Name = "Custom", Icon = "wrench", Build = function(page) page:Button({ Name = "Hi" }) end },
     },
 }
 ```
 
-The stats refresh once a second and pause while the window is hidden or another tab is open. Pages appear as a pill strip above the content; the greeting only shows on the first page.
+Stats refresh once a second and pause while the window is hidden or another tab is open. When `Pages` is set, the home tab gets sub tabs: an overview page with the cards above, then one per page.
+
+The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest Server. The executor card names the executor, says whether it is supported, and shows the hide key. The **Name** and **Profile** switches hide the player's name and headshot on the home tab and in the sidebar.
 
 ### Properties
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `Name` / `Desc` / `Icon` | string | `"Home"` | The tab itself. |
-| `Welcome` | string | `"Hello, "` | Prefix before the player's display name. |
-| `Greeting` | string | time of day | Second line under the welcome. |
-| `SectionName` | string | `"System info"` | Heading above the cards. `Sections = false` hides it. |
-| `Stats` | table | first six | `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"Players"`, `"Uptime"`. |
-| `TimeFormat` | string | `"%H:%M"` | `os.date` format for the time card. |
-| `TabIcon` | string | `"layout-grid"` | Icon on the built-in details page button. |
-| `Pages` | table | — | Extra pages beside the details one. |
-| `Pages[n].Name` / `Icon` | string | — | The page button. |
+| `Name` / `Desc` / `Icon` | string | `"Home"`, `"house"` | The tab itself. |
+| `Title` | string | `"Welcome to <Name>!"` | Page heading. |
+| `Welcome` | string | `"Welcome back,"` | Line above the display name. |
+| `Tier` | string \| false | `"Free"` | Badge on the player card. `false` hides it. |
+| `TierIcon` | string | window icon | Icon in the badge. |
+| `Expiry` | number \| string \| function | — | Under the badge. A unix time counts down (`11h 57m`), a string is shown as is, a function is called every second. |
+| `Stats` | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
+| `StatsFolder` | string | config folder | Where the execution counter is stored. |
+| `TimeFormat` | string | `"%H:%M"` | `os.date` format for the time stat. |
+| `SupportedExecutors` | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
+| `Discord` / `Website` | string | — | Link cards with a copy button. |
+| `DiscordTitle` / `WebsiteTitle` | string | `"Join the community"` / `"Supported games"` | Card titles. |
+| `Links` | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
+| `HideName` / `HideAvatar` | boolean | `false` | Start with the privacy switches on. |
+| `OverviewName` / `TabIcon` | string | `"Overview"` / `"layout-grid"` | The first sub tab when `Pages` is set. |
+| `Pages` | table | — | Extra sub tabs. |
+| `Pages[n].Name` / `Icon` | string | — | The sub tab button. |
 | `Pages[n].Content` | string | — | Wrapped text in a card. |
 | `Pages[n].Entries` | table | — | Cards with `Title`, `Tag` or `Date`, and `Changes` (a list) or `Content`. |
-| `Pages[n].Build` | function | — | `function(frame)` to fill the page yourself. |
+| `Pages[n].Build` | function | — | `function(page, list)`. `page` is a sub tab, so every element constructor and `Groupbox` work on it. |
 
 ---
 
 ## Tab
 
-> A sidebar button and a scrolling page.
+> A sidebar button and a page with its icon and title.
 
 ```lua
 local Tab = Window:CreateTab({
@@ -169,20 +186,97 @@ local Tab = Window:CreateTab({
 local Tab = Window:CreateTab("Main", "zap")
 ```
 
-The first tab created is selected automatically. An empty tab shows its icon with `EmptyText`.
+The first tab created is selected automatically. An empty tab shows its icon with `EmptyText`. Elements added straight to a tab stack as full-width cards. Groupboxes go into two columns underneath them.
 
 ### Properties
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Name` | string | `"Tab"` | Sidebar label and page title. |
+| `PageTitle` | string | `Name` | Page heading when it should differ from the sidebar label. |
 | `Desc` | string | — | Muted line under the page title. |
-| `Icon` | string \| table | — | Sidebar icon, accent-tinted when selected. |
+| `Icon` | string \| table | — | Sidebar and page icon, accent-tinted. |
 | `EmptyText` | string | `"Nothing here yet"` | Shown while the tab has no elements. |
 
 ### Handle
 
-Every `Create*` element constructor below, plus `.Name` and `.Window`.
+Every `Create*` element constructor below, `CreateSubTab`, `CreateGroupbox` / `AddLeftGroupbox` / `AddRightGroupbox`, `SelectSubTab(subTab | name | index)`, `.CurrentSubTab`, `.Name` and `.Window`.
+
+---
+
+## Sub Tab
+
+> A row of pills under the page title. Each pill has its own page, and switching slides between them.
+
+```lua
+local Farm = Window:CreateTab({ Name = "Farm", Icon = "swords" })
+
+local MobFarm = Farm:CreateSubTab({ Name = "Mob Farm" })
+local BossFarm = Farm:CreateSubTab({ Name = "Boss Farm", Icon = "skull" })
+
+MobFarm:CreateToggle({ Name = "Auto Farm", Callback = function(v) end })
+Farm:SelectSubTab("Boss Farm")
+```
+
+The first sub tab is selected automatically. Once a tab has sub tabs, add elements and groupboxes to the sub tabs, not the tab. The pill row scrolls sideways when it overflows.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | `"Page n"` | Pill label. |
+| `Icon` | string \| table | — | Optional icon in the pill. |
+| `EmptyText` | string | `"Nothing here yet"` | Shown while the page is empty. |
+
+### Handle
+
+Same as a tab: every element constructor and the groupbox constructors.
+
+---
+
+## Groupbox
+
+> A titled, collapsible card. Groupboxes fill two columns and stack into one when the window is narrow.
+
+```lua
+local Mobs = MobFarm:AddLeftGroupbox({ Name = "Mob Farm", Icon = "crosshair" })
+local Other = MobFarm:AddRightGroupbox("Other Features", "sparkles")
+local Auto = MobFarm:CreateGroupbox({ Name = "Movement", Icon = "move", Collapsed = true })
+
+Mobs:CreateToggle({ Name = "Auto Farm Mobs", Callback = function(v) end })
+Mobs:CreateDropdown({ Name = "Mobs", Options = { "Bandit", "Wolf" } })
+Mobs:CreateButton({ Name = "Teleport to mob" })
+Mobs:CreateLabel("Status: idle")
+
+Auto:Expand()
+```
+
+Inside a groupbox, elements are compact rows without their own card. Dropdowns and inputs take the same share of the row so their boxes line up, and buttons fill the width. Click the header or the `−` to collapse it. Without `Side`, each new groupbox goes to the column with fewer boxes.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | `"Groupbox"` | Header title. |
+| `Icon` | string \| table | — | Accent icon on the right of the header. |
+| `Side` | `"Left"` \| `"Right"` \| 1 \| 2 | balanced | Column. |
+| `Collapsed` | boolean | `false` | Start collapsed. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| every element constructor | Adds a row to the groupbox. |
+| `Collapse()` / `Expand()` / `SetCollapsed(bool)` | Animate closed or open. |
+| `IsCollapsed()` | Current state. |
+| `SetTitle(text)` | Rename the header. |
+| `Destroy()` | Remove the groupbox and its elements. |
+
+---
+
+## Search
+
+The search box in the top-right filters the page you are on as you type. It matches element names and groupbox titles. A groupbox whose title matches stays whole; otherwise only its matching rows stay. Sections and dividers hide while searching. Switching tabs or sub tabs clears it.
 
 ---
 
