@@ -518,6 +518,72 @@ local function bindColors(object, props)
     end
 end
 
+-- Repaints every bound property from the colours on screen to the new theme.
+-- One Heartbeat loop lerps each theme key once per frame and assigns the
+-- result, instead of creating a tween per object, which hitched the frame the
+-- theme changed on large UIs. A change mid-fade picks up from what is shown.
+local shownTheme = table.clone(Library.Theme)
+local themeDriver = nil
+
+local function paintBinding(object, bound, colors)
+    for property, name in pairs(bound) do
+        local color = colors[name]
+        if color then
+            object[property] = color
+        end
+    end
+end
+
+local function paintBindings(colors)
+    for object, bound in pairs(themeBindings) do
+        pcall(paintBinding, object, bound, colors)
+    end
+end
+
+local function driveTheme(duration)
+    if themeDriver then
+        themeDriver:Disconnect()
+        themeDriver = nil
+    end
+    local from, colors = {}, {}
+    for _, name in ipairs(THEME_KEYS) do
+        local target = Library.Theme[name]
+        local current = shownTheme[name] or target
+        if current ~= target then
+            from[name] = current
+            colors[name] = current
+        end
+    end
+    local function finish()
+        for _, name in ipairs(THEME_KEYS) do
+            colors[name] = Library.Theme[name]
+            shownTheme[name] = Library.Theme[name]
+        end
+        paintBindings(colors)
+    end
+    if duration <= 0 or next(from) == nil then
+        finish()
+        return
+    end
+    local elapsed = 0
+    themeDriver = RunService.Heartbeat:Connect(function(deltaTime)
+        elapsed += deltaTime
+        if elapsed >= duration then
+            themeDriver:Disconnect()
+            themeDriver = nil
+            finish()
+            return
+        end
+        local alpha = 1 - (1 - elapsed / duration) ^ 5
+        for name, start in pairs(from) do
+            local color = start:Lerp(Library.Theme[name], alpha)
+            colors[name] = color
+            shownTheme[name] = color
+        end
+        paintBindings(colors)
+    end)
+end
+
 -- Runs fn now and again whenever the theme changes, while owner exists.
 local function onTheme(owner, fn)
     themeHooks[owner] = fn
@@ -5277,14 +5343,7 @@ function Library:SetTheme(theme, instant)
     end
     rebuildThemeLookup()
     sweepBindings()
-    local duration = instant and 0 or 0.3
-    for object, bound in pairs(themeBindings) do
-        local props = {}
-        for property, name in pairs(bound) do
-            props[property] = Theme[name]
-        end
-        pcall(tween, object, props, duration, Enum.EasingStyle.Quint, nil, true)
-    end
+    driveTheme(instant and 0 or 0.3)
     for owner, fn in pairs(themeHooks) do
         if owner.Parent then
             pcall(fn)
@@ -10269,23 +10328,61 @@ function Window:Toggle(open)
     self.Open = open
     self:_refreshToggleButton()
     self:_refreshBackdrop(open)
+    -- Like minimize, a plain ghost panel carries the scale and fade. The body
+    -- is never reparented into the fader or rescaled, which relaid out the
+    -- whole window and stuttered on the keypress frame.
+    self._minimizeGeneration = (self._minimizeGeneration or 0) + 1
+    local generation = self._minimizeGeneration
+    local gui = self.Gui
+    local fit = self._fitScale or 1
+    local size = Vector2.new(self.Root.Size.X.Offset, self.Root.Size.Y.Offset) * fit
+    local centre = self.Root.AbsolutePosition + self.Root.AbsoluteSize / 2 - gui.AbsolutePosition
+    local shrunk = size * 0.94
+    local fromPosition, fromSize, fromAlpha
+    if self._ghost then
+        fromPosition = self._ghost.AbsolutePosition - gui.AbsolutePosition
+        fromSize = self._ghost.AbsoluteSize
+        fromAlpha = self._ghost.BackgroundTransparency
+    end
     if open then
-        self.Root.Visible = true
-        tween(self.Scale, { Scale = self._fitScale or 1 }, 0.4, Enum.EasingStyle.Back)
-        self:_fade(0, 0.25)
-        tween(self.BodyStroke, { Transparency = 0 }, 0.25)
+        local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition or centre - shrunk / 2, fromSize or shrunk, 10)
+        ghost.BackgroundTransparency = fromAlpha or 1
+        ghostStroke.Transparency = fromAlpha or 1
+        tween(ghost, { BackgroundTransparency = 0 }, 0.12, Enum.EasingStyle.Quad)
+        tween(ghostStroke, { Transparency = 0 }, 0.12, Enum.EasingStyle.Quad)
+        morphGhost(ghost, ghostCorner, centre - size / 2, size, 10, 0.3)
         tween(self.Shadow, { ImageTransparency = 0.6 }, 0.3)
-    else
-
-        tween(self.Scale, { Scale = (self._fitScale or 1) * 0.94 }, 0.2, Enum.EasingStyle.Quint)
-        self:_closePopups()
-        self:_fade(1, 0.16)
-        tween(self.BodyStroke, { Transparency = 1 }, 0.12)
-        tween(self.Shadow, { ImageTransparency = 1 }, 0.16)
+        -- Shown under the ghost once it covers the spot, then revealed.
         task.delay(0.2, function()
-            if not self.Open then
-                self.Root.Visible = false
+            if self._minimizeGeneration ~= generation or self._destroyed then
+                return
             end
+            self.Scale.Scale = fit
+            self.BodyStroke.Transparency = 0
+            self.Root.Visible = true
+        end)
+        task.delay(0.3, function()
+            if self._ghost == ghost and self._minimizeGeneration == generation then
+                dissolve(self, ghost, ghostStroke, 0.18)
+            end
+        end)
+    else
+        self:_closePopups()
+        local position = fromPosition or self.Root.AbsolutePosition - gui.AbsolutePosition
+        local current = fromSize or self.Root.AbsoluteSize
+        local ghost, ghostStroke, ghostCorner = makeGhost(self, position, current, 10)
+        ghost.BackgroundTransparency = fromAlpha or 1
+        ghostStroke.Transparency = fromAlpha or 1
+        tween(ghost, { BackgroundTransparency = 0 }, 0.08, Enum.EasingStyle.Quad)
+        tween(ghostStroke, { Transparency = 0 }, 0.08, Enum.EasingStyle.Quad)
+        tween(self.Shadow, { ImageTransparency = 1 }, 0.16)
+        task.delay(0.08, function()
+            if self._minimizeGeneration ~= generation or self._destroyed then
+                return
+            end
+            self.Root.Visible = false
+            morphGhost(ghost, ghostCorner, centre - shrunk / 2, shrunk, 10, 0.2)
+            dissolve(self, ghost, ghostStroke, 0.16)
         end)
     end
 end
