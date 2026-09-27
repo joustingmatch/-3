@@ -11143,6 +11143,106 @@ end
 
 Library.Unload = Library.Destroy
 
+-- A script thread that yielded inside an engine call (InvokeServer and the
+-- like) resumes at game identity and can no longer touch the GUI in CoreGui.
+-- Every public call checks for that: it raises the thread back to the identity
+-- the library loaded at, or, when the executor cannot, runs the call on a
+-- trusted Heartbeat thread and waits for its result.
+local getIdentity = getthreadidentity or getidentity or get_thread_identity or (syn and syn.get_thread_identity)
+local setIdentity = setthreadidentity or setidentity or set_thread_identity or (syn and syn.set_thread_identity)
+local loadIdentity = nil
+if getIdentity then
+    local ok, identity = pcall(getIdentity)
+    if ok and type(identity) == "number" then
+        loadIdentity = identity
+    end
+end
+
+local function threadLowered()
+    local window = Library.Windows[#Library.Windows]
+    local probe = window and window.Gui
+    if typeof(probe) ~= "Instance" then
+        return false
+    end
+    return not pcall(function()
+        return probe.Name
+    end)
+end
+
+local trustedQueue = {}
+RunService.Heartbeat:Connect(function()
+    if #trustedQueue == 0 then
+        return
+    end
+    local queue = trustedQueue
+    trustedQueue = {}
+    for _, job in ipairs(queue) do
+        job()
+    end
+end)
+
+local function runTrusted(fn, ...)
+    local args = table.pack(...)
+    local result = nil
+    table.insert(trustedQueue, function()
+        result = table.pack(pcall(fn, table.unpack(args, 1, args.n)))
+    end)
+    while result == nil do
+        task.wait()
+    end
+    if not result[1] then
+        error(result[2], 0)
+    end
+    return table.unpack(result, 2, result.n)
+end
+
+local guardedObjects = setmetatable({}, { __mode = "k" })
+local guardObject
+
+local function guarded(fn)
+    return function(...)
+        if threadLowered() then
+            if setIdentity then
+                pcall(setIdentity, loadIdentity or 8)
+            end
+            if threadLowered() then
+                return guardObject(runTrusted(fn, ...))
+            end
+        end
+        return guardObject(fn(...))
+    end
+end
+
+-- Elements carry their methods as closures, so each returned object gets its
+-- public functions wrapped too; windows and tabs share the guarded metatables.
+function guardObject(...)
+    for index = 1, select("#", ...) do
+        local object = select(index, ...)
+        if type(object) == "table" and not guardedObjects[object] then
+            local meta = getmetatable(object)
+            if meta ~= Window and meta ~= Tab then
+                guardedObjects[object] = true
+                for key, value in pairs(object) do
+                    if type(key) == "string" and type(value) == "function" and key:sub(1, 1) ~= "_" then
+                        object[key] = guarded(value)
+                    elseif type(key) == "number" and type(value) == "table" then
+                        guardObject(value)
+                    end
+                end
+            end
+        end
+    end
+    return ...
+end
+
+for _, class in ipairs({ Library, Window, Tab }) do
+    for key, value in pairs(class) do
+        if type(key) == "string" and type(value) == "function" and key:sub(1, 1) ~= "_" then
+            class[key] = guarded(value)
+        end
+    end
+end
+
 local Airflow = Library
 
 Airflow:LoadFont({ Name = "ValleySans" }) -- downloads the font once into workspace/AirFlowFonts and uses it everywhere
