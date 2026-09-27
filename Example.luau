@@ -56,6 +56,7 @@ local function finishElement(tab, opts, element, frame, kind)
                 end
                 window:_autoSave()
             end
+            window:_flagCreated(opts.Flag, element)
         end
     end
     -- What the script asked for, kept apart from what search is currently hiding.
@@ -2404,13 +2405,56 @@ function Tab:Dropdown(opts)
         return currentValue()
     end
 
-    function self_:Refresh(newOptions, keepSelection)
+    local function sameValue(a, b)
+        if type(a) ~= "table" or type(b) ~= "table" then
+            return a == b
+        end
+        if #a ~= #b then
+            return false
+        end
+        for index, item in ipairs(a) do
+            if b[index] ~= item then
+                return false
+            end
+        end
+        return true
+    end
+
+    -- A kept pick only counts once its option exists, so a list filled in after a
+    -- config load changes the value; the callback runs so scripts see it.
+    function self_:Refresh(newOptions, keepSelection, silent)
+        local before = currentValue()
         options = newOptions or {}
         if not keepSelection then
             selected = {}
         end
         buildOptions()
         renderValue(false)
+        if not silent and not sameValue(before, currentValue()) then
+            safeCall(opts.Callback, currentValue())
+        end
+    end
+
+    -- Every pick, including ones whose option isn't in the list right now, so
+    -- saving never drops them.
+    function self_:_saveValue()
+        local picked = currentValue()
+        if multi then
+            local seen = {}
+            for _, item in ipairs(picked) do
+                seen[item] = true
+            end
+            for item in pairs(selected) do
+                if not seen[item] then
+                    table.insert(picked, item)
+                end
+            end
+            return picked
+        end
+        if picked == nil then
+            picked = next(selected)
+        end
+        return picked
     end
 
     function self_:SetOpen(open)
@@ -3293,6 +3337,7 @@ function Library.Window(_, opts)
         self._autoSaveEnabled = false
     end
     self._configListeners = {}
+    self._pendingFlags = {}
     local configSettings = self:_readConfigSettings()
     if type(configSettings.Autosave) == "boolean" then
         self._autoSaveEnabled = configSettings.Autosave
@@ -4473,6 +4518,14 @@ function Window:_enableResize(minSize)
     end)
 end
 
+-- Configs are plain JSON, one file per config, in the same shape as a share code:
+--   {"Folder":"MyHub","Name":"farm","Version":1,"Config":"{\"AutoFarm\":{\"Value\":true,\"Type\":\"Toggle\"}}"}
+-- Config holds the flags as their own JSON string, each one {"Value":...,"Type":...}.
+-- Colours are {"Hex":"ff5a5a"}, keybinds are key names, an empty dropdown has no Value.
+
+local CONFIG_VERSION = 1
+local LEGACY_SHARE_PREFIX = "airflow:"
+
 local function configPath(self, name)
     return self.ConfigFolder .. "/" .. name .. ".json"
 end
@@ -4481,19 +4534,55 @@ local function fileApiAvailable()
     return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 end
 
+-- Makes every missing folder along the path, so FolderName can be "Hub/Game".
 local function ensureFolder(folder)
-    if type(isfolder) == "function" and type(makefolder) == "function" and not isfolder(folder) then
-        makefolder(folder)
+    if type(isfolder) ~= "function" or type(makefolder) ~= "function" then
+        return
     end
+    local path = ""
+    for segment in tostring(folder):gmatch("[^/\\]+") do
+        path = path == "" and segment or path .. "/" .. segment
+        if not isfolder(path) then
+            makefolder(path)
+        end
+    end
+end
+
+local function colorToHex(color)
+    return string.format("%02x%02x%02x",
+        math.floor(color.R * 255 + 0.5),
+        math.floor(color.G * 255 + 0.5),
+        math.floor(color.B * 255 + 0.5))
+end
+
+local function colorFromValue(value)
+    if type(value) == "table" then
+        if type(value.Hex) == "string" then
+            value = value.Hex
+        elseif type(value[1]) == "number" then
+            -- Older configs stored { r, g, b } in 0-1.
+            return Color3.new(value[1], value[2] or 0, value[3] or 0)
+        end
+    end
+    if type(value) == "string" then
+        local r, g, b = value:match("^%s*#?(%x%x)(%x%x)(%x%x)%s*$")
+        if r then
+            return Color3.fromRGB(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16))
+        end
+    end
+    return nil
 end
 
 local function serializeFlag(element)
     local kind = element._type
     local value = element:Get()
+    if type(element._saveValue) == "function" then
+        value = element:_saveValue()
+    end
     if kind == "Keybind" then
         return { Type = kind, Value = value and value.Name or nil }
     elseif kind == "ColorPicker" then
-        return { Type = kind, Value = { value.R, value.G, value.B } }
+        return { Type = kind, Value = typeof(value) == "Color3" and { Hex = colorToHex(value) } or nil }
     end
     return { Type = kind, Value = value }
 end
@@ -4502,37 +4591,104 @@ local function deserializeFlag(element, entry, silent)
     local kind = element._type
     local value = entry.Value
     if kind == "Keybind" then
-        element:Set(value and Enum.KeyCode[value] or nil, silent)
+        element:Set(type(value) == "string" and Enum.KeyCode[value] or nil, silent)
     elseif kind == "ColorPicker" then
-        if type(value) == "table" then
-            element:Set(Color3.new(value[1], value[2], value[3]), silent)
+        local color = colorFromValue(value)
+        if color then
+            element:Set(color, silent)
+        end
+    elseif kind == "Dropdown" then
+        -- A dropdown saved with nothing picked has no Value at all.
+        element:Set(value, silent)
+    elseif kind == "Toggle" then
+        if type(value) == "boolean" then
+            element:Set(value, silent)
+        end
+    elseif kind == "Slider" or kind == "Stepper" or kind == "Progress" then
+        local number = tonumber(value)
+        if number then
+            element:Set(number, silent)
         end
     elseif value ~= nil then
         element:Set(value, silent)
     end
 end
 
-local function collectFlags()
+local function entryMatches(element, entry)
+    return type(entry) == "table" and (entry.Type == nil or entry.Type == element._type)
+end
+
+-- Flags a config holds but no element has claimed yet are kept here. They are
+-- applied when an element with that flag is created and written back on save,
+-- so a config survives elements that only exist some of the time.
+local function collectFlags(self)
     local data = {}
+    if self and self._pendingFlags then
+        for flag, pending in pairs(self._pendingFlags) do
+            data[flag] = pending.Entry
+        end
+    end
     for flag, element in pairs(Library.Flags) do
         if element._type and type(element.Get) == "function" then
-            data[flag] = serializeFlag(element)
+            local ok, entry = pcall(serializeFlag, element)
+            if ok then
+                data[flag] = entry
+            end
         end
     end
     return data
 end
 
-function Window:_applyFlags(data, silent)
+function Window:_withoutAutosave(callback)
     local previous = self._autoSaveEnabled
     self._autoSaveEnabled = false
-    for flag, entry in pairs(data) do
-        local element = Library.Flags[flag]
-        if element and type(element.Set) == "function" and type(entry) == "table" and entry.Type == element._type then
-            pcall(deserializeFlag, element, entry, silent == true)
-        end
-    end
+    local ok, err = pcall(callback)
     self._autoSaveEnabled = previous
+    if not ok then
+        warn("[Airflow] " .. tostring(err))
+    end
+end
+
+function Window:_applyFlags(data, silent)
+    silent = silent == true
+    self._pendingFlags = {}
+    self:_withoutAutosave(function()
+        for flag, entry in pairs(data) do
+            local element = Library.Flags[flag]
+            if element and type(element.Set) == "function" then
+                if entryMatches(element, entry) then
+                    pcall(deserializeFlag, element, entry, silent)
+                end
+            elseif type(entry) == "table" then
+                self._pendingFlags[flag] = { Entry = entry, Silent = silent }
+            end
+        end
+    end)
     self._autoSaveReady = true
+end
+
+-- Every flagged element reports here: its starting value becomes its default,
+-- and a value waiting from an earlier load is applied once the constructor returns.
+function Window:_flagCreated(flag, element)
+    local ok, entry = pcall(serializeFlag, element)
+    if ok then
+        element._defaultEntry = entry
+    end
+    local pending = self._pendingFlags and self._pendingFlags[flag]
+    if not pending then
+        return
+    end
+    task.defer(function()
+        if self._pendingFlags[flag] ~= pending or Library.Flags[flag] ~= element or element._destroyed then
+            return
+        end
+        self._pendingFlags[flag] = nil
+        if entryMatches(element, pending.Entry) then
+            self:_withoutAutosave(function()
+                deserializeFlag(element, pending.Entry, pending.Silent)
+            end)
+        end
+    end)
 end
 
 -- Anything listening for config changes (the config manager's status line).
@@ -4556,129 +4712,22 @@ local function validConfigName(name)
     return type(name) == "string" and name ~= "" and not name:find('[\\/:%*%?"<>|]')
 end
 
-local function writeConfig(self, name, data)
-    if not validConfigName(name) then
-        return false, "invalid config name"
-    end
-    if not fileApiAvailable() then
-        return false, "file API unavailable"
-    end
-    ensureFolder(self.ConfigFolder)
-    return pcall(function()
-        writefile(configPath(self, name), HttpService:JSONEncode(data))
-    end)
+local function encodeConfig(self, name, flags)
+    return HttpService:JSONEncode({
+        Folder = self.ConfigFolder,
+        Name = name,
+        Version = CONFIG_VERSION,
+        Config = HttpService:JSONEncode(flags),
+    })
 end
-
-local function readConfig(self, name)
-    if not fileApiAvailable() then
-        return nil, "file API unavailable"
-    end
-    local path = configPath(self, name)
-    if not isfile(path) then
-        return nil, "no config named " .. tostring(name)
-    end
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(readfile(path))
-    end)
-    if not ok or type(data) ~= "table" then
-        return nil, "config is not valid JSON"
-    end
-    return data
-end
-
-function Window:SaveConfig(name)
-    name = name or self.ConfigName
-    local ok, err = writeConfig(self, name, collectFlags())
-    if ok then
-        self.ConfigName = name
-    end
-    return ok, err
-end
-
-function Window:LoadConfig(name, silent)
-    name = name or self.ConfigName
-    local data, err = readConfig(self, name)
-    if not data then
-        return false, err
-    end
-    self:_applyFlags(data, silent)
-    self.ConfigName = name
-    self.LoadedConfig = name
-    self:_configChanged()
-    return true
-end
-
-function Window:DeleteConfig(name)
-    if not fileApiAvailable() or type(delfile) ~= "function" then
-        return false, "file API unavailable"
-    end
-    local path = configPath(self, name)
-    if not isfile(path) then
-        return false, "no config named " .. name
-    end
-    delfile(path)
-    if self.LoadedConfig == name then
-        self.LoadedConfig = nil
-    end
-    self:_configChanged()
-    return true
-end
-
-function Window:ListConfigs()
-    local names = {}
-    if type(listfiles) ~= "function" or type(isfolder) ~= "function" or not isfolder(self.ConfigFolder) then
-        return names
-    end
-    for _, path in ipairs(listfiles(self.ConfigFolder)) do
-        local name = path:match("([^/\\]+)%.json$")
-        if name then
-            table.insert(names, name)
-        end
-    end
-    table.sort(names)
-    return names
-end
-
-function Window:_autoSave()
-    if not self._autoSaveEnabled or self._destroyed or not self._autoSaveReady then
-        return
-    end
-    if self._autoSavePending then
-        return
-    end
-    self._autoSavePending = true
-    task.delay(0.5, function()
-        self._autoSavePending = false
-        if not self._destroyed and self._autoSaveEnabled then
-            self:SaveConfig(self.ConfigName)
-        end
-    end)
-end
-
--- Share codes: "airflow:" followed by the config JSON in base64.
 
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local B64_INDEX = {}
 for index = 1, #B64 do
     B64_INDEX[B64:byte(index)] = index - 1
 end
-local SHARE_PREFIX = "airflow:"
 
-local function base64Encode(text)
-    local out = {}
-    for index = 1, #text, 3 do
-        local a, b, c = text:byte(index, index + 2)
-        local n = bit32.bor(bit32.lshift(a, 16), bit32.lshift(b or 0, 8), c or 0)
-        table.insert(out, string.char(
-            B64:byte(bit32.extract(n, 18, 6) + 1),
-            B64:byte(bit32.extract(n, 12, 6) + 1),
-            b and B64:byte(bit32.extract(n, 6, 6) + 1) or 61,
-            c and B64:byte(bit32.extract(n, 0, 6) + 1) or 61
-        ))
-    end
-    return table.concat(out)
-end
-
+-- Only for reading the old "airflow:<base64>" share codes.
 local function base64Decode(text)
     if #text % 4 ~= 0 then
         return nil
@@ -4706,23 +4755,226 @@ local function base64Decode(text)
     return table.concat(out)
 end
 
-local function decodeShareCode(code)
-    code = tostring(code or ""):gsub("%s", "")
-    if code:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
-        return nil
-    end
-    local json = base64Decode(code:sub(#SHARE_PREFIX + 1))
-    if not json then
-        return nil
+-- Reads a config file or a pasted code: the JSON above (Config as a string or
+-- a table), a bare flag table, or an old "airflow:" code. Returns flags, info.
+local function decodeConfig(text)
+    text = tostring(text or ""):match("^%s*(.-)%s*$")
+    if text:sub(1, #LEGACY_SHARE_PREFIX) == LEGACY_SHARE_PREFIX then
+        text = base64Decode((text:sub(#LEGACY_SHARE_PREFIX + 1):gsub("%s", "")))
+        if not text then
+            return nil, "invalid config code"
+        end
     end
     local ok, data = pcall(function()
-        return HttpService:JSONDecode(json)
+        return HttpService:JSONDecode(text)
     end)
-    if ok and type(data) == "table" then
-        return data
+    if not ok or type(data) ~= "table" then
+        return nil, "invalid config code"
     end
-    return nil
+    local info = {}
+    -- A bare flag table could have a flag named Config, but its entry carries a Type.
+    if type(data.Config) == "string" or (type(data.Config) == "table" and data.Config.Type == nil) then
+        info.Folder = type(data.Folder) == "string" and data.Folder or nil
+        info.Name = type(data.Name) == "string" and data.Name or nil
+        info.Version = tonumber(data.Version)
+        local flags = data.Config
+        if type(flags) == "string" then
+            ok, flags = pcall(function()
+                return HttpService:JSONDecode(data.Config)
+            end)
+            if not ok then
+                return nil, "invalid config code"
+            end
+        end
+        if type(flags) ~= "table" then
+            return nil, "invalid config code"
+        end
+        data = flags
+    end
+    for flag, entry in pairs(data) do
+        if type(flag) ~= "string" or type(entry) ~= "table" then
+            return nil, "invalid config code"
+        end
+    end
+    return data, info
 end
+
+local function writeConfig(self, name, data)
+    if not validConfigName(name) then
+        return false, "invalid config name"
+    end
+    if not fileApiAvailable() then
+        return false, "file API unavailable"
+    end
+    local encoded, text = pcall(encodeConfig, self, name, data)
+    if not encoded then
+        return false, "could not encode config"
+    end
+    ensureFolder(self.ConfigFolder)
+    return pcall(writefile, configPath(self, name), text)
+end
+
+local function readConfig(self, name)
+    if not fileApiAvailable() then
+        return nil, "file API unavailable"
+    end
+    if not validConfigName(name) then
+        return nil, "invalid config name"
+    end
+    local path = configPath(self, name)
+    if not isfile(path) then
+        return nil, "no config named " .. tostring(name)
+    end
+    local ok, text = pcall(readfile, path)
+    if not ok or type(text) ~= "string" then
+        return nil, "could not read " .. name
+    end
+    local data, info = decodeConfig(text)
+    if not data then
+        return nil, "config is not valid JSON"
+    end
+    return data, info
+end
+
+function Window:ConfigExists(name)
+    return validConfigName(name) and fileApiAvailable() and isfile(configPath(self, name)) or false
+end
+
+function Window:SaveConfig(name)
+    name = name or self.ConfigName
+    local ok, err = writeConfig(self, name, collectFlags(self))
+    if ok then
+        self.ConfigName = name
+    end
+    return ok, err
+end
+
+function Window:LoadConfig(name, silent)
+    name = name or self.ConfigName
+    local data, err = readConfig(self, name)
+    if not data then
+        return false, err
+    end
+    self:_applyFlags(data, silent)
+    self.ConfigName = name
+    self.LoadedConfig = name
+    self:_configChanged()
+    return true
+end
+
+function Window:DeleteConfig(name)
+    if not fileApiAvailable() or type(delfile) ~= "function" then
+        return false, "file API unavailable"
+    end
+    if not validConfigName(name) then
+        return false, "invalid config name"
+    end
+    local path = configPath(self, name)
+    if not isfile(path) then
+        return false, "no config named " .. name
+    end
+    local ok, err = pcall(delfile, path)
+    if not ok then
+        return false, err
+    end
+    if self.LoadedConfig == name then
+        self.LoadedConfig = nil
+    end
+    self:_configChanged()
+    return true
+end
+
+-- Moves the file and anything pointing at it: the loaded name and both autoloads.
+function Window:RenameConfig(name, newName)
+    if not validConfigName(newName) then
+        return false, "invalid config name"
+    end
+    if name == newName then
+        return true
+    end
+    if self:ConfigExists(newName) then
+        return false, newName .. " already exists"
+    end
+    local data, err = readConfig(self, name)
+    if not data then
+        return false, err
+    end
+    local ok
+    ok, err = writeConfig(self, newName, data)
+    if not ok then
+        return false, err
+    end
+    if type(delfile) == "function" then
+        pcall(delfile, configPath(self, name))
+    end
+    if self.LoadedConfig == name then
+        self.LoadedConfig = newName
+    end
+    if self.ConfigName == name then
+        self.ConfigName = newName
+    end
+    for _, scope in ipairs({ "Global", "Account" }) do
+        if self:GetAutoload(scope) == name then
+            self:SetAutoload(newName, scope)
+        end
+    end
+    self:_configChanged()
+    return true
+end
+
+function Window:ListConfigs()
+    local names = {}
+    if type(listfiles) ~= "function" or type(isfolder) ~= "function" or not isfolder(self.ConfigFolder) then
+        return names
+    end
+    local ok, paths = pcall(listfiles, self.ConfigFolder)
+    if not ok or type(paths) ~= "table" then
+        return names
+    end
+    for _, path in ipairs(paths) do
+        local name = path:match("([^/\\]+)%.json$")
+        if name then
+            table.insert(names, name)
+        end
+    end
+    table.sort(names, function(a, b)
+        return a:lower() < b:lower()
+    end)
+    return names
+end
+
+-- Puts every flagged element back to the value it was created with.
+function Window:ResetConfig(silent)
+    self._pendingFlags = {}
+    self:_withoutAutosave(function()
+        for _, element in pairs(Library.Flags) do
+            if element._defaultEntry and type(element.Set) == "function" then
+                pcall(deserializeFlag, element, element._defaultEntry, silent == true)
+            end
+        end
+    end)
+    self:_autoSave()
+    self:_configChanged()
+    return true
+end
+
+function Window:_autoSave()
+    if not self._autoSaveEnabled or self._destroyed or not self._autoSaveReady then
+        return
+    end
+    if self._autoSavePending then
+        return
+    end
+    self._autoSavePending = true
+    task.delay(0.5, function()
+        self._autoSavePending = false
+        if not self._destroyed and self._autoSaveEnabled then
+            self:SaveConfig(self.ConfigName)
+        end
+    end)
+end
+
+-- Share codes are the same JSON a config file holds.
 
 function Window:ExportConfig(name)
     local data, err
@@ -4732,15 +4984,36 @@ function Window:ExportConfig(name)
             return nil, err
         end
     else
-        data = collectFlags()
+        data = collectFlags(self)
+        name = self.LoadedConfig or self.ConfigName
     end
-    return SHARE_PREFIX .. base64Encode(HttpService:JSONEncode(data))
+    local ok, code = pcall(encodeConfig, self, name, data)
+    if not ok then
+        return nil, "could not encode config"
+    end
+    return code
 end
 
-function Window:ImportConfig(code, saveAs)
-    local data = decodeShareCode(code)
+-- Reads a code without applying it. Returns flags and { Folder, Name, Version }.
+function Window:DecodeConfig(code)
+    return decodeConfig(code)
+end
+
+-- saveAs: a name to save under, true for the name inside the code, or nil to
+-- only apply it. Codes made for another folder are refused unless force is set.
+function Window:ImportConfig(code, saveAs, force)
+    local data, info = decodeConfig(code)
     if not data then
-        return false, "invalid config code"
+        return false, info
+    end
+    if not force and info.Folder and info.Folder ~= self.ConfigFolder then
+        return false, "config is for " .. info.Folder
+    end
+    if saveAs == true then
+        saveAs = info.Name
+        if not validConfigName(saveAs) then
+            return false, "config has no usable name"
+        end
     end
     if saveAs then
         local ok, err = writeConfig(self, saveAs, data)
@@ -4754,7 +5027,7 @@ function Window:ImportConfig(code, saveAs)
         self.LoadedConfig = saveAs
     end
     self:_configChanged()
-    return true
+    return true, nil, saveAs
 end
 
 local function readText(path)
@@ -5939,6 +6212,10 @@ function Tab:ConfigManager(opts)
         { Name = "Set autoload", Callback = function() manager:SetAutoload() end },
         { Name = "Clear autoload", Callback = function() manager:ClearAutoload() end },
     })
+    host:ButtonRow({
+        { Name = "Rename", Callback = function() manager:Rename(nil, nameInput:Get()) end },
+        { Name = "Reset", Style = "Danger", Callback = function() manager:Reset() end },
+    })
     status = host:Label("loaded: none   |   autoload: none")
     modeList = host:Dropdown({
         Name = "Autoload mode",
@@ -6055,6 +6332,41 @@ function Tab:ConfigManager(opts)
         })
     end
 
+    function manager:Rename(name, newName)
+        name = name or pickedName()
+        if not name then
+            return
+        end
+        newName = trim(newName)
+        if newName == "" then
+            notify(false, "Name the config", "Type the new name in the name box")
+            return
+        end
+        if not validConfigName(newName) then
+            notify(false, "Invalid name", 'Names cannot contain \\ / : * ? " < > |')
+            return
+        end
+        local ok, err = window:RenameConfig(name, newName)
+        if ok then
+            nameInput:Set("")
+            select(newName)
+        end
+        notify(ok, ok and "Config renamed" or "Rename failed", ok and (name .. " -> " .. newName) or tostring(err))
+    end
+
+    function manager:Reset()
+        window:Confirm({
+            Title = "Reset settings",
+            Content = "Put every setting back to its default? Saved configs are not touched unless autosave is on.",
+            Icon = "rotate-ccw",
+            ConfirmText = "Reset",
+            Callback = function()
+                window:ResetConfig()
+                notify(true, "Settings reset", "Everything is back to its default")
+            end,
+        })
+    end
+
     function manager:SetAutoload(name)
         name = name or pickedName()
         if not name then
@@ -6111,22 +6423,49 @@ function Tab:ConfigManager(opts)
             notify(false, "Nothing to import", "Paste a config code first")
             return
         end
+        local data, info = window:DecodeConfig(code)
+        if not data then
+            notify(false, "Import failed", "Invalid config code")
+            return
+        end
+        -- The typed name wins; otherwise the code's own name, never overwriting a config.
         local saveAs = trim(nameInput:Get())
         if saveAs == "" then
             saveAs = nil
+            if validConfigName(info.Name) then
+                saveAs = info.Name
+                local index = 2
+                while window:ConfigExists(saveAs) do
+                    saveAs = ("%s (%d)"):format(info.Name, index)
+                    index += 1
+                end
+            end
         elseif not validConfigName(saveAs) then
             notify(false, "Invalid name", 'Names cannot contain \\ / : * ? " < > |')
             return
         end
-        local ok, err = window:ImportConfig(code, saveAs)
-        if ok then
-            codeInput:Set("")
-            if saveAs then
-                nameInput:Set("")
-                select(saveAs)
+        local function run()
+            local ok, err = window:ImportConfig(code, saveAs, true)
+            if ok then
+                codeInput:Set("")
+                if saveAs then
+                    nameInput:Set("")
+                    select(saveAs)
+                end
             end
+            notify(ok, ok and "Config imported" or "Import failed", ok and (saveAs or "Applied to current settings") or tostring(err))
         end
-        notify(ok, ok and "Config imported" or "Import failed", ok and (saveAs or "Applied to current settings") or (err == "invalid config code" and "Invalid config code" or tostring(err)))
+        if info.Folder and info.Folder ~= window.ConfigFolder then
+            window:Confirm({
+                Title = "Different script",
+                Content = ("This config was made for %s. Import it anyway? Only matching settings are applied."):format(info.Folder),
+                Icon = "triangle-alert",
+                ConfirmText = "Import",
+                Callback = run,
+            })
+            return
+        end
+        run()
     end
 
     local disconnect = window:OnConfigChanged(function()

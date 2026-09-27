@@ -787,7 +787,7 @@ Clicking the chip unfolds a popup out of it, floating over the window under the 
 | --- | --- |
 | `.Open` | Whether the popup is showing. |
 | `Set(value, skipCallback?)` | Select a value, or a list in multi mode. |
-| `Refresh(options, keepSelection?)` | Replace the rows. |
+| `Refresh(options, keepSelection?, skipCallback?)` | Replace the rows. A pick only counts while its option is in the list, so if the refresh changes the value (a config's saved picks becoming real options, or picks dropped), the callback runs with the new value. Saving keeps picks whose option is missing right now. |
 | `SetOpen(open)` | Show or hide the popup. |
 | `Get()` | The current selection. |
 
@@ -1045,27 +1045,39 @@ Window:LoadAutoload()
 The config manager is a groupbox with, from top to bottom:
 
 - a **config name** box and the config picker
-- **Create** / **Save**, **Load** / **Delete**, **Set autoload** / **Clear autoload**
+- **Create** / **Save**, **Load** / **Delete**, **Set autoload** / **Clear autoload**, **Rename** / **Reset**
 - a status line: `loaded: <name> | autoload: <name>`
 - **Autoload mode**: *All accounts* or *This account*
 - **Autosave loaded config**: when on, every flagged change is written into the loaded config half a second later
 - **Refresh list**
-- a **share** section: **Copy code** puts the current settings on the clipboard as a code, and **Import code** applies a pasted code. If the name box has text, the imported code is also saved under that name.
+- a **share** section: **Copy code** puts the current settings on the clipboard as a code, and **Import code** applies a pasted code and saves it. It's saved under the name in the name box, or else the name inside the code (with ` (2)`, ` (3)`... added rather than overwriting a config you already have).
 
-Save with nothing picked creates a config from the typed name. Names can't contain `\ / : * ? " < > |`. Call `LoadAutoload` after every element exists.
+Save with nothing picked creates a config from the typed name. **Rename** renames the picked config to the typed name and moves the loaded name and autoloads with it. **Reset** puts every flagged element back to the value it was created with, after a confirm. Names can't contain `\ / : * ? " < > |`.
 
-Share codes look like `airflow:eyJT...`: the config JSON in base64, so they paste cleanly into Discord.
+`LoadAutoload` can run before every element exists. Values for flags that no element has claimed yet are held and applied as soon as an element with that flag is created, and saving writes them back, so a config never loses settings for elements that only exist some of the time (a game-specific tab, say).
+
+### File format
+
+A config file and a share code are the same readable JSON, so a code is just the file's contents:
+
+```json
+{"Folder":"MyHub/Game","Name":"farm","Version":1,"Config":"{\"AutoFarm\":{\"Value\":true,\"Type\":\"Toggle\"},\"Speed\":{\"Value\":40,\"Type\":\"Slider\"},\"EspColor\":{\"Value\":{\"Hex\":\"ff5a5a\"},\"Type\":\"ColorPicker\"},\"Targets\":{\"Value\":[\"Boss\",\"Mob\"],\"Type\":\"Dropdown\"},\"Pick\":{\"Type\":\"Dropdown\"}}"}
+```
+
+- `Folder` is the window's `FolderName`. Importing a code made for another folder asks first, and then only applies the flags that match by name and type.
+- `Config` is the flags as their own JSON string. Each flag is `{ "Value": ..., "Type": ... }`. Colours are `{ "Hex": "rrggbb" }`, keybinds are key names (`"RightShift"`), and a dropdown with nothing picked has no `Value`.
+- Old `airflow:...` base64 codes and older config files (bare flag tables, colours as RGB arrays) still load, and are rewritten in the new format on the next save.
 
 The autoload mode and autosave switch live in `<folder>/configsettings.txt`, apart from the configs, so loading a config never flips them. *This account* keeps the autoload in `autoload_<UserId>.txt`, so other accounts on the same PC don't load it. Switching modes moves the current autoload across.
 
-Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as RGB components.
+Requires `writefile` / `readfile`.
 
 ### Properties
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Enabled` | boolean | `true` | Default for **Autosave loaded config**. The saved switch wins after the first change. |
-| `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. |
+| `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. Can be nested, like `"MyHub/Game"`; missing folders are made. |
 | `FileName` | string | `"default"` | Config used when no name is given, and the autosave target before anything is loaded. |
 
 `CreateConfigManager` takes `Name`, `Icon`, `Side` and `Placeholder`. Called on a groupbox it adds its rows there instead of making its own.
@@ -1077,15 +1089,19 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 | `Window:SaveConfig(name?)` | Write `<folder>/<name>.json`. Returns `ok, err`. |
 | `Window:LoadConfig(name?, skipCallbacks?)` | Apply a saved config and mark it loaded. |
 | `Window:DeleteConfig(name)` | Remove the file. |
-| `Window:ListConfigs()` | Sorted list of saved names. |
+| `Window:RenameConfig(name, newName)` | Rename a config, carrying the loaded name and autoloads along. Refuses to overwrite. |
+| `Window:ConfigExists(name)` | Whether `<folder>/<name>.json` exists. |
+| `Window:ResetConfig(skipCallbacks?)` | Put every flagged element back to its starting value. |
+| `Window:ListConfigs()` | Saved names, sorted without regard to case. |
 | `Window.LoadedConfig` | Name of the loaded config, or `nil`. |
-| `Window:ExportConfig(name?)` | Share code for a saved config, or for the current settings when `name` is `nil`. |
-| `Window:ImportConfig(code, saveAs?)` | Apply a share code, and save it as `saveAs` if given. Returns `ok, err`. |
+| `Window:ExportConfig(name?)` | Share code (the config JSON) for a saved config, or for the current settings when `name` is `nil`. |
+| `Window:DecodeConfig(code)` | Read a code without applying it. Returns `flags, { Folder, Name, Version }`, or `nil, err`. |
+| `Window:ImportConfig(code, saveAs?, force?)` | Apply a code. `saveAs` is a name, `true` for the name inside the code, or `nil` to only apply it. Codes for another `Folder` fail unless `force`. Returns `ok, err, savedName`. |
 | `Window:SetAutoload(name?, scope?)` / `GetAutoload(scope?)` / `LoadAutoload(skipCallbacks?)` | The config loaded on start. `nil` clears it. `scope` is `"Global"` or `"Account"`, defaulting to the current mode. |
 | `Window:SetAutoloadMode(mode)` / `GetAutoloadMode()` | `"Global"` (all accounts) or `"Account"` (this account). |
 | `Window:SetConfigAutosave(enabled)` / `GetConfigAutosave()` | The autosave switch. Saved between sessions. |
 | `Window:OnConfigChanged(fn)` | Runs `fn` after a load, delete, import or autoload change. Returns a disconnect function. |
-| `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / SetAutoload / ClearAutoload / ToggleAutoload / SetAutoloadMode / Export / Import / Refresh`. |
+| `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / Rename / Reset / SetAutoload / ClearAutoload / ToggleAutoload / SetAutoloadMode / Export / Import / Refresh`. |
 
 ---
 
