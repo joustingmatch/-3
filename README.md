@@ -51,9 +51,11 @@ local Window = Airflow:CreateWindow({
 Window:Toggle(false)
 ```
 
-Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. It scales itself down on small screens and stays inside the viewport.
+Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport.
 
-The bottom of the sidebar shows the player's headshot, display name and the current game. Clicking it opens the home tab.
+The button in the top-right minimizes the window: it folds into a small floating bar with the logo, the current tab, how many toggles are on, and up to three pinned [statuses](#status) with live values. Drag the bar anywhere; click it (or press the hide key) and it unfolds back into the window. The bar remembers where you left it.
+
+The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
 
 ### Properties
 
@@ -78,6 +80,7 @@ The bottom of the sidebar shows the player's headshot, display name and the curr
 | `Loading.Duration` | number | `1.6` | Seconds before the window appears. |
 | `ConfigurationSaving` | table | — | See [Configs](#configs). |
 | `Home` | boolean \| table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
+| `Theme` | string \| table | — | Theme applied before the window is built. See [Theme](#theme). |
 | `Parent` | Instance | `gethui()` / CoreGui | Where the ScreenGui goes. Falls back to PlayerGui. |
 
 ### Handle
@@ -89,7 +92,9 @@ The bottom of the sidebar shows the player's headshot, display name and the curr
 | `.Tabs` | Array of tabs. |
 | `.Home` | The home tab, unless `Home = false`. |
 | `.SearchBox` | The search TextBox. |
-| `Toggle(open?)` | Show, hide, or flip. |
+| `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
+| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the floating bar and back. |
+| `.Minimized` / `.MiniBar` | Whether it's minimized, and the bar itself. |
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
@@ -346,6 +351,61 @@ Label:Set("Players: 13")
 
 ---
 
+## Status
+
+> Read-only key and value lines, in six styles. Built for groupboxes.
+
+```lua
+local Floor = Group:CreateStatus({ Name = "Floor", Value = 1, Pin = true })
+Floor:Set(2)
+
+Group:CreateStatus({ Name = "Exp", Value = "7859/10740", Style = "Bar" })
+Group:CreateStatus({ Name = "Server", Value = "Healthy", Style = "Badge", Tone = "Success" })
+Group:CreateStatus({ Name = "Bot", Style = "Dot", Update = function()
+    return "Farming", "Success"
+end })
+
+local Run = Group:CreateStatuses({ "Points", "Hearts", "Map" }, { Style = "Row" })
+Run.Hearts:Set(3)
+```
+
+| Style | Looks like |
+| --- | --- |
+| `Plain` | `Floor: 3`, muted key then the value. The default. |
+| `Row` | Key on the left, value on the right. |
+| `Badge` | Value in a pill tinted by `Tone`. |
+| `Dot` | A pulsing dot tinted by `Tone`, then key and value. |
+| `Bar` | Key and `current / max` with a progress bar. `"7859/10740"` strings, `Set(current, max)`, or a 0–1 number all work. |
+| `Stat` | Small key over a large value. |
+
+A changed value flashes the accent colour briefly. With `Update`, the function runs every `UpdateRate` seconds: its first return is the value, and a second return sets the max (a number) or the tone (a string).
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | The key. |
+| `Value` | any | `"-"` shown | The value. `nil` shows `Placeholder`. |
+| `Style` | string | `"Plain"` | See above. |
+| `Tone` | string | `"Accent"` | Any theme colour name: `"Success"`, `"Warning"`, `"Error"`, `"Muted"`… |
+| `Max` | number | — | Max for `Bar`. |
+| `Prefix` / `Suffix` | string | — | Text around the value. |
+| `Placeholder` | string | `"-"` | Shown while the value is `nil`. |
+| `Update` / `UpdateRate` | function / number | — / `1` | Refresh on a timer. |
+| `Pin` | boolean | `false` | Also show it on the minimized bar. |
+| `Pulse` / `Flash` | boolean | `true` | The `Dot` pulse and the change flash. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `Set(value, max?)` / `Get()` | Change or read the value. |
+| `SetTone(tone)` / `SetName(name)` | Recolour or rename. |
+| `SetUpdateRate(seconds)` | When `Update` is set. |
+| `Tab:CreateStatuses(entries, shared?)` | Several at once. Entries are names or option tables; `shared` fills missing options. Returns the handles by name. |
+
+---
+
 ## Paragraph
 
 > A card with a heading and wrapped body text.
@@ -407,6 +467,21 @@ Button:SetText("Respawn")
 | Member | Description |
 | --- | --- |
 | `SetText(text)` | Replace the label. |
+
+---
+
+## Button Row
+
+> Equal-width buttons side by side.
+
+```lua
+Group:CreateButtonRow({
+    { Name = "Save", Callback = function() end },
+    { Name = "Load", Callback = function() end },
+})
+```
+
+Each entry takes `Name`, `Callback` and `Style = "Primary"`. The handle has `SetText(index, text)` and `.Buttons`.
 
 ---
 
@@ -585,26 +660,25 @@ Progress:Set(0.5)
 
 ## Dropdown
 
-> Pick one option, or several.
+> Pick one option, or several, from a searchable popup.
 
 ```lua
 local Dropdown = Tab:CreateDropdown({
-    Name = "Camera mode",
-    Desc = "Applied to the current camera",
-    Options = { "Classic", "Follow", "Orbital", "Track" },
-    CurrentOption = "Classic",
-    MultipleOptions = false,
-    SearchAfter = 6,
-    Flag = "CameraMode",
-    Callback = function(Option)
-        print("Camera mode:", Option)
+    Name = "Mobs",
+    Desc = "Farmed in order",
+    Options = { "T1", "T2", "T3" },
+    CurrentOption = { "T1" },
+    MultipleOptions = true,
+    Flag = "Mobs",
+    Callback = function(Options)
+        print("Mobs:", table.concat(Options, ", "))
     end,
 })
 
-Dropdown:Set("Follow")
+Dropdown:Set({ "T1", "T3" })
 ```
 
-Clicking the selected row unchecks it. Lists longer than `SearchAfter` get a search box.
+Clicking the chip unfolds a popup out of it, floating over the window under the chip, or above it when there's no room below. It follows the window while open and closes on an outside click, `Esc`, a tab switch, or when its row scrolls out of view. The popup has a search box, **Select all** / **Clear all** in multi mode, and flat rows with square checkboxes that highlight on hover. Select all only picks the rows matching the search. Clicking a selected row unchecks it.
 
 ### Properties
 
@@ -615,7 +689,13 @@ Clicking the selected row unchecks it. Lists longer than `SearchAfter` get a sea
 | `Options` | table | `{}` | The rows. |
 | `CurrentOption` | string \| table | — | The initial selection. A table in multi mode. |
 | `MultipleOptions` | boolean | `false` | Rows toggle independently and the callback receives a list. |
-| `SearchAfter` | number | `6` | Row count that turns the search box on. |
+| `Searchable` | boolean | `true` | Show the search box. |
+| `SearchAfter` | number | `0` | Only show search when there are more rows than this. |
+| `MaxRows` | number | `6` | Rows visible before the list scrolls. |
+| `NoneText` | string | `"None"` | Chip text with nothing selected. |
+| `EmptyText` | string | `"None"` | Chip text when there are no options. |
+| `AllowNone` | boolean | `true` | `false` stops a single dropdown from unchecking its value. |
+| `PopupWidth` | number | `210` | Minimum popup width. It grows to the chip width. |
 | `Flag` | string | — | The save key. |
 | `Callback` | function | — | Runs with the selection on every change. `nil` when unchecked. |
 
@@ -623,10 +703,10 @@ Clicking the selected row unchecks it. Lists longer than `SearchAfter` get a sea
 
 | Member | Description |
 | --- | --- |
-| `.Open` | Whether the list is expanded. |
+| `.Open` | Whether the popup is showing. |
 | `Set(value, skipCallback?)` | Select a value, or a list in multi mode. |
 | `Refresh(options, keepSelection?)` | Replace the rows. |
-| `SetOpen(open)` | Expand or collapse. |
+| `SetOpen(open)` | Show or hide the popup. |
 | `Get()` | The current selection. |
 
 ---
@@ -864,7 +944,7 @@ Toggles, sliders, steppers, dropdowns, inputs, keybinds and colour pickers creat
 
 ## Configs
 
-> Save every flagged element to a file and load it back.
+> Save every flagged element to a file, load it back, and pick one to autoload.
 
 ```lua
 local Window = Airflow:CreateWindow({
@@ -872,12 +952,17 @@ local Window = Airflow:CreateWindow({
     ConfigurationSaving = { Enabled = true, FolderName = "MyHub", FileName = "default" },
 })
 
--- create tabs and elements
+local Settings = Window:CreateTab({ Name = "Settings", Icon = "settings" })
+Settings:CreateConfigManager({ Name = "Configs", Side = "Left" })
 
-Window:LoadConfig()
+-- create the rest of your tabs and elements
+
+Window:LoadAutoload()
 ```
 
-Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as RGB components. Call `LoadConfig` after every element exists.
+The config manager is a groupbox with a name box and **Create**, a **Config** picker, **Save** / **Load**, **Delete** / **Set Autoload**, and a line showing the current autoload. Pressing Set Autoload on the config that already autoloads clears it. Call `LoadAutoload` after every element exists.
+
+Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as RGB components.
 
 ### Properties
 
@@ -887,6 +972,8 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 | `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. |
 | `FileName` | string | `"default"` | Config used when no name is given. |
 
+`CreateConfigManager` takes `Name`, `Icon`, `Side` and `Placeholder`. Called on a groupbox it adds its rows there instead of making its own.
+
 ### Handle
 
 | Member | Description |
@@ -895,7 +982,8 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 | `Window:LoadConfig(name?, skipCallbacks?)` | Apply a saved config. |
 | `Window:DeleteConfig(name)` | Remove the file. |
 | `Window:ListConfigs()` | Sorted list of saved names. |
-| `Tab:CreateConfigManager({ Name })` | Name input, saved-config dropdown, Save / Load / Delete and an auto-save toggle. Returns `Save / Load / Delete / Refresh`. |
+| `Window:SetAutoload(name?)` / `GetAutoload()` / `LoadAutoload(skipCallbacks?)` | The config loaded on start. `nil` clears it. |
+| `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / ToggleAutoload / Refresh`. |
 
 ---
 
@@ -952,22 +1040,17 @@ Call it before `CreateWindow`. The TTFs are saved to the folder on first run and
 
 ## Theme
 
-> Colours, fonts and assets. Change them before creating a window.
+> Colours, fonts and assets. Themes switch live: every themed colour in the window fades to the new one.
 
 ```lua
-Airflow.Theme.Background = Color3.fromRGB(20, 16, 20)
-Airflow.Theme.Surface = Color3.fromRGB(24, 19, 24)
-Airflow.Theme.Surface2 = Color3.fromRGB(28, 22, 28)
-Airflow.Theme.Surface3 = Color3.fromRGB(42, 36, 43)
-Airflow.Theme.Stroke = Color3.fromRGB(40, 32, 41)
-Airflow.Theme.StrokeHover = Color3.fromRGB(88, 70, 90)
-Airflow.Theme.Accent = Color3.fromRGB(235, 199, 246)
-Airflow.Theme.AccentDark = Color3.fromRGB(24, 18, 26)
-Airflow.Theme.Text = Color3.fromRGB(233, 229, 234)
-Airflow.Theme.Muted = Color3.fromRGB(125, 115, 126)
-Airflow.Theme.Success = Color3.fromRGB(150, 220, 170)
-Airflow.Theme.Warning = Color3.fromRGB(240, 176, 108)
-Airflow.Theme.Error = Color3.fromRGB(240, 120, 120)
+Airflow:SetTheme("Midnight")
+Airflow:SetTheme({ Accent = Color3.fromRGB(128, 160, 246), Background = "#0F121A" })
+
+local Window = Airflow:CreateWindow({ Name = "Airflow", Theme = "Ocean" })
+
+Settings:CreateThemeManager({ Name = "Themes", Side = "Right" })
+
+Airflow.ThemePresets.Neon = { Accent = Color3.fromRGB(0, 255, 170) }
 
 local Family = "rbxasset://fonts/families/BuilderSans.json"
 Airflow.Fonts.Regular = Font.new(Family, Enum.FontWeight.Regular)
@@ -979,21 +1062,36 @@ Airflow.Assets.Glow = "rbxassetid://8992230677"
 Airflow.Assets.Shadow = "rbxassetid://6014261993"
 ```
 
+Presets: `Airflow` (default), `Midnight`, `Ocean`, `Rose`, `Emerald`, `Amber`, `Mono`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
+
+The theme manager is a groupbox with a **Preset** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). The default theme, a preset or a saved one, is applied when the window is created. Themes are saved in `<config folder>/themes`.
+
 ### Properties
 
 | Name | Used for |
 | --- | --- |
 | `Background` | Window, toast and dialog fill. |
-| `Surface` | Chips, text boxes, option rows. |
-| `Surface2` | Element cards, selected tab. |
-| `Surface3` | Toggle pill off, tracks. |
+| `Surface` | Chips, text boxes, popups. |
+| `Surface2` | Element cards, groupboxes, option rows. |
+| `Surface3` | Toggle pill off, tracks, buttons, selected tab. |
 | `Stroke` | Outlines at rest. |
 | `StrokeHover` | Outlines on hover, focus, open. |
-| `Accent` | Highlights, primary buttons, indicator, progress bars. |
+| `Accent` | Highlights, primary buttons, checkboxes, progress bars. |
 | `AccentDark` | Text on accent surfaces. |
 | `Text` / `Muted` | Primary and secondary text. |
 | `Success` / `Warning` / `Error` | Notification title tints. |
 | `Fonts.Regular` / `Medium` / `Bold` | Body text / titles and chips / emphasis. |
-| `Assets.Logo` / `Glow` / `Shadow` | Header mark, glow decal, drop shadow. |
+| `Assets.Logo` / `Glow` / `Shadow` | Sidebar mark, glow decal, drop shadow. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `Airflow:SetTheme(nameOrTable, instant?)` | Apply a preset or colours live. |
+| `Airflow:GetTheme()` | Copy of the current colours. |
+| `Airflow.ThemePresets` | The presets, by name. Add your own. |
+| `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
+| `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | Theme applied on start. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
