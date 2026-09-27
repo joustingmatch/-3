@@ -74,6 +74,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
+| `Transparent` | boolean | `false` | See-through window body and sidebar. |
 | `DragSkeleton` | boolean | `true` | While dragging, an accent outline follows the pointer and the window glides into it on release. `false` drags the window itself. |
 | `OpenButton` | boolean \| table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
@@ -85,6 +86,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Backdrop.Weather` | string | `"Snow"` | `"Snow"`, `"Rain"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
 | `Backdrop.Tint` | number | `0.45` | Tint strength, `0` to `1`. |
 | `Backdrop.Dim` | boolean | `true` | `false` starts with the tint off and only the weather showing. |
+| `Backdrop.Mode` | string | `"Screen"` | `"Screen"` drifts the weather across the whole screen, `"UI"` keeps it inside the window behind its content. |
 | `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
 | `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
@@ -124,6 +126,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetDragSkeleton(enabled)` | Turn the drag outline on or off. |
+| `SetTransparent(enabled)` / `.Transparent` | See-through window on or off. |
+| `SetWeatherMode(mode)` / `.WeatherMode` | `"Screen"` or `"UI"`. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
 | `SelectTab(tab)` | Switch tabs from code. |
 | `CreateTab(opts)` | See [Tab](#tab). |
@@ -1235,6 +1239,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle). |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.

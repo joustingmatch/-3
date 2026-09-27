@@ -3539,6 +3539,7 @@ function Library.Window(_, opts)
         Parent = root,
     })
     self.Shadow = shadow
+    self._shadowRest = 0.6
 
     -- The body is a plain Frame so resizing never re-renders the window into a
     -- texture. It only moves into the fader CanvasGroup while fading.
@@ -3580,6 +3581,7 @@ function Library.Window(_, opts)
         BorderSizePixel = 0,
         Parent = body,
     })
+    self.Sidebar = sidebar
     corner(sidebar, UDim.new(0, 12))
     stroke(sidebar, Theme.Stroke)
     local railGradient = create("UIGradient", { Rotation = 90, Parent = sidebar })
@@ -3817,6 +3819,9 @@ function Library.Window(_, opts)
     end))
 
     self.DragSkeleton = opts.DragSkeleton ~= false
+    if opts.Transparent then
+        self:SetTransparent(true)
+    end
     self:_enableDrag()
     self.MaxSize = opts.MaxSize
     self.KeepOnScreen = opts.KeepOnScreen ~= false
@@ -4135,6 +4140,19 @@ end
 
 function Window:SetDragSkeleton(enabled)
     self.DragSkeleton = enabled ~= false
+end
+
+-- See-through window: the body and sidebar let the game show through, and the
+-- shadow lightens so it doesn't smudge behind them.
+function Window:SetTransparent(enabled)
+    self.Transparent = enabled == true
+    local on = self.Transparent
+    self._shadowRest = on and 0.85 or 0.6
+    tween(self.Body, { BackgroundTransparency = on and 0.35 or 0 }, 0.25)
+    tween(self.Sidebar, { BackgroundTransparency = on and 0.3 or 0 }, 0.25)
+    if self.Open and not self.Minimized and self.Root.Visible then
+        tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.25)
+    end
 end
 
 local function orderedChildren(parent)
@@ -7023,12 +7041,43 @@ function Tab:ThemeManager(opts)
             end,
         })
     end
+    if window._backdrop and opts.Weather ~= false then
+        host:Dropdown({
+            Name = "Weather Mode",
+            Options = { "Screen", "UI" },
+            Default = window.WeatherMode,
+            AllowNone = false,
+            Callback = function(mode)
+                if mode then
+                    window:SetWeatherMode(mode)
+                end
+            end,
+        })
+    end
     if window._backdrop and opts.Dim ~= false then
         host:Toggle({
             Name = "Dim",
             Default = window._backdropDim,
             Callback = function(value)
                 window:SetDim(value)
+            end,
+        })
+    end
+    if opts.Transparent ~= false then
+        host:Toggle({
+            Name = "Transparent",
+            Default = window.Transparent == true,
+            Callback = function(value)
+                window:SetTransparent(value)
+            end,
+        })
+    end
+    if opts.DragSkeleton ~= false then
+        host:Toggle({
+            Name = "Drag Skeleton",
+            Default = window.DragSkeleton,
+            Callback = function(value)
+                window:SetDragSkeleton(value)
             end,
         })
     end
@@ -9807,6 +9856,15 @@ local WEATHER_NAMES = {
 local RAIN_STREAK = Vector2.new(7 / 420, 151 / 263)
 local weatherRandom = Random.new()
 
+-- "UI" keeps the weather inside the window, behind its content; anything
+-- else drifts it across the whole screen.
+local function weatherMode(mode)
+    if type(mode) == "string" and ({ ui = true, window = true, inside = true })[mode:lower()] then
+        return "UI"
+    end
+    return "Screen"
+end
+
 local function weatherName(name)
     if type(name) ~= "string" then
         return "None"
@@ -9912,6 +9970,8 @@ function Window:_buildBackdrop(opts)
         Transparency = NumberSequence.new(1, 0),
         Parent = heat,
     })
+    -- Holds the heat and the particles so both move together between the
+    -- screen and the window.
     local field = create("Frame", {
         Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
@@ -9919,6 +9979,7 @@ function Window:_buildBackdrop(opts)
         ZIndex = 2,
         Parent = layer,
     })
+    heat.Parent = field
     self._backdrop = layer
     self._backdropTintFrame = tint
     self._backdropHeat = heat
@@ -9934,10 +9995,20 @@ function Window:_buildBackdrop(opts)
     self._weatherDensity = math.clamp(tonumber(opts.Density) or 1, 0, 3)
     self._weatherSpeed = math.clamp(tonumber(opts.Speed) or 1, 0.1, 3)
     self.Weather = weatherName(opts.Weather == nil and "Snow" or opts.Weather)
+    self.WeatherMode = "Screen"
+    self:SetWeatherMode(opts.Mode)
     self:_rebuildWeather()
     table.insert(self._frameSteps, function(deltaTime)
         self:_stepBackdrop(deltaTime)
     end)
+end
+
+-- The area the particles cover, in the field's own (unscaled) units.
+function Window:_weatherSize()
+    if self.WeatherMode == "UI" then
+        return Vector2.new(self.Root.Size.X.Offset, self.Root.Size.Y.Offset)
+    end
+    return self.Gui.AbsoluteSize
 end
 
 function Window:_rebuildWeather()
@@ -9949,8 +10020,10 @@ function Window:_rebuildWeather()
     if not definition then
         return
     end
-    local size = self.Gui.AbsoluteSize
-    for _ = 1, math.floor(definition.Count * self._weatherDensity + 0.5) do
+    local size = self:_weatherSize()
+    -- The window is a fraction of the screen, so it gets fewer particles.
+    local count = definition.Count * self._weatherDensity * (self.WeatherMode == "UI" and 0.45 or 1)
+    for _ = 1, math.floor(count + 0.5) do
         local particle = {
             Label = create("ImageLabel", {
                 AnchorPoint = Vector2.new(0.5, 0.5),
@@ -9981,6 +10054,7 @@ function Window:_stepBackdrop(deltaTime)
     self._backdropFade = fade
     if fade <= 0 then
         self._backdrop.Visible = false
+        self._weatherField.Visible = false
         return
     end
     local eased = 1 - (1 - fade) ^ 3
@@ -10002,7 +10076,7 @@ function Window:_stepBackdrop(deltaTime)
     local kick = self._weatherKick
     self._weatherKick = math.max(kick - deltaTime * 1.3, 0)
     local speed = self._weatherSpeed * (1 + kick * kick * 2.5)
-    local size = self.Gui.AbsoluteSize
+    local size = self:_weatherSize()
     local width, height = size.X, size.Y
     for _, particle in ipairs(self._weatherParticles) do
         particle.Time += deltaTime
@@ -10041,8 +10115,9 @@ function Window:_refreshBackdrop(gust)
     local shown = self._backdropEnabled and self._introDone and self.Open and not self.Minimized and not self._destroyed
     if shown and not self._backdropShown then
         self._backdrop.Visible = true
+        self._weatherField.Visible = true
         if self._backdropFade <= 0 then
-            local size = self.Gui.AbsoluteSize
+            local size = self:_weatherSize()
             for _, particle in ipairs(self._weatherParticles) do
                 seedParticle(self.Weather, particle, size.X, size.Y, true)
             end
@@ -10075,6 +10150,30 @@ function Window:SetDim(enabled)
         return
     end
     self._backdropDim = enabled ~= false
+end
+
+function Window:SetWeatherMode(mode)
+    if not self._backdrop then
+        return
+    end
+    mode = weatherMode(mode)
+    local field = self._weatherField
+    if mode == "UI" then
+        -- Under everything else in the body: sidebar, content and glows.
+        field.ZIndex = 0
+        field.Parent = self.Body
+    else
+        field.ZIndex = 2
+        field.Parent = self._backdrop
+    end
+    if mode == self.WeatherMode then
+        return
+    end
+    self.WeatherMode = mode
+    self:_rebuildWeather()
+    if self._backdropShown then
+        self._weatherKick = 1
+    end
 end
 
 function Window:SetWeather(name)
@@ -10679,7 +10778,7 @@ function Window:Restore()
     tween(ghost, { BackgroundTransparency = 0 }, 0.1, Enum.EasingStyle.Quad)
     tween(ghostStroke, { Transparency = 0 }, 0.1, Enum.EasingStyle.Quad)
     morphGhost(ghost, ghostCorner, target, size, 10, 0.4)
-    tween(self.Shadow, { ImageTransparency = 0.6 }, 0.45)
+    tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.45)
 
     -- Shown under the ghost a little early so its first frames are drawn
     -- while still covered, then the ghost clears to reveal it.
@@ -10748,7 +10847,7 @@ function Window:Toggle(open)
         tween(ghost, { BackgroundTransparency = 0 }, 0.12, Enum.EasingStyle.Quad)
         tween(ghostStroke, { Transparency = 0 }, 0.12, Enum.EasingStyle.Quad)
         morphGhost(ghost, ghostCorner, centre - size / 2, size, 10, 0.3)
-        tween(self.Shadow, { ImageTransparency = 0.6 }, 0.3)
+        tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.3)
         -- Shown under the ghost once it covers the spot, then revealed.
         task.delay(0.2, function()
             if self._minimizeGeneration ~= generation or self._destroyed then
@@ -11451,15 +11550,6 @@ Interface:CreateDropdown({
     Flag = "ToggleButtonPlatform",
     Callback = function(Option)
         Window:SetToggleButtonPlatform(Option == "Mobile & PC" and "Both" or "Mobile")
-    end,
-})
-
-Interface:CreateToggle({
-    Name = "Drag Skeleton",
-    CurrentValue = true,
-    Flag = "DragSkeleton",
-    Callback = function(Value)
-        Window:SetDragSkeleton(Value)
     end,
 })
 
