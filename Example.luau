@@ -10211,7 +10211,11 @@ end
 -- unfolds back into the window from wherever the box was dragged.
 
 local MINI_WIDTH = 220
+local MINI_MIN_WIDTH = 180
+local MINI_MAX_WIDTH = 420
 local MAX_PINNED = 3
+local MINI_MAX_PINNED = 8
+local MINI_ROW_STEP = 22 -- one pinned status row plus its gap
 
 -- The morph is carried by a plain "ghost" panel drawn over the window. The
 -- window body itself never moves or fades, so nothing has to be laid out
@@ -10260,8 +10264,13 @@ function Window:_buildMiniBar()
         return self.MiniBar
     end
     local gui = self.Gui
+    local function fitWidth(width)
+        local room = math.max(gui.AbsoluteSize.X - 16, MINI_MIN_WIDTH)
+        return math.floor(math.clamp(width, MINI_MIN_WIDTH, math.min(MINI_MAX_WIDTH, room)) + 0.5)
+    end
+    self._miniWidth = fitWidth(self._miniWidth or MINI_WIDTH)
     local bar = create("CanvasGroup", {
-        Size = UDim2.fromOffset(MINI_WIDTH, 0),
+        Size = UDim2.fromOffset(self._miniWidth, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
@@ -10493,6 +10502,98 @@ function Window:_buildMiniBar()
     })
     local barScale = create("UIScale", { Parent = bar })
     self._miniScale = barScale
+
+    -- Resize grip over the bottom-right bracket: sideways sets the width,
+    -- up and down sets how many pinned statuses fit. Bigger on touch.
+    local gripSize = TOUCH and 36 or 24
+    local grip = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.fromScale(1, 1),
+        Size = UDim2.fromOffset(gripSize, gripSize),
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 6,
+        Parent = bar,
+    })
+    grip:SetAttribute("NoDrag", true)
+    local gripBrackets = { brackets[7], brackets[8] }
+    local resizingMini = false
+    local gripHovered = false
+    local function lightGrip(on)
+        for index, bracket in ipairs(gripBrackets) do
+            tween(bracket, {
+                BackgroundTransparency = on and 0 or 0.35,
+                Size = index == 1 and UDim2.fromOffset(on and 14 or 10, 2) or UDim2.fromOffset(2, on and 14 or 10),
+            }, 0.15)
+        end
+    end
+    if TOUCH then
+        lightGrip(true)
+    end
+    grip.MouseEnter:Connect(function()
+        gripHovered = true
+        lightGrip(true)
+    end)
+    grip.MouseLeave:Connect(function()
+        gripHovered = false
+        if not resizingMini and not TOUCH then
+            lightGrip(false)
+        end
+    end)
+    local resizeStartPointer = Vector2.zero
+    local resizeStartWidth = 0
+    local resizeStartCapacity = MAX_PINNED
+    grip.InputBegan:Connect(function(input)
+        if not isPress(input) or not self.Minimized then
+            return
+        end
+        resizingMini = true
+        resizeStartPointer = pointerPosition()
+        resizeStartWidth = bar.Size.X.Offset
+        resizeStartCapacity = self._miniCapacity or MAX_PINNED
+        lightGrip(true)
+    end)
+    table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
+        if not resizingMini or not isMove(input) then
+            return
+        end
+        if not self.Minimized then
+            resizingMini = false
+            return
+        end
+        local delta = (pointerPosition() - resizeStartPointer) / barScale.Scale
+        local left = bar.AbsolutePosition.X - gui.AbsolutePosition.X
+        local room = gui.AbsoluteSize.X - left - 8
+        local width = math.min(fitWidth(resizeStartWidth + delta.X), math.max(room, MINI_MIN_WIDTH))
+        if width ~= bar.Size.X.Offset then
+            bar.Size = UDim2.fromOffset(width, 0)
+            self._miniWidth = width
+        end
+        local capacity = math.clamp(resizeStartCapacity + math.floor(delta.Y / MINI_ROW_STEP + 0.5), 1, MINI_MAX_PINNED)
+        if capacity ~= (self._miniCapacity or MAX_PINNED) then
+            self._miniCapacity = capacity
+            self:_refreshMini()
+        end
+    end))
+    table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
+        if resizingMini and isPress(input) then
+            resizingMini = false
+            if not gripHovered and not TOUCH then
+                lightGrip(false)
+            end
+            -- A taller box may now hang off the bottom edge.
+            local position = bar.AbsolutePosition - gui.AbsolutePosition
+            local clamped = Vector2.new(
+                math.clamp(position.X, 8, math.max(gui.AbsoluteSize.X - bar.AbsoluteSize.X - 8, 8)),
+                math.clamp(position.Y, 8, math.max(gui.AbsoluteSize.Y - bar.AbsoluteSize.Y - 8, 8))
+            )
+            if clamped ~= position then
+                tween(bar, { Position = UDim2.fromOffset(clamped.X, clamped.Y) }, 0.25, Enum.EasingStyle.Quint)
+                self._miniPosition = clamped
+            end
+        end
+    end))
     hit.MouseEnter:Connect(function()
         tween(barStroke, { Color = Theme.StrokeHover }, 0.15)
         tween(expand, { BackgroundTransparency = 0.1 }, 0.15)
@@ -10510,16 +10611,25 @@ function Window:_buildMiniBar()
         tween(expandIcon, { ImageColor3 = Theme.Muted }, 0.25)
         tween(barScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
         for _, bracket in ipairs(brackets) do
-            tween(bracket, { BackgroundTransparency = 0.35 }, 0.25)
+            if not (TOUCH or gripHovered or resizingMini) or not table.find(gripBrackets, bracket) then
+                tween(bracket, { BackgroundTransparency = 0.35 }, 0.25)
+            end
         end
     end
     hit.MouseLeave:Connect(unhover)
-    self._miniUnhover = unhover
+    self._miniUnhover = function()
+        gripHovered = false
+        resizingMini = false
+        unhover()
+        if not TOUCH then
+            lightGrip(false)
+        end
+    end
 
     local dragging, moved = false, false
     local grab = Vector2.zero
     hit.InputBegan:Connect(function(input)
-        if isPress(input) then
+        if isPress(input) and not resizingMini and not pointInside(pointerPosition(), grip) then
             dragging = true
             moved = false
             grab = pointerPosition() - bar.AbsolutePosition
@@ -10596,7 +10706,7 @@ function Window:_buildMiniBar()
                 table.insert(list, handle)
             end
         end
-        local shown = math.min(#list, MAX_PINNED)
+        local shown = math.min(#list, self._miniCapacity or MAX_PINNED)
         pinnedDivider.Visible = shown > 0
         pinned.Visible = shown > 0
         for index = 1, math.max(shown, #chips) do
@@ -10639,6 +10749,10 @@ function Window:_buildMiniBar()
 
     -- Keep the bar reachable when the screen shrinks or rotates.
     table.insert(self._connections, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        local width = fitWidth(self._miniWidth)
+        if width ~= bar.Size.X.Offset then
+            bar.Size = UDim2.fromOffset(width, 0)
+        end
         if not bar.Visible then
             return
         end
