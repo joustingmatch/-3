@@ -975,6 +975,54 @@ function Tab:Section(text)
 end
 
 function Tab:Divider(opts)
+    local caption = type(opts) == "table" and (opts.Text or opts.Name) or type(opts) == "string" and opts or nil
+    if caption then
+        -- A centred caption with a rule on each side.
+        local inset = metricsOf(self).Compact and 14 or 2
+        local holder = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 18),
+            BackgroundTransparency = 1,
+            LayoutOrder = self:_nextOrder(),
+            Parent = self.List,
+        })
+        local text_ = label({
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(0, 0, 0, 14),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Text = caption,
+            TextSize = 11,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextTruncate = Enum.TextTruncate.None,
+            Parent = holder,
+        })
+        padding(text_, 8, 8)
+        local rules = {}
+        for index, anchor in ipairs({ 0, 1 }) do
+            rules[index] = create("Frame", {
+                AnchorPoint = Vector2.new(anchor, 0.5),
+                Position = UDim2.new(anchor, anchor == 0 and inset or -inset, 0.5, 0),
+                Size = UDim2.new(0.5, -inset, 0, 1),
+                BackgroundColor3 = Theme.Stroke,
+                BorderSizePixel = 0,
+                Parent = holder,
+            })
+        end
+        local function fitRules()
+            local half = text_.AbsoluteSize.X / self.Window.Scale.Scale / 2
+            for _, rule in ipairs(rules) do
+                rule.Size = UDim2.new(0.5, -(inset + half), 0, 1)
+            end
+        end
+        text_:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitRules)
+        task.defer(fitRules)
+        return finishElement(self, { Visible = not (type(opts) == "table" and opts.Visible == false) }, {
+            Set = function(_, value)
+                text_.Text = tostring(value)
+            end,
+        }, holder, "Divider")
+    end
     local line = create("Frame", {
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Theme.Stroke,
@@ -1635,6 +1683,15 @@ function Tab:Dropdown(opts)
     local window = self.Window
     local ROW = TOUCH and 36 or 30
     local MAX_ROWS = opts.MaxRows or 6
+    -- Stacked: the chip spans the whole row, with the name (if any) above it.
+    local stacked = compact and opts.Stacked == true
+    local stackTop = 2
+    if stacked then
+        stackTop = (opts.Name or "") ~= "" and 20 or 2
+        chipHeight = TOUCH and 34 or 30
+        height = stackTop + chipHeight + 4
+        frame.Size = UDim2.new(1, 0, 0, height)
+    end
 
     local header = create("TextButton", {
         Size = UDim2.new(1, 0, 0, height),
@@ -1643,11 +1700,22 @@ function Tab:Dropdown(opts)
         AutoButtonColor = false,
         Parent = frame,
     })
-    local titleLabel, descLabel = titleDesc(header, opts.Name or "Dropdown", opts.Desc, 180, metrics)
+    local titleLabel, descLabel
+    if not stacked then
+        titleLabel, descLabel = titleDesc(header, opts.Name or "Dropdown", opts.Desc, 180, metrics)
+    elseif stackTop > 2 then
+        titleLabel = label({
+            Position = UDim2.fromOffset(14, 1),
+            Size = UDim2.new(1, -28, 0, 16),
+            Text = opts.Name,
+            TextSize = metrics.TextSize,
+            Parent = header,
+        })
+    end
 
     local chip = create("Frame", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, compact and -14 or -10, 0.5, 0),
+        AnchorPoint = stacked and Vector2.zero or Vector2.new(1, 0.5),
+        Position = stacked and UDim2.fromOffset(14, stackTop) or UDim2.new(1, compact and -14 or -10, 0.5, 0),
         Size = UDim2.fromOffset(60, chipHeight),
         BackgroundColor3 = Theme.Surface,
         BorderSizePixel = 0,
@@ -1675,7 +1743,7 @@ function Tab:Dropdown(opts)
     })
     local fullText = ""
     local function trimmed()
-        local maxText = (compact and rowControlWidth(frame, window) or 190) - 10 - 34
+        local maxText = (stacked and frame.AbsoluteSize.X / window.Scale.Scale - 28 or compact and rowControlWidth(frame, window) or 190) - 10 - 34
         measure.Text = fullText
         if measure.TextBounds.X <= maxText then
             return fullText
@@ -1691,6 +1759,10 @@ function Tab:Dropdown(opts)
         return ".."
     end
     local function fitChip(instant)
+        if stacked then
+            chip.Size = UDim2.new(1, -28, 0, chipHeight)
+            return
+        end
         local width
         if compact then
             width = rowControlWidth(frame, window)
@@ -3113,6 +3185,11 @@ function Library.Window(_, opts)
         self.ConfigName = "default"
         self._autoSaveEnabled = false
     end
+    self._configListeners = {}
+    local configSettings = self:_readConfigSettings()
+    if type(configSettings.Autosave) == "boolean" then
+        self._autoSaveEnabled = configSettings.Autosave
+    end
 
     if opts.Theme then
         Library:SetTheme(opts.Theme, true)
@@ -3426,7 +3503,16 @@ function Library.Window(_, opts)
         self:_fitToScreen()
         self:_clampToScreen()
     end))
-    if (opts.OpenButton ~= nil and opts.OpenButton ~= false) or (opts.OpenButton == nil and TOUCH) then
+    local toggleOpts = opts.ToggleButton
+    if toggleOpts == nil or toggleOpts == true then
+        toggleOpts = {}
+    end
+    if type(toggleOpts) == "table" then
+        self:_createToggleButton(toggleOpts)
+    end
+    -- The toggle button already brings a hidden window back.
+    local toggleShown = self.ToggleButton ~= nil and self:_toggleButtonAllowed()
+    if (opts.OpenButton ~= nil and opts.OpenButton ~= false) or (opts.OpenButton == nil and TOUCH and not toggleShown) then
         self:_createOpenButton(type(opts.OpenButton) == "table" and opts.OpenButton or {})
     end
     self._introDone = false
@@ -3639,6 +3725,9 @@ function Window:_playIntro(morph)
     self._introDone = true
     task.delay(1, function()
         self._autoSaveReady = true
+    end)
+    task.delay(0.4, function()
+        self:_refreshToggleButton()
     end)
     local root, shadow, scale = self.Root, self.Shadow, self.Scale
     if self.CurrentTab then
@@ -3943,6 +4032,141 @@ function Window:_createOpenButton(opts)
     end))
 end
 
+-- Square floating button that minimizes and restores the window. Shown on
+-- touch devices only, or everywhere with Platform = "Both".
+function Window:_toggleButtonAllowed()
+    return self._toggleEnabled and (TOUCH or self._togglePlatform == "Both")
+end
+
+function Window:_refreshToggleButton()
+    local button = self.ToggleButton
+    if not button then
+        return
+    end
+    local shown = self._introDone and not self._destroyed and self:_toggleButtonAllowed()
+    if shown and not button.Visible then
+        button.Visible = true
+        button.Size = UDim2.fromOffset(0, 0)
+        tween(button, { Size = UDim2.fromOffset(self._toggleSize, self._toggleSize) }, 0.35, Enum.EasingStyle.Back)
+    elseif not shown then
+        button.Visible = false
+    end
+    local folded = self.Minimized or not self.Open
+    tween(self._toggleStroke, { Color = folded and Theme.Accent or Theme.Stroke, Transparency = folded and 0.35 or 0 }, 0.2)
+    tween(self._toggleIcon, { Rotation = folded and 180 or 0 }, 0.35, Enum.EasingStyle.Quint)
+end
+
+function Window:_createToggleButton(opts)
+    local gui = self.Gui
+    local size = tonumber(opts.Size) or (TOUCH and 44 or 40)
+    self._toggleEnabled = opts.Enabled ~= false
+    self._togglePlatform = opts.Platform == "Both" and "Both" or "Mobile"
+    self._toggleSize = size
+    local button = create("TextButton", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = opts.Position or UDim2.new(0, 18 + size / 2, 0.5, 0),
+        Size = UDim2.fromOffset(size, size),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+        Visible = false,
+        ZIndex = 30,
+        Parent = gui,
+    })
+    corner(button, UDim.new(0, 10))
+    local buttonStroke = stroke(button, Theme.Stroke)
+    local icon = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(math.floor(size * 0.45), math.floor(size * 0.45)),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Accent,
+        ScaleType = Enum.ScaleType.Fit,
+        ZIndex = 31,
+        Parent = button,
+    })
+    self.ToggleButton = button
+    self._toggleStroke = buttonStroke
+    self._toggleIcon = icon
+    self:SetToggleButtonIcon(opts.Icon or "layout-grid")
+
+    button.MouseEnter:Connect(function()
+        tween(button, { BackgroundColor3 = Theme.Surface2 }, 0.12)
+    end)
+    button.MouseLeave:Connect(function()
+        tween(button, { BackgroundColor3 = Theme.Background }, 0.2)
+    end)
+
+    local dragging, moved = false, false
+    local grab = Vector2.zero
+    button.InputBegan:Connect(function(input)
+        if isPress(input) then
+            dragging = true
+            moved = false
+            grab = pointerPosition() - button.AbsolutePosition
+            tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.38), math.floor(size * 0.38)) }, 0.1)
+        end
+    end)
+    table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
+        if not dragging or not isMove(input) then
+            return
+        end
+        local point = pointerPosition() - grab - gui.AbsolutePosition
+        if (point - (button.AbsolutePosition - gui.AbsolutePosition)).Magnitude > 3 then
+            moved = true
+        end
+        if moved then
+            button.AnchorPoint = Vector2.zero
+            button.Position = UDim2.fromOffset(
+                math.clamp(point.X, 0, math.max(gui.AbsoluteSize.X - button.AbsoluteSize.X, 0)),
+                math.clamp(point.Y, 0, math.max(gui.AbsoluteSize.Y - button.AbsoluteSize.Y, 0))
+            )
+        end
+    end))
+    table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
+        if not dragging or not isPress(input) then
+            return
+        end
+        dragging = false
+        tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.45), math.floor(size * 0.45)) }, 0.25, Enum.EasingStyle.Back)
+        if moved then
+            return
+        end
+        ripple(button)
+        if not self.Open then
+            self:Toggle(true)
+        elseif self.Minimized then
+            self:Restore()
+        else
+            self:Minimize()
+        end
+    end))
+end
+
+function Window:SetToggleButton(enabled)
+    self._toggleEnabled = enabled ~= false
+    self:_refreshToggleButton()
+end
+
+function Window:SetToggleButtonPlatform(platform)
+    self._togglePlatform = platform == "Both" and "Both" or "Mobile"
+    self:_refreshToggleButton()
+end
+
+function Window:SetToggleButtonIcon(icon)
+    local image = self._toggleIcon
+    if not image then
+        return
+    end
+    image.Image = ""
+    applyIcon(image, icon)
+    if image.Image == "" then
+        applyIcon(image, Assets.Logo)
+    end
+end
+
 function Window:_enableResize(minSize)
     local maxSize = self.MaxSize or Vector2.new(math.huge, math.huge)
     local root = self.Root
@@ -4120,42 +4344,17 @@ local function deserializeFlag(element, entry, silent)
     end
 end
 
-function Window:SaveConfig(name)
-    name = name or self.ConfigName
-    if not fileApiAvailable() then
-        return false, "file API unavailable"
-    end
-    ensureFolder(self.ConfigFolder)
+local function collectFlags()
     local data = {}
     for flag, element in pairs(Library.Flags) do
         if element._type and type(element.Get) == "function" then
             data[flag] = serializeFlag(element)
         end
     end
-    local ok, err = pcall(function()
-        writefile(configPath(self, name), HttpService:JSONEncode(data))
-    end)
-    if ok then
-        self.ConfigName = name
-    end
-    return ok, err
+    return data
 end
 
-function Window:LoadConfig(name, silent)
-    name = name or self.ConfigName
-    if not fileApiAvailable() then
-        return false, "file API unavailable"
-    end
-    local path = configPath(self, name)
-    if not isfile(path) then
-        return false, "no config named " .. name
-    end
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(readfile(path))
-    end)
-    if not ok or type(data) ~= "table" then
-        return false, "config is not valid JSON"
-    end
+function Window:_applyFlags(data, silent)
     local previous = self._autoSaveEnabled
     self._autoSaveEnabled = false
     for flag, entry in pairs(data) do
@@ -4166,10 +4365,80 @@ function Window:LoadConfig(name, silent)
     end
     self._autoSaveEnabled = previous
     self._autoSaveReady = true
-    self.ConfigName = name
-    return true
 end
 
+-- Anything listening for config changes (the config manager's status line).
+function Window:_configChanged()
+    for _, handler in ipairs(self._configListeners) do
+        safeCall(handler)
+    end
+end
+
+function Window:OnConfigChanged(handler)
+    table.insert(self._configListeners, handler)
+    return function()
+        local index = table.find(self._configListeners, handler)
+        if index then
+            table.remove(self._configListeners, index)
+        end
+    end
+end
+
+local function validConfigName(name)
+    return type(name) == "string" and name ~= "" and not name:find('[\\/:%*%?"<>|]')
+end
+
+local function writeConfig(self, name, data)
+    if not validConfigName(name) then
+        return false, "invalid config name"
+    end
+    if not fileApiAvailable() then
+        return false, "file API unavailable"
+    end
+    ensureFolder(self.ConfigFolder)
+    return pcall(function()
+        writefile(configPath(self, name), HttpService:JSONEncode(data))
+    end)
+end
+
+local function readConfig(self, name)
+    if not fileApiAvailable() then
+        return nil, "file API unavailable"
+    end
+    local path = configPath(self, name)
+    if not isfile(path) then
+        return nil, "no config named " .. tostring(name)
+    end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile(path))
+    end)
+    if not ok or type(data) ~= "table" then
+        return nil, "config is not valid JSON"
+    end
+    return data
+end
+
+function Window:SaveConfig(name)
+    name = name or self.ConfigName
+    local ok, err = writeConfig(self, name, collectFlags())
+    if ok then
+        self.ConfigName = name
+    end
+    return ok, err
+end
+
+function Window:LoadConfig(name, silent)
+    name = name or self.ConfigName
+    local data, err = readConfig(self, name)
+    if not data then
+        return false, err
+    end
+    self:_applyFlags(data, silent)
+    self.ConfigName = name
+    self.LoadedConfig = name
+    self:_configChanged()
+    return true
+end
 
 function Window:DeleteConfig(name)
     if not fileApiAvailable() or type(delfile) ~= "function" then
@@ -4180,6 +4449,10 @@ function Window:DeleteConfig(name)
         return false, "no config named " .. name
     end
     delfile(path)
+    if self.LoadedConfig == name then
+        self.LoadedConfig = nil
+    end
+    self:_configChanged()
     return true
 end
 
@@ -4208,10 +4481,112 @@ function Window:_autoSave()
     self._autoSavePending = true
     task.delay(0.5, function()
         self._autoSavePending = false
-        if not self._destroyed then
+        if not self._destroyed and self._autoSaveEnabled then
             self:SaveConfig(self.ConfigName)
         end
     end)
+end
+
+-- Share codes: "airflow:" followed by the config JSON in base64.
+
+local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local B64_INDEX = {}
+for index = 1, #B64 do
+    B64_INDEX[B64:byte(index)] = index - 1
+end
+local SHARE_PREFIX = "airflow:"
+
+local function base64Encode(text)
+    local out = {}
+    for index = 1, #text, 3 do
+        local a, b, c = text:byte(index, index + 2)
+        local n = bit32.bor(bit32.lshift(a, 16), bit32.lshift(b or 0, 8), c or 0)
+        table.insert(out, string.char(
+            B64:byte(bit32.extract(n, 18, 6) + 1),
+            B64:byte(bit32.extract(n, 12, 6) + 1),
+            b and B64:byte(bit32.extract(n, 6, 6) + 1) or 61,
+            c and B64:byte(bit32.extract(n, 0, 6) + 1) or 61
+        ))
+    end
+    return table.concat(out)
+end
+
+local function base64Decode(text)
+    if #text % 4 ~= 0 then
+        return nil
+    end
+    local out = {}
+    for index = 1, #text, 4 do
+        local n, pad = 0, 0
+        for offset = 0, 3 do
+            local byte = text:byte(index + offset)
+            local value = B64_INDEX[byte]
+            if byte == 61 and index + 3 >= #text then
+                pad += 1
+                value = 0
+            elseif value == nil or pad > 0 then
+                return nil
+            end
+            n = n * 64 + value
+        end
+        if pad > 2 then
+            return nil
+        end
+        local chunk = string.char(bit32.extract(n, 16, 8), bit32.extract(n, 8, 8), bit32.extract(n, 0, 8))
+        table.insert(out, chunk:sub(1, 3 - pad))
+    end
+    return table.concat(out)
+end
+
+local function decodeShareCode(code)
+    code = tostring(code or ""):gsub("%s", "")
+    if code:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
+        return nil
+    end
+    local json = base64Decode(code:sub(#SHARE_PREFIX + 1))
+    if not json then
+        return nil
+    end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(json)
+    end)
+    if ok and type(data) == "table" then
+        return data
+    end
+    return nil
+end
+
+function Window:ExportConfig(name)
+    local data, err
+    if name then
+        data, err = readConfig(self, name)
+        if not data then
+            return nil, err
+        end
+    else
+        data = collectFlags()
+    end
+    return SHARE_PREFIX .. base64Encode(HttpService:JSONEncode(data))
+end
+
+function Window:ImportConfig(code, saveAs)
+    local data = decodeShareCode(code)
+    if not data then
+        return false, "invalid config code"
+    end
+    if saveAs then
+        local ok, err = writeConfig(self, saveAs, data)
+        if not ok then
+            return false, err
+        end
+    end
+    self:_applyFlags(data)
+    if saveAs then
+        self.ConfigName = saveAs
+        self.LoadedConfig = saveAs
+    end
+    self:_configChanged()
+    return true
 end
 
 local function readText(path)
@@ -4225,25 +4600,114 @@ local function readText(path)
     return nil
 end
 
--- Autoload: one config name kept next to the configs and loaded on demand.
-
-function Window:GetAutoload()
-    return readText(self.ConfigFolder .. "/autoload.txt")
+local function removeFile(path)
+    if fileApiAvailable() and type(delfile) == "function" and isfile(path) then
+        pcall(delfile, path)
+    end
 end
 
-function Window:SetAutoload(name)
+-- Manager settings (autoload mode, autosave) live beside the configs, apart
+-- from the flags, so loading a config never changes them.
+
+local function settingsPath(self)
+    return self.ConfigFolder .. "/configsettings.txt"
+end
+
+function Window:_readConfigSettings()
+    local text = readText(settingsPath(self))
+    if text then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(text)
+        end)
+        if ok and type(data) == "table" then
+            return data
+        end
+    end
+    return {}
+end
+
+function Window:_writeConfigSettings(changes)
     if not fileApiAvailable() then
         return false, "file API unavailable"
     end
+    local data = self:_readConfigSettings()
+    for key, value in pairs(changes) do
+        data[key] = value
+    end
     ensureFolder(self.ConfigFolder)
-    local path = self.ConfigFolder .. "/autoload.txt"
+    return pcall(writefile, settingsPath(self), HttpService:JSONEncode(data))
+end
+
+function Window:GetConfigAutosave()
+    return self._autoSaveEnabled == true
+end
+
+function Window:SetConfigAutosave(enabled)
+    self._autoSaveEnabled = enabled ~= false
+    self:_writeConfigSettings({ Autosave = self._autoSaveEnabled })
+    self:_configChanged()
+end
+
+-- Autoload: one config name kept next to the configs, either for every
+-- account ("Global") or only the local player ("Account").
+
+local function autoloadPath(self, scope)
+    if scope == "Account" then
+        return self.ConfigFolder .. "/autoload_" .. tostring(LocalPlayer and LocalPlayer.UserId or 0) .. ".txt"
+    end
+    return self.ConfigFolder .. "/autoload.txt"
+end
+
+function Window:GetAutoloadMode()
+    return self:_readConfigSettings().AutoloadMode == "Account" and "Account" or "Global"
+end
+
+function Window:GetAutoload(scope)
+    if scope then
+        return readText(autoloadPath(self, scope))
+    end
+    return readText(autoloadPath(self, "Account")) or readText(autoloadPath(self, "Global"))
+end
+
+function Window:SetAutoload(name, scope)
+    if not fileApiAvailable() then
+        return false, "file API unavailable"
+    end
+    scope = scope or self:GetAutoloadMode()
+    local ok, err = true, nil
     if name == nil or name == "" then
-        if isfile(path) and type(delfile) == "function" then
-            pcall(delfile, path)
+        removeFile(autoloadPath(self, scope))
+        if scope == "Global" then
+            removeFile(autoloadPath(self, "Account"))
         end
+    else
+        ensureFolder(self.ConfigFolder)
+        ok, err = pcall(writefile, autoloadPath(self, scope), tostring(name))
+        if ok and scope == "Global" then
+            removeFile(autoloadPath(self, "Account"))
+        end
+    end
+    self:_configChanged()
+    return ok, err
+end
+
+-- Switching the mode moves the current autoload so only one stays active.
+function Window:SetAutoloadMode(mode)
+    mode = mode == "Account" and "Account" or "Global"
+    if mode == self:GetAutoloadMode() then
         return true
     end
-    return pcall(writefile, path, tostring(name))
+    local current = self:GetAutoload()
+    local ok, err = self:_writeConfigSettings({ AutoloadMode = mode })
+    if not ok then
+        return false, err
+    end
+    removeFile(autoloadPath(self, mode == "Account" and "Global" or "Account"))
+    if current then
+        return self:SetAutoload(current, mode)
+    end
+    self:_configChanged()
+    return true
 end
 
 function Window:LoadAutoload(silent)
@@ -5139,6 +5603,8 @@ function Tab:ButtonRow(opts)
         if spec.Style == "Primary" then
             tween(button, { BackgroundColor3 = Theme.Accent, BackgroundTransparency = 0.12 }, 0)
             tween(text_, { TextColor3 = Theme.AccentDark }, 0)
+        elseif spec.Style == "Danger" then
+            tween(text_, { TextColor3 = Theme.Error }, 0)
         end
         handle.Buttons[index] = { Button = button, Label = text_ }
     end
@@ -5152,12 +5618,13 @@ function Tab:ButtonRow(opts)
 end
 
 -- A text box with an action button beside it, for naming new configs and themes.
+-- Without buttonText the box spans the row on its own.
 local function actionInput(tab, placeholder, buttonText, callback)
     local boxHeight = TOUCH and 34 or 30
     local frame = card(tab, "Frame", boxHeight + 4, {})
     local inset = metricsOf(tab).Compact and 14 or 7
     local box
-    local button = softButton(frame, buttonText, {
+    local button = buttonText and softButton(frame, buttonText, {
         AnchorPoint = Vector2.new(1, 0),
         Position = UDim2.new(1, -inset, 0, 2),
         Size = UDim2.fromOffset(0, boxHeight),
@@ -5167,7 +5634,7 @@ local function actionInput(tab, placeholder, buttonText, callback)
     end)
     local holder = create("Frame", {
         Position = UDim2.fromOffset(inset, 2),
-        Size = UDim2.new(1, -(inset * 2 + 70), 0, boxHeight),
+        Size = UDim2.new(1, -(inset * 2 + (button and 70 or 0)), 0, boxHeight),
         BackgroundColor3 = Theme.Surface,
         BorderSizePixel = 0,
         Parent = frame,
@@ -5198,12 +5665,14 @@ local function actionInput(tab, placeholder, buttonText, callback)
             safeCall(callback, box.Text)
         end
     end)
-    local function fit()
-        local width = button.AbsoluteSize.X / tab.Window.Scale.Scale
-        holder.Size = UDim2.new(1, -(inset * 2 + width + 6), 0, boxHeight)
+    if button then
+        local function fit()
+            local width = button.AbsoluteSize.X / tab.Window.Scale.Scale
+            holder.Size = UDim2.new(1, -(inset * 2 + width + 6), 0, boxHeight)
+        end
+        button:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+        task.defer(fit)
     end
-    button:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-    task.defer(fit)
     return finishElement(tab, { Name = placeholder }, {
         Get = function()
             return box.Text
@@ -5228,20 +5697,17 @@ end
 
 function Tab:ConfigManager(opts)
     opts = normalize(opts, { Title = "Name" })
-    local host = managerHost(self, opts, "Configs", "save")
+    local host = managerHost(self, opts, "Configs", "folder")
     local window = self.Window
     local manager = {}
-    local list, status, autoloadRow
+    local list, status, modeList, autosaveToggle
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
     end
 
     local function refreshStatus()
-        local current = window:GetAutoload()
-        status:Set("Current autoload: " .. (current or "none"))
-        local picked = list:Get()
-        autoloadRow:SetText(2, (picked and picked == current) and "Clear Autoload" or "Set Autoload")
+        status:Set(("loaded: %s   |   autoload: %s"):format(window.LoadedConfig or "none", window:GetAutoload() or "none"))
     end
 
     local function pickedName()
@@ -5252,32 +5718,71 @@ function Tab:ConfigManager(opts)
         return name
     end
 
-    local nameInput = actionInput(host, opts.Placeholder or "config name", "Create", function(text)
+    local nameInput = actionInput(host, opts.Placeholder or "config name", nil, function(text)
         manager:Create(text)
     end)
+    local names = window:ListConfigs()
+    local initial = window.LoadedConfig or window:GetAutoload()
     list = host:Dropdown({
-        Name = "Config",
-        Options = window:ListConfigs(),
-        Default = window:GetAutoload(),
-        EmptyText = "no configs",
-        NoneText = "select",
-        Callback = function()
-            refreshStatus()
-        end,
+        Stacked = true,
+        Options = names,
+        Default = table.find(names, initial) and initial or nil,
+        EmptyText = "--",
+        NoneText = "--",
     })
     host:ButtonRow({
+        { Name = "Create", Callback = function() manager:Create(nameInput:Get()) end },
         { Name = "Save", Callback = function() manager:Save() end },
+    })
+    host:ButtonRow({
         { Name = "Load", Callback = function() manager:Load() end },
+        { Name = "Delete", Style = "Danger", Callback = function() manager:Delete() end },
     })
-    autoloadRow = host:ButtonRow({
-        { Name = "Delete", Callback = function() manager:Delete() end },
-        { Name = "Set Autoload", Callback = function() manager:ToggleAutoload() end },
+    host:ButtonRow({
+        { Name = "Set autoload", Callback = function() manager:SetAutoload() end },
+        { Name = "Clear autoload", Callback = function() manager:ClearAutoload() end },
     })
-    status = host:Label("Current autoload: none")
+    status = host:Label("loaded: none   |   autoload: none")
+    modeList = host:Dropdown({
+        Name = "Autoload mode",
+        Stacked = true,
+        Options = { "All accounts", "This account" },
+        Default = window:GetAutoloadMode() == "Account" and "This account" or "All accounts",
+        AllowNone = false,
+        Callback = function(choice)
+            manager:SetAutoloadMode(choice == "This account" and "Account" or "Global")
+        end,
+    })
+    autosaveToggle = host:Toggle({
+        Name = "Autosave loaded config",
+        Default = window:GetConfigAutosave(),
+        Callback = function(enabled)
+            if enabled ~= window:GetConfigAutosave() then
+                window:SetConfigAutosave(enabled)
+            end
+        end,
+    })
+    host:Button({ Name = "Refresh list", Callback = function() manager:Refresh() end })
+    host:Divider({ Text = "share" })
+    host:Button({ Name = "Copy code", Callback = function() manager:Export() end })
+    local codeInput = actionInput(host, "paste a config code...", nil, function(text)
+        manager:Import(text)
+    end)
+    host:Button({ Name = "Import code", Callback = function() manager:Import(codeInput:Get()) end })
 
     function manager:Refresh()
-        list:Refresh(window:ListConfigs(), true)
+        local names = window:ListConfigs()
+        local keep = list:Get()
+        list:Refresh(names, true)
+        if keep and not table.find(names, keep) then
+            list:Set(window.LoadedConfig and table.find(names, window.LoadedConfig) and window.LoadedConfig or nil, true)
+        end
         refreshStatus()
+    end
+
+    local function select(name)
+        manager:Refresh()
+        list:Set(name, true)
     end
 
     function manager:Create(name)
@@ -5286,22 +5791,34 @@ function Tab:ConfigManager(opts)
             notify(false, "Name the config", "Type a name before creating it")
             return
         end
+        if not validConfigName(name) then
+            notify(false, "Invalid name", 'Names cannot contain \\ / : * ? " < > |')
+            return
+        end
         local ok, err = window:SaveConfig(name)
-        manager:Refresh()
         if ok then
-            list:Set(name, true)
+            window.LoadedConfig = name
             nameInput:Set("")
-            refreshStatus()
+            select(name)
         end
         notify(ok, ok and "Config created" or "Create failed", ok and name or tostring(err))
     end
 
     function manager:Save(name)
-        name = name or pickedName()
+        name = name or list:Get()
         if not name then
-            return
+            local typed = trim(nameInput:Get())
+            if typed == "" then
+                notify(false, "No config selected", "Pick one from the list or type a name")
+                return
+            end
+            return manager:Create(typed)
         end
         local ok, err = window:SaveConfig(name)
+        if ok then
+            window.LoadedConfig = name
+            refreshStatus()
+        end
         notify(ok, ok and "Config saved" or "Save failed", ok and name or tostring(err))
     end
 
@@ -5326,8 +5843,14 @@ function Tab:ConfigManager(opts)
             ConfirmText = "Delete",
             Callback = function()
                 local ok, err = window:DeleteConfig(name)
-                if ok and window:GetAutoload() == name then
-                    window:SetAutoload(nil)
+                if ok then
+                    if window:GetAutoload("Account") == name then
+                        window:SetAutoload(nil, "Account")
+                    end
+                    if window:GetAutoload("Global") == name then
+                        window:SetAutoload(nil, "Global")
+                    end
+                    list:Set(nil, true)
                 end
                 manager:Refresh()
                 notify(ok, ok and "Config deleted" or "Delete failed", ok and name or tostring(err))
@@ -5335,16 +5858,91 @@ function Tab:ConfigManager(opts)
         })
     end
 
+    function manager:SetAutoload(name)
+        name = name or pickedName()
+        if not name then
+            return
+        end
+        local ok, err = window:SetAutoload(name)
+        notify(ok, ok and "Autoload set" or "Autoload failed", ok and name or tostring(err))
+    end
+
+    function manager:ClearAutoload()
+        local current = window:GetAutoload()
+        if not current then
+            notify(false, "No autoload", "Nothing is set to autoload")
+            return
+        end
+        local ok, err = window:SetAutoload(nil)
+        notify(ok, ok and "Autoload cleared" or "Clear failed", ok and current or tostring(err))
+    end
+
     function manager:ToggleAutoload(name)
         name = name or pickedName()
         if not name then
             return
         end
-        local clearing = window:GetAutoload() == name
-        local ok, err = window:SetAutoload(not clearing and name or nil)
-        refreshStatus()
-        notify(ok ~= false, clearing and "Autoload cleared" or "Autoload set", ok ~= false and name or tostring(err))
+        if window:GetAutoload() == name then
+            manager:ClearAutoload()
+        else
+            manager:SetAutoload(name)
+        end
     end
+
+    function manager:SetAutoloadMode(mode)
+        local ok, err = window:SetAutoloadMode(mode)
+        local label_ = mode == "Account" and "This account" or "All accounts"
+        if modeList:Get() ~= label_ then
+            modeList:Set(label_, true)
+        end
+        notify(ok ~= false, ok ~= false and "Autoload mode" or "Mode change failed", ok ~= false and label_ or tostring(err))
+    end
+
+    function manager:Export(name)
+        local code, err = window:ExportConfig(name)
+        if not code then
+            notify(false, "Export failed", tostring(err))
+            return nil
+        end
+        window:CopyToClipboard(code, "Config code")
+        return code
+    end
+
+    function manager:Import(code)
+        code = trim(code)
+        if code == "" then
+            notify(false, "Nothing to import", "Paste a config code first")
+            return
+        end
+        local saveAs = trim(nameInput:Get())
+        if saveAs == "" then
+            saveAs = nil
+        elseif not validConfigName(saveAs) then
+            notify(false, "Invalid name", 'Names cannot contain \\ / : * ? " < > |')
+            return
+        end
+        local ok, err = window:ImportConfig(code, saveAs)
+        if ok then
+            codeInput:Set("")
+            if saveAs then
+                nameInput:Set("")
+                select(saveAs)
+            end
+        end
+        notify(ok, ok and "Config imported" or "Import failed", ok and (saveAs or "Applied to current settings") or (err == "invalid config code" and "Invalid config code" or tostring(err)))
+    end
+
+    local disconnect = window:OnConfigChanged(function()
+        if window.LoadedConfig and list:Get() == nil then
+            list:Set(window.LoadedConfig, true)
+        end
+        if autosaveToggle:Get() ~= window:GetConfigAutosave() then
+            autosaveToggle:Set(window:GetConfigAutosave(), true)
+        end
+        refreshStatus()
+    end)
+    status._listeners = status._listeners or {}
+    table.insert(status._listeners, disconnect)
 
     refreshStatus()
     return manager
@@ -8398,6 +8996,7 @@ function Window:Minimize()
     self._minimizeGeneration = (self._minimizeGeneration or 0) + 1
     local generation = self._minimizeGeneration
     self:_closePopups()
+    self:_refreshToggleButton()
     local bar = self:_buildMiniBar()
     self:_refreshMini()
     local gui = self.Gui
@@ -8445,6 +9044,7 @@ function Window:Restore()
     self.Minimized = false
     self._minimizeGeneration = (self._minimizeGeneration or 0) + 1
     local generation = self._minimizeGeneration
+    self:_refreshToggleButton()
     local gui = self.Gui
     local bar = self.MiniBar
     local fit = self._fitScale or 1
@@ -8503,6 +9103,7 @@ function Window:Toggle(open)
         return
     end
     self.Open = open
+    self:_refreshToggleButton()
     if open then
         self.Root.Visible = true
         tween(self.Scale, { Scale = self._fitScale or 1 }, 0.4, Enum.EasingStyle.Back)
@@ -8721,6 +9322,9 @@ function Window:Destroy()
     self:_fade(1, 0.2)
     tween(self.BodyStroke, { Transparency = 1 }, 0.12)
     tween(self.Shadow, { ImageTransparency = 1 }, 0.2)
+    if self.ToggleButton then
+        tween(self.ToggleButton, { Size = UDim2.fromOffset(0, 0) }, 0.2)
+    end
     task.delay(0.22, function()
         self.Gui:Destroy()
     end)
@@ -8738,6 +9342,7 @@ local Window = Airflow:CreateWindow({
     -- examples: "RightShift", "RightControl", "LeftAlt", "Insert", "Home", "F1", "Backquote"
     -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift
     ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample", FileName = "default" },
+    ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
     Home = {
         Tier = "Free",
         Expiry = os.time() + 12 * 3600, -- countdown under the tier badge. A string or a function also works
@@ -9118,6 +9723,17 @@ Interface:CreateKeybind({
     CurrentKeybind = "RightControl",
     OnChanged = function(Key)
         Window:SetKeybind(Key)
+    end,
+})
+
+Interface:CreateDropdown({
+    Name = "Toggle button",
+    Options = { "Mobile only", "Mobile & PC" },
+    CurrentOption = "Mobile only",
+    AllowNone = false,
+    Flag = "ToggleButtonPlatform",
+    Callback = function(Option)
+        Window:SetToggleButtonPlatform(Option == "Mobile & PC" and "Both" or "Mobile")
     end,
 })
 

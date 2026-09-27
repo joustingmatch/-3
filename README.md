@@ -26,6 +26,7 @@ local Window = Airflow:CreateWindow({
     MaxNotifications = 4,
     KeepOnScreen = true,
     OpenButton = { Title = "Airflow", Icon = "wind" },
+    ToggleButton = { Platform = "Mobile", Icon = "layout-grid" },
     Profile = true,
     Search = true,
     Loading = {
@@ -55,6 +56,8 @@ Drag any empty area to move it and the grip in the bottom-right corner to resize
 
 The button in the top-right minimizes the window: it folds into a small floating bar with the logo, the current tab, how many toggles are on, and up to three pinned [statuses](#status) with live values. Drag the bar anywhere; click it (or press the hide key) and it unfolds back into the window. The bar remembers where you left it.
 
+The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
+
 The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
 
 ### Properties
@@ -70,7 +73,12 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
-| `OpenButton` | boolean \|| `Icon` | string | number | table | touch-only devices | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
+| `OpenButton` | boolean \|| `Icon` | string | number | table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
+| `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
+| `ToggleButton.Platform` | string | `"Mobile"` | `"Mobile"` shows it on touch devices only, `"Both"` on PC and mobile. |
+| `ToggleButton.Icon` | string \| number \| table | `"layout-grid"` | Any [icon](#icons). |
+| `ToggleButton.Enabled` | boolean | `true` | `false` builds it hidden, to show later with `SetToggleButton(true)`. |
+| `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `44` touch, `40` PC | Starting position and side length. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \|| `Icon` | string | number | table | `true` | Loading card before the window morphs in. `false` skips it. |
@@ -95,6 +103,10 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
 | `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the floating bar and back. |
 | `.Minimized` / `.MiniBar` | Whether it's minimized, and the bar itself. |
+| `SetToggleButton(enabled)` | Show or hide the toggle button. |
+| `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
+| `SetToggleButtonIcon(icon)` | Swap its icon. |
+| `.ToggleButton` | The toggle button, when it was built. |
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
@@ -324,10 +336,11 @@ Section:Set("Movement (beta)")
 
 ## Divider
 
-> A 1px line.
+> A 1px line, optionally with a caption in the middle.
 
 ```lua
 Tab:CreateDivider()
+Tab:CreateDivider({ Text = "share" })
 ```
 
 ---
@@ -549,7 +562,7 @@ Group:CreateButtonRow({
 })
 ```
 
-Each entry takes `Name`, `Callback` and `Style = "Primary"`. The handle has `SetText(index, text)` and `.Buttons`.
+Each entry takes `Name`, `Callback` and `Style` (`"Primary"` for the accent fill, `"Danger"` for red text). The handle has `SetText(index, text)` and `.Buttons`.
 
 ---
 
@@ -764,6 +777,7 @@ Clicking the chip unfolds a popup out of it, floating over the window under the 
 | `EmptyText` | string | `"None"` | Chip text when there are no options. |
 | `AllowNone` | boolean | `true` | `false` stops a single dropdown from unchecking its value. |
 | `PopupWidth` | number | `210` | Minimum popup width. It grows to the chip width. |
+| `Stacked` | boolean | `false` | Inside a groupbox: the chip spans the full row with the name above it. Leave `Name` out for a bare chip. |
 | `Flag` | string | — | The save key. |
 | `Callback` | function | — | Runs with the selection on every change. `nil` when unchecked. |
 
@@ -1028,7 +1042,21 @@ Settings:CreateConfigManager({ Name = "Configs", Side = "Left" })
 Window:LoadAutoload()
 ```
 
-The config manager is a groupbox with a name box and **Create**, a **Config** picker, **Save** / **Load**, **Delete** / **Set Autoload**, and a line showing the current autoload. Pressing Set Autoload on the config that already autoloads clears it. Call `LoadAutoload` after every element exists.
+The config manager is a groupbox with, from top to bottom:
+
+- a **config name** box and the config picker
+- **Create** / **Save**, **Load** / **Delete**, **Set autoload** / **Clear autoload**
+- a status line: `loaded: <name> | autoload: <name>`
+- **Autoload mode**: *All accounts* or *This account*
+- **Autosave loaded config**: when on, every flagged change is written into the loaded config half a second later
+- **Refresh list**
+- a **share** section: **Copy code** puts the current settings on the clipboard as a code, and **Import code** applies a pasted code. If the name box has text, the imported code is also saved under that name.
+
+Save with nothing picked creates a config from the typed name. Names can't contain `\ / : * ? " < > |`. Call `LoadAutoload` after every element exists.
+
+Share codes look like `airflow:eyJT...`: the config JSON in base64, so they paste cleanly into Discord.
+
+The autoload mode and autosave switch live in `<folder>/configsettings.txt`, apart from the configs, so loading a config never flips them. *This account* keeps the autoload in `autoload_<UserId>.txt`, so other accounts on the same PC don't load it. Switching modes moves the current autoload across.
 
 Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as RGB components.
 
@@ -1036,9 +1064,9 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `Enabled` | boolean | `true` | Auto-save 0.5 s after any flagged element changes. |
+| `Enabled` | boolean | `true` | Default for **Autosave loaded config**. The saved switch wins after the first change. |
 | `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. |
-| `FileName` | string | `"default"` | Config used when no name is given. |
+| `FileName` | string | `"default"` | Config used when no name is given, and the autosave target before anything is loaded. |
 
 `CreateConfigManager` takes `Name`, `Icon`, `Side` and `Placeholder`. Called on a groupbox it adds its rows there instead of making its own.
 
@@ -1047,11 +1075,17 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 | Member | Description |
 | --- | --- |
 | `Window:SaveConfig(name?)` | Write `<folder>/<name>.json`. Returns `ok, err`. |
-| `Window:LoadConfig(name?, skipCallbacks?)` | Apply a saved config. |
+| `Window:LoadConfig(name?, skipCallbacks?)` | Apply a saved config and mark it loaded. |
 | `Window:DeleteConfig(name)` | Remove the file. |
 | `Window:ListConfigs()` | Sorted list of saved names. |
-| `Window:SetAutoload(name?)` / `GetAutoload()` / `LoadAutoload(skipCallbacks?)` | The config loaded on start. `nil` clears it. |
-| `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / ToggleAutoload / Refresh`. |
+| `Window.LoadedConfig` | Name of the loaded config, or `nil`. |
+| `Window:ExportConfig(name?)` | Share code for a saved config, or for the current settings when `name` is `nil`. |
+| `Window:ImportConfig(code, saveAs?)` | Apply a share code, and save it as `saveAs` if given. Returns `ok, err`. |
+| `Window:SetAutoload(name?, scope?)` / `GetAutoload(scope?)` / `LoadAutoload(skipCallbacks?)` | The config loaded on start. `nil` clears it. `scope` is `"Global"` or `"Account"`, defaulting to the current mode. |
+| `Window:SetAutoloadMode(mode)` / `GetAutoloadMode()` | `"Global"` (all accounts) or `"Account"` (this account). |
+| `Window:SetConfigAutosave(enabled)` / `GetConfigAutosave()` | The autosave switch. Saved between sessions. |
+| `Window:OnConfigChanged(fn)` | Runs `fn` after a load, delete, import or autoload change. Returns a disconnect function. |
+| `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / SetAutoload / ClearAutoload / ToggleAutoload / SetAutoloadMode / Export / Import / Refresh`. |
 
 ---
 
