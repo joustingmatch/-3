@@ -4310,37 +4310,24 @@ function Window:_refreshToggleButton()
     if shown and not button.Visible then
         button.Visible = true
         button.Size = UDim2.fromOffset(0, 0)
-        tween(button, { Size = UDim2.fromOffset(self._toggleSize, self._toggleSize) }, 0.4, Enum.EasingStyle.Back)
+        tween(button, { Size = UDim2.fromOffset(self._toggleSize, self._toggleSize) }, 0.45, Enum.EasingStyle.Quint)
     elseif not shown then
         button.Visible = false
     end
-    -- Folded (window minimized or hidden): the ring lights up in the accent
-    -- and breathes so the button reads as "tap to bring it back".
+    -- Folded (window minimized or hidden): the outline takes the accent.
     local folded = self.Minimized or not self.Open
-    tween(self._toggleStroke, { Color = folded and Theme.Accent or Theme.Stroke, Transparency = folded and 0.1 or 0 }, 0.25)
-    tween(self._toggleGlow, { BackgroundTransparency = folded and 0.72 or 0.9 }, 0.3)
+    tween(self._toggleStroke, { Color = folded and Theme.Accent or Theme.Stroke, Transparency = folded and 0.3 or 0 }, 0.35)
     local icon = self._toggleIcon
-    tween(icon, { Rotation = folded and 180 or 0 }, 0.4, Enum.EasingStyle.Quint)
+    tween(icon, { Rotation = folded and 180 or 0 }, 0.5, Enum.EasingStyle.Quint)
     if not icon:GetAttribute("CustomIcon") then
-        tween(icon, { ImageColor3 = folded and Theme.Text or Theme.Accent }, 0.25)
-    end
-    if folded and not self._togglePulse then
-        self._togglePulse = TweenService:Create(self._toggleRing, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-            Transparency = 0.75,
-        })
-        self._toggleRing.Transparency = 0.2
-        self._togglePulse:Play()
-    elseif not folded and self._togglePulse then
-        self._togglePulse:Cancel()
-        self._togglePulse = nil
-        tween(self._toggleRing, { Transparency = 1 }, 0.2)
+        tween(icon, { ImageColor3 = folded and Theme.Text or Theme.Accent }, 0.35)
     end
 end
 
 function Window:_createToggleButton(opts)
     local gui = self.Gui
     local size = tonumber(opts.Size) or (TOUCH and 56 or 50)
-    local iconSize = math.floor(size * 0.48)
+    local iconSize = math.floor(size * 0.46)
     self._toggleEnabled = opts.Enabled ~= false
     self._togglePlatform = opts.Platform == "Both" and "Both" or "Mobile"
     self._toggleSize = size
@@ -4357,44 +4344,8 @@ function Window:_createToggleButton(opts)
         ZIndex = 30,
         Parent = gui,
     })
-    corner(button, UDim.new(0, math.floor(size * 0.3)))
-    -- Lit from above, like the window body.
-    create("UIGradient", {
-        Rotation = 90,
-        Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(165, 165, 165)),
-        Parent = button,
-    })
-    local buttonStroke = stroke(button, Theme.Stroke, 0, 1.5)
-    edgeHighlight(button)
-    -- Soft accent glow pooled at the bottom.
-    local glowFrame = create("Frame", {
-        Size = UDim2.fromScale(1, 1),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 0.9,
-        BorderSizePixel = 0,
-        ZIndex = 30,
-        Parent = button,
-    })
-    create("UIGradient", {
-        Rotation = 90,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.55, 0.7),
-            NumberSequenceKeypoint.new(1, 0),
-        }),
-        Parent = glowFrame,
-    })
-    -- Inner ring that pulses while the window is folded away.
-    local ring = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.new(1, -6, 1, -6),
-        BackgroundTransparency = 1,
-        ZIndex = 30,
-        Parent = button,
-    })
-    corner(ring, UDim.new(0, math.floor(size * 0.3) - 3))
-    local ringStroke = stroke(ring, Theme.Accent, 1, 1)
+    corner(button, UDim.new(0, 12))
+    local buttonStroke = stroke(button, Theme.Stroke)
     local icon = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
@@ -4408,21 +4359,8 @@ function Window:_createToggleButton(opts)
     local buttonScale = create("UIScale", { Parent = button })
     self.ToggleButton = button
     self._toggleStroke = buttonStroke
-    self._toggleGlow = glowFrame
-    self._toggleRing = ringStroke
     self._toggleIcon = icon
     self:SetToggleButtonIcon(opts.Icon or "layout-grid")
-
-    button.MouseEnter:Connect(function()
-        tween(button, { BackgroundColor3 = Theme.Surface2 }, 0.12)
-        tween(buttonScale, { Scale = 1.06 }, 0.25, Enum.EasingStyle.Quint)
-        tween(glowFrame, { BackgroundTransparency = 0.7 }, 0.2)
-    end)
-    button.MouseLeave:Connect(function()
-        tween(button, { BackgroundColor3 = Theme.Background }, 0.2)
-        tween(buttonScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
-        tween(glowFrame, { BackgroundTransparency = (self.Minimized or not self.Open) and 0.72 or 0.9 }, 0.25)
-    end)
 
     local dragging, moved = false, false
     local grab = Vector2.zero
@@ -4431,8 +4369,7 @@ function Window:_createToggleButton(opts)
             dragging = true
             moved = false
             grab = pointerPosition() - button.AbsolutePosition
-            tween(buttonScale, { Scale = 0.92 }, 0.1)
-            tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.4), math.floor(size * 0.4)) }, 0.1)
+            tween(buttonScale, { Scale = 0.94 }, 0.18, Enum.EasingStyle.Quint)
         end
     end)
     table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
@@ -4456,8 +4393,7 @@ function Window:_createToggleButton(opts)
             return
         end
         dragging = false
-        tween(buttonScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
-        tween(icon, { Size = UDim2.fromOffset(iconSize, iconSize) }, 0.3, Enum.EasingStyle.Back)
+        tween(buttonScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Quint)
         if moved then
             return
         end
@@ -6611,6 +6547,20 @@ function Tab:ThemeManager(opts)
             end
         end,
     })
+    if window._backdrop and opts.Weather ~= false then
+        local labels = { None = "None", Snow = "Snow", Rain = "Rain", Ember = "Hell Fire" }
+        host:Dropdown({
+            Name = "Weather",
+            Options = { "Snow", "Rain", "Hell Fire", "None" },
+            Default = labels[window.Weather] or "None",
+            AllowNone = false,
+            Callback = function(name)
+                if name then
+                    window:SetWeather(name)
+                end
+            end,
+        })
+    end
     local nameInput = actionInput(host, opts.Placeholder or "theme name", "Create", function(text)
         manager:Create(text)
     end)
@@ -9495,7 +9445,7 @@ function Window:_buildBackdrop(opts)
     self._backdropTint = math.clamp(tonumber(opts.Tint) or 0.45, 0, 1)
     self._weatherDensity = math.clamp(tonumber(opts.Density) or 1, 0, 3)
     self._weatherSpeed = math.clamp(tonumber(opts.Speed) or 1, 0.1, 3)
-    self.Weather = weatherName(opts.Weather == nil and "Rain" or opts.Weather)
+    self.Weather = weatherName(opts.Weather == nil and "Snow" or opts.Weather)
     self:_rebuildWeather()
     table.insert(self._frameSteps, function(deltaTime)
         self:_stepBackdrop(deltaTime)
@@ -10467,7 +10417,7 @@ local Window = Airflow:CreateWindow({
     -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift
     ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample", FileName = "default" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
-    Backdrop = { Weather = "Rain", Tint = 0.45 }, -- black tint + weather behind the open window: "Rain", "Snow", "Hell Fire" or "None". false turns it off
+    Backdrop = { Weather = "Snow", Tint = 0.45 }, -- black tint + weather behind the open window: "Rain", "Snow", "Hell Fire" or "None". false turns it off
     Home = {
         Tier = "Free",
         Expiry = os.time() + 12 * 3600, -- countdown under the tier badge. A string or a function also works
@@ -10869,17 +10819,6 @@ Interface:CreateToggle({
     Flag = "Backdrop",
     Callback = function(Value)
         Window:SetBackdrop(Value)
-    end,
-})
-
-Interface:CreateDropdown({
-    Name = "Weather",
-    Options = { "None", "Rain", "Snow", "Hell Fire" },
-    CurrentOption = "Rain",
-    AllowNone = false,
-    Flag = "BackdropWeather",
-    Callback = function(Option)
-        Window:SetWeather(Option)
     end,
 })
 

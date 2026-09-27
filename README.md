@@ -27,7 +27,7 @@ local Window = Airflow:CreateWindow({
     KeepOnScreen = true,
     OpenButton = { Title = "Airflow", Icon = "wind" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" },
-    Backdrop = { Weather = "Rain", Tint = 0.45 },
+    Backdrop = { Weather = "Snow", Tint = 0.45 },
     Profile = true,
     Search = true,
     Loading = {
@@ -80,8 +80,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `ToggleButton.Icon` | string \| number \| table | `"layout-grid"` | Any [icon](#icons). |
 | `ToggleButton.Enabled` | boolean | `true` | `false` builds it hidden, to show later with `SetToggleButton(true)`. |
 | `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `56` touch, `50` PC | Starting position and side length. |
-| `Backdrop` | boolean \| table | `{ Weather = "Rain" }` | Black tint over the game while the window is up, with weather drifting through it. It fades out when the window is minimized or hidden and sweeps back in with a gust on restore. `false` removes it. |
-| `Backdrop.Weather` | string | `"Rain"` | `"Rain"`, `"Snow"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
+| `Backdrop` | boolean \| table | `{ Weather = "Snow" }` | Black tint over the game while the window is up, with weather drifting through it. It fades out when the window is minimized or hidden and sweeps back in with a gust on restore. `false` removes it. |
+| `Backdrop.Weather` | string | `"Snow"` | `"Snow"`, `"Rain"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
 | `Backdrop.Tint` | number | `0.45` | Tint strength, `0` to `1`. |
 | `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
 | `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
@@ -1229,6 +1229,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown). |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
