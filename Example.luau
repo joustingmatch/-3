@@ -3816,6 +3816,7 @@ function Library.Window(_, opts)
         self._controlsDirty = true
     end))
 
+    self.DragSkeleton = opts.DragSkeleton ~= false
     self:_enableDrag()
     self.MaxSize = opts.MaxSize
     self.KeepOnScreen = opts.KeepOnScreen ~= false
@@ -3983,14 +3984,82 @@ function Window:_overControl(point)
     return false
 end
 
+-- With the drag skeleton on, an outline follows the pointer while the window
+-- stays put, and the window glides into the outline's spot on release.
+local function makeSkeleton(window)
+    local root = window.Root
+    local skeleton = create("Frame", {
+        AnchorPoint = root.AnchorPoint,
+        Position = root.Position,
+        Size = UDim2.fromOffset(root.AbsoluteSize.X, root.AbsoluteSize.Y),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 40,
+        Parent = window.Gui,
+    })
+    corner(skeleton, UDim.new(0, 10))
+    local outline = stroke(skeleton, Theme.Accent, 1, 1.5)
+    local brackets = {}
+    for _, spot in ipairs({ Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) }) do
+        local inset = UDim2.new(spot.X, spot.X == 0 and 6 or -6, spot.Y, spot.Y == 0 and 6 or -6)
+        for _, size in ipairs({ UDim2.fromOffset(16, 2), UDim2.fromOffset(2, 16) }) do
+            table.insert(brackets, create("Frame", {
+                AnchorPoint = spot,
+                Position = inset,
+                Size = size,
+                BackgroundColor3 = Theme.Accent,
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = skeleton,
+            }))
+        end
+    end
+    local scale = create("UIScale", { Scale = 1.02, Parent = skeleton })
+    tween(skeleton, { BackgroundTransparency = 0.92 }, 0.15, Enum.EasingStyle.Quad)
+    tween(outline, { Transparency = 0.2 }, 0.15, Enum.EasingStyle.Quad)
+    tween(scale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
+    for _, bracket in ipairs(brackets) do
+        tween(bracket, { BackgroundTransparency = 0 }, 0.15, Enum.EasingStyle.Quad)
+    end
+    local function fade()
+        tween(skeleton, { BackgroundTransparency = 1 }, 0.2, Enum.EasingStyle.Quad)
+        tween(outline, { Transparency = 1 }, 0.2, Enum.EasingStyle.Quad)
+        for _, bracket in ipairs(brackets) do
+            tween(bracket, { BackgroundTransparency = 1 }, 0.2, Enum.EasingStyle.Quad)
+        end
+        task.delay(0.22, function()
+            skeleton:Destroy()
+        end)
+    end
+    return skeleton, fade
+end
+
 function Window:_enableDrag()
-    local dragging = false
-    local grabOffset = Vector2.zero
+    local dragging, moved = false, false
+    local grabOffset, pressPoint = Vector2.zero, Vector2.zero
     local target = nil
+    local skeleton, fadeSkeleton = nil, nil
 
     local function centre()
         local root = self.Root
         return root.AbsolutePosition + root.AbsoluteSize * root.AnchorPoint - self.Gui.AbsolutePosition
+    end
+
+    local function dropSkeleton()
+        if not skeleton then
+            return
+        end
+        local spot = Vector2.new(skeleton.Position.X.Offset, skeleton.Position.Y.Offset)
+        if self.KeepOnScreen then
+            spot = self:_clampedCentre(spot)
+        end
+        if self._clampTween then
+            self._clampTween:Cancel()
+        end
+        self._clampTween = tween(self.Root, { Position = UDim2.fromOffset(spot.X, spot.Y) }, 0.3, Enum.EasingStyle.Quint)
+        fadeSkeleton()
+        skeleton, fadeSkeleton = nil, nil
     end
 
     table.insert(self._connections, UserInputService.InputBegan:Connect(function(input)
@@ -4007,7 +4076,12 @@ function Window:_enableDrag()
         if not pointInside(point, self.Body) or self:_overControl(point) then
             return
         end
-        dragging = true
+        if self._clampTween then
+            self._clampTween:Cancel()
+            self._clampTween = nil
+        end
+        dragging, moved = true, false
+        pressPoint = point
         grabOffset = point - centre()
     end))
 
@@ -4018,7 +4092,11 @@ function Window:_enableDrag()
         if isPress(input) then
             dragging = false
             target = nil
-            self:_clampToScreen()
+            if skeleton then
+                dropSkeleton()
+            else
+                self:_clampToScreen()
+            end
         end
     end))
 
@@ -4026,12 +4104,37 @@ function Window:_enableDrag()
         if not dragging then
             return
         end
-        target = pointerPosition() - grabOffset
-        local current = centre()
+        local point = pointerPosition()
+        if not moved and (point - pressPoint).Magnitude > 3 then
+            moved = true
+            if self.DragSkeleton then
+                skeleton, fadeSkeleton = makeSkeleton(self)
+            end
+        end
+        if not moved then
+            return
+        end
+        -- Hidden or minimized mid-drag: land it where the outline is.
+        if skeleton and (not self.Open or not self.Root.Visible) then
+            dragging = false
+            dropSkeleton()
+            return
+        end
+        target = point - grabOffset
         local alpha = 1 - math.exp(-deltaTime * 45)
-        local step = current:Lerp(target, alpha)
-        self.Root.Position = UDim2.fromOffset(step.X, step.Y)
+        if skeleton then
+            local current = Vector2.new(skeleton.Position.X.Offset, skeleton.Position.Y.Offset)
+            local step = current:Lerp(target, alpha)
+            skeleton.Position = UDim2.fromOffset(step.X, step.Y)
+        else
+            local step = centre():Lerp(target, alpha)
+            self.Root.Position = UDim2.fromOffset(step.X, step.Y)
+        end
     end)
+end
+
+function Window:SetDragSkeleton(enabled)
+    self.DragSkeleton = enabled ~= false
 end
 
 local function orderedChildren(parent)
@@ -4552,18 +4655,23 @@ function Window:_fitToScreen(instant)
     end
 end
 
+-- Nearest centre that keeps the whole window inside the viewport.
+function Window:_clampedCentre(centre)
+    local viewport = self.Gui.AbsoluteSize
+    local half = self.Root.AbsoluteSize / 2
+    return Vector2.new(
+        math.clamp(centre.X, math.min(half.X, viewport.X / 2), math.max(viewport.X - half.X, viewport.X / 2)),
+        math.clamp(centre.Y, math.min(half.Y, viewport.Y / 2), math.max(viewport.Y - half.Y, viewport.Y / 2))
+    )
+end
+
 function Window:_clampToScreen()
     if not self.KeepOnScreen or self._resizeActive then
         return
     end
-    local viewport = self.Gui.AbsoluteSize
     local root = self.Root
-    local half = root.AbsoluteSize / 2
-    local centre = root.AbsolutePosition + half - self.Gui.AbsolutePosition
-    local clamped = Vector2.new(
-        math.clamp(centre.X, math.min(half.X, viewport.X / 2), math.max(viewport.X - half.X, viewport.X / 2)),
-        math.clamp(centre.Y, math.min(half.Y, viewport.Y / 2), math.max(viewport.Y - half.Y, viewport.Y / 2))
-    )
+    local centre = root.AbsolutePosition + root.AbsoluteSize / 2 - self.Gui.AbsolutePosition
+    local clamped = self:_clampedCentre(centre)
     if (clamped - centre).Magnitude > 0.5 then
         self._clampTween = tween(root, { Position = UDim2.fromOffset(clamped.X, clamped.Y) }, 0.25, Enum.EasingStyle.Quint)
     end
@@ -11343,6 +11451,15 @@ Interface:CreateDropdown({
     Flag = "ToggleButtonPlatform",
     Callback = function(Option)
         Window:SetToggleButtonPlatform(Option == "Mobile & PC" and "Both" or "Mobile")
+    end,
+})
+
+Interface:CreateToggle({
+    Name = "Drag Skeleton",
+    CurrentValue = true,
+    Flag = "DragSkeleton",
+    Callback = function(Value)
+        Window:SetDragSkeleton(Value)
     end,
 })
 
