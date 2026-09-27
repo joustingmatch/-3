@@ -58,6 +58,41 @@ local function finishElement(tab, opts, element, frame, kind)
             end
         end
     end
+    -- What the script asked for, kept apart from what search is currently hiding.
+    element._userVisible = opts.Visible ~= false
+    function element:IsVisible()
+        return element._userVisible
+    end
+    function element:_isShown()
+        return element._userVisible and not (tab and tab._userVisible == false)
+    end
+    function element:SetVisible(visible)
+        visible = visible and true or false
+        if visible == element._userVisible or element._destroyed then
+            return
+        end
+        element._userVisible = visible
+        if not visible then
+            if element._onHide then
+                element._onHide()
+            end
+            if element.Open and type(element.SetOpen) == "function" then
+                element:SetOpen(false)
+            end
+        end
+        if frame then
+            frame.Visible = visible and element._searchMatch ~= false
+        end
+        if window then
+            window._controlsDirty = true
+            if window._filtered and window.SearchBox then
+                window:_applySearch(window.SearchBox.Text)
+            end
+        end
+    end
+    if frame and not element._userVisible then
+        frame.Visible = false
+    end
     function element:Destroy()
         if element._destroyed then
             return
@@ -897,6 +932,7 @@ function Tab:_nextOrder()
 end
 
 function Tab:Section(text)
+    local visible = not (type(text) == "table" and text.Visible == false)
     if type(text) == "table" then
         text = text.Name or text.Title or ""
     end
@@ -931,14 +967,14 @@ function Tab:Section(text)
     end
     text_:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitRule)
     task.defer(fitRule)
-    return finishElement(self, {}, {
+    return finishElement(self, { Visible = visible }, {
         Set = function(_, value)
             text_.Text = string.upper(value)
         end,
     }, holder, "Section")
 end
 
-function Tab:Divider()
+function Tab:Divider(opts)
     local line = create("Frame", {
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Theme.Stroke,
@@ -957,7 +993,7 @@ function Tab:Divider()
             Parent = line,
         })
     end
-    return finishElement(self, {}, {}, line, "Divider")
+    return finishElement(self, { Visible = not (type(opts) == "table" and opts.Visible == false) }, {}, line, "Divider")
 end
 
 function Tab:Label(opts)
@@ -2449,6 +2485,12 @@ function Tab:Keybind(opts)
     task.defer(fitChip, true)
     function self_:Get()
         return self_.Value
+    end
+    self_._onHide = function()
+        if self_.Listening then
+            self_.Listening = false
+            render()
+        end
     end
     return finishElement(self, opts, self_, frame, "Keybind")
 end
@@ -4971,16 +5013,15 @@ function Tab:Groupbox(opts, icon)
         tween(horizontal, { BackgroundColor3 = on and Theme.Text or Theme.Muted }, 0.15)
         tween(vertical, { BackgroundColor3 = on and Theme.Text or Theme.Muted }, 0.15)
     end
-    header.MouseEnter:Connect(function()
+    collapseButton.MouseEnter:Connect(function()
         hover(true)
     end)
-    header.MouseLeave:Connect(function()
+    collapseButton.MouseLeave:Connect(function()
         hover(false)
     end)
     local function flip()
         setCollapsed(not collapsed)
     end
-    header.MouseButton1Click:Connect(flip)
     collapseButton.MouseButton1Click:Connect(flip)
 
     function group:SetCollapsed(value)
@@ -4999,6 +5040,35 @@ function Tab:Groupbox(opts, icon)
         group.Name = tostring(text)
         group._searchKey = string.lower(group.Name)
         title.Text = group.Name
+    end
+    group._userVisible = opts.Visible ~= false
+    function group:IsVisible()
+        return group._userVisible
+    end
+    function group:SetVisible(visible)
+        visible = visible and true or false
+        if visible == group._userVisible then
+            return
+        end
+        group._userVisible = visible
+        if not visible then
+            for _, element in ipairs(group._items) do
+                if element._onHide then
+                    element._onHide()
+                end
+                if element.Open and type(element.SetOpen) == "function" then
+                    element:SetOpen(false)
+                end
+            end
+        end
+        box.Visible = visible and group._searchMatch ~= false
+        window._controlsDirty = true
+        if window._filtered and window.SearchBox then
+            window:_applySearch(window.SearchBox.Text)
+        end
+    end
+    if not group._userVisible then
+        box.Visible = false
     end
     function group:Destroy()
         for index = #group._items, 1, -1 do
@@ -5078,7 +5148,7 @@ function Tab:ButtonRow(opts)
             entry.Label.Text = tostring(text)
         end
     end
-    return finishElement(self, { Name = table.concat(names, " ") }, handle, frame, "ButtonRow")
+    return finishElement(self, { Name = table.concat(names, " "), Visible = not (type(opts) == "table" and opts.Visible == false) }, handle, frame, "ButtonRow")
 end
 
 -- A text box with an action button beside it, for naming new configs and themes.
@@ -5812,9 +5882,328 @@ function Tab:Statuses(entries, shared)
     return handles
 end
 
+-- Status list: a read-only block of rows that grows up to MaxRows, then
+-- scrolls inside itself. Rows are reused between refreshes so nothing flickers.
+function Tab:StatusList(opts)
+    opts = normalize(opts, { Title = "Name" })
+    local compact = metricsOf(self).Compact
+    local window = self.Window
+    local maxRows = math.max(math.floor(tonumber(opts.MaxRows) or 5), 1)
+    local frame = card(self, "Frame", 0, opts)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+    if compact then
+        padding(frame, 14, 14, 6, 8)
+    else
+        padding(frame, 14, 14, 11, 12)
+    end
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 4),
+        Parent = frame,
+    })
+    local heading = label({
+        Size = UDim2.new(1, 0, 0, 16),
+        Text = string.upper(tostring(opts.Name or "")),
+        TextSize = 11,
+        TextColor3 = Theme.Muted,
+        Visible = tostring(opts.Name or "") ~= "",
+        LayoutOrder = 1,
+        Parent = frame,
+    })
+    local scroller = create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = Theme.Accent,
+        ScrollBarImageTransparency = 0.4,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(),
+        ScrollingEnabled = false,
+        LayoutOrder = 2,
+        Parent = frame,
+    })
+    scroller:SetAttribute("NoDrag", true)
+    local content = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = scroller,
+    })
+    local contentPadding = padding(content, 0, 0, 0, 0)
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = content,
+    })
+    local empty = label({
+        Size = UDim2.new(1, 0, 0, 24),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Text = tostring(opts.EmptyText or "Nothing yet"),
+        TextSize = 13,
+        LineHeight = 1.1,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextWrapped = true,
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 0,
+        Parent = content,
+    })
+
+    local rowObjects, rows, signature, raw = {}, {}, nil, {}
+    local handle = { _listeners = {} }
+
+    -- Fits the list to its first MaxRows rows, measured, so wrapped rows count
+    -- at their real height. Past MaxRows the list scrolls.
+    local function fit()
+        if handle._destroyed then
+            return
+        end
+        local scale = window.Scale.Scale
+        local count = #rows
+        local height = 0
+        if count == 0 then
+            height = empty.AbsoluteSize.Y / scale
+        else
+            local shown = math.min(count, maxRows)
+            for index = 1, shown do
+                height += rowObjects[index].Frame.AbsoluteSize.Y / scale
+            end
+            height += (shown - 1) * 2
+        end
+        height = math.ceil(height)
+        local scrolling = count > maxRows
+        scroller.ScrollingEnabled = scrolling
+        contentPadding.PaddingRight = UDim.new(0, scrolling and 8 or 0)
+        if scroller.Size.Y.Offset ~= height then
+            scroller.Size = UDim2.new(1, 0, 0, height)
+        end
+        local maxScroll = math.max(scroller.AbsoluteCanvasSize.Y - scroller.AbsoluteWindowSize.Y, 0) / scale
+        if scroller.CanvasPosition.Y > maxScroll then
+            scroller.CanvasPosition = Vector2.new(0, maxScroll)
+        end
+    end
+
+    local function fitText(row)
+        if row.Value.Visible then
+            row.Text.Size = UDim2.new(1, -(math.ceil(row.Value.AbsoluteSize.X / window.Scale.Scale) + 12), 0, 24)
+        else
+            row.Text.Size = UDim2.new(1, 0, 0, 24)
+        end
+    end
+
+    local function newRow(order)
+        local holder = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+            Parent = content,
+        })
+        local row = {
+            Frame = holder,
+            Text = label({
+                Size = UDim2.new(1, 0, 0, 24),
+                AutomaticSize = Enum.AutomaticSize.Y,
+                Text = "",
+                TextSize = 13,
+                LineHeight = 1.1,
+                FontFace = Fonts.Regular,
+                TextColor3 = Theme.Muted,
+                TextWrapped = true,
+                TextTruncate = Enum.TextTruncate.None,
+                Parent = holder,
+            }),
+            Value = label({
+                AnchorPoint = Vector2.new(1, 0),
+                Position = UDim2.new(1, 0, 0, 0),
+                Size = UDim2.new(0, 0, 0, 24),
+                AutomaticSize = Enum.AutomaticSize.X,
+                Text = "",
+                TextSize = 12,
+                FontFace = Fonts.Medium,
+                TextColor3 = Theme.Text,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                TextTruncate = Enum.TextTruncate.None,
+                Visible = false,
+                Parent = holder,
+            }),
+        }
+        row.Connections = {
+            holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit),
+            row.Value:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+                fitText(row)
+            end),
+        }
+        return row
+    end
+
+    local function normalizeRow(entry)
+        if type(entry) == "table" then
+            local text = entry.Text or entry.Name or entry[1]
+            return {
+                Text = tostring(text == nil and "" or text),
+                Value = entry.Value ~= nil and tostring(entry.Value) or nil,
+                Tone = type(entry.Tone) == "string" and entry.Tone or nil,
+            }
+        end
+        return { Text = tostring(entry) }
+    end
+
+    local function rowKey(entry)
+        return entry.Text .. "\0" .. (entry.Value or "\1") .. "\0" .. (entry.Tone or "")
+    end
+
+    -- Tone tints the value, or the text when there is no value.
+    local function paint(row, entry)
+        local key = rowKey(entry)
+        if row.Key == key then
+            return
+        end
+        row.Key = key
+        row.Text.Text = entry.Text
+        local tone = entry.Tone and typeof(Theme[entry.Tone]) == "Color3" and Theme[entry.Tone] or nil
+        if entry.Value then
+            row.Value.Text = entry.Value
+            row.Value.Visible = true
+            tween(row.Value, { TextColor3 = tone or Theme.Text }, 0)
+            tween(row.Text, { TextColor3 = Theme.Muted }, 0)
+        else
+            row.Value.Visible = false
+            tween(row.Text, { TextColor3 = tone or Theme.Muted }, 0)
+        end
+        fitText(row)
+    end
+
+    local function dropRow(row)
+        for _, connection in ipairs(row.Connections) do
+            connection:Disconnect()
+        end
+        row.Frame:Destroy()
+    end
+
+    function handle:Set(list)
+        if type(list) ~= "table" or handle._destroyed then
+            return
+        end
+        local nextRows, keys = {}, {}
+        raw = {}
+        for index, entry in ipairs(list) do
+            raw[index] = type(entry) == "table" and table.clone(entry) or entry
+            local row = normalizeRow(entry)
+            nextRows[index] = row
+            keys[index] = rowKey(row)
+        end
+        local nextSignature = table.concat(keys, "\2") .. "#" .. #nextRows
+        if nextSignature == signature then
+            return
+        end
+        signature = nextSignature
+        rows = nextRows
+        for index, entry in ipairs(rows) do
+            local row = rowObjects[index]
+            if not row then
+                row = newRow(index)
+                rowObjects[index] = row
+            end
+            paint(row, entry)
+        end
+        for index = #rowObjects, #rows + 1, -1 do
+            dropRow(rowObjects[index])
+            rowObjects[index] = nil
+        end
+        empty.Visible = #rows == 0
+        fit()
+    end
+    function handle:Get()
+        local copy = {}
+        for index, entry in ipairs(raw) do
+            copy[index] = type(entry) == "table" and table.clone(entry) or entry
+        end
+        return copy
+    end
+    function handle:Clear()
+        handle:Set({})
+    end
+    function handle:SetName(text)
+        text = tostring(text or "")
+        heading.Text = string.upper(text)
+        heading.Visible = text ~= ""
+        handle._searchKey = string.lower(text)
+    end
+    local rate = math.max(tonumber(opts.UpdateRate) or 1, 0.05)
+    function handle:SetUpdateRate(seconds)
+        rate = math.max(tonumber(seconds) or rate, 0.05)
+    end
+
+    local emptyConnection = empty:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+    table.insert(handle._listeners, function()
+        handle._destroyed = true
+        emptyConnection:Disconnect()
+        for _, row in ipairs(rowObjects) do
+            for _, connection in ipairs(row.Connections) do
+                connection:Disconnect()
+            end
+        end
+    end)
+
+    -- Refreshes only while someone can see it: window open and not minimized,
+    -- its tab and sub tab showing, and neither it nor its groupbox hidden.
+    local function onScreen()
+        if window._destroyed or not window.Open or window.Minimized or not handle._userVisible then
+            return false
+        end
+        local page = self
+        if page._groupbox then
+            if page._userVisible == false then
+                return false
+            end
+            page = page.Parent
+        end
+        if page._isSubTab then
+            if page.Parent.CurrentSubTab ~= page then
+                return false
+            end
+            page = page.Parent
+        end
+        return window.CurrentTab == page
+    end
+
+    if type(opts.Update) == "function" then
+        local alive = true
+        table.insert(handle._listeners, function()
+            alive = false
+        end)
+        task.defer(function()
+            local first = true
+            while alive and frame.Parent do
+                if first or onScreen() then
+                    first = false
+                    local ok, err = pcall(function()
+                        local result = opts.Update()
+                        if result ~= nil then
+                            handle:Set(result)
+                        end
+                    end)
+                    if not ok then
+                        warn("[AirFlow] status list update error: " .. tostring(err))
+                    end
+                end
+                task.wait(rate)
+            end
+        end)
+    end
+
+    handle:Set(opts.Rows or {})
+    return finishElement(self, opts, handle, frame, "StatusList")
+end
+
 Tab.CreateStatus = Tab.Status
 Tab.AddStatus = Tab.Status
 Tab.CreateStatuses = Tab.Statuses
+Tab.CreateStatusList = Tab.StatusList
+Tab.AddStatusList = Tab.StatusList
 
 local function settleSubOut(ui)
     if ui.OutFrame then
@@ -6132,10 +6521,11 @@ local function filterContainer(container, query)
     local hits = 0
     for _, element in ipairs(container._items or {}) do
         local show = not searching or (not isStructural(element) and hit(element._searchKey))
+        element._searchMatch = show
         if element._frame then
-            element._frame.Visible = show
+            element._frame.Visible = show and element._userVisible ~= false
         end
-        if show then
+        if show and element._userVisible ~= false then
             hits += 1
         end
     end
@@ -6144,14 +6534,16 @@ local function filterContainer(container, query)
         local any = false
         for _, element in ipairs(group._items) do
             local show = titleHit or (not isStructural(element) and hit(element._searchKey))
+            element._searchMatch = show
             if element._frame then
-                element._frame.Visible = show
+                element._frame.Visible = show and element._userVisible ~= false
             end
-            any = any or show
+            any = any or (show and element._userVisible ~= false)
         end
         local visible = titleHit or any
-        group._frame.Visible = visible
-        if visible then
+        group._searchMatch = visible
+        group._frame.Visible = visible and group._userVisible ~= false
+        if visible and group._userVisible ~= false then
             hits += 1
         end
     end
@@ -7937,7 +8329,12 @@ function Window:_buildMiniBar()
         active.Visible = running > 0
         activeLabel.Text = running .. " on"
 
-        local list = self._pinned
+        local list = {}
+        for _, handle in ipairs(self._pinned) do
+            if not handle._isShown or handle:_isShown() then
+                table.insert(list, handle)
+            end
+        end
         local shown = math.min(#list, MAX_PINNED)
         pinnedDivider.Visible = shown > 0
         pinned.Visible = shown > 0
@@ -8529,6 +8926,49 @@ Live:CreateStatus({ Name = "Server", Value = "Healthy", Style = "Badge", Tone = 
 Live:CreateStatus({ Name = "Rank", Style = "Bar", Tone = "Warning", Update = function()
     return (os.clock() * 100) % 7000, 7000 -- a number second return sets the max
 end, UpdateRate = 0.5 })
+
+-- Status list: grows with its rows up to MaxRows, then scrolls inside itself.
+local Hotbar = Run:AddRightGroupbox({ Name = "Hotbar", Icon = "zap" })
+local skills = {
+    "Z", "X", "C", "V", "B", "N", "M", "F",
+}
+Hotbar:CreateStatusList({
+    Name = "Skills",
+    MaxRows = 5,
+    EmptyText = "no skills on the hotbar yet",
+    UpdateRate = 0.5,
+    Update = function()
+        local rows = { "Z Compound Eye Hexagon (on target, up to 3s)" } -- a plain string is one wrapped line
+        for index = 2, #skills do
+            local cooldown = math.floor((os.clock() + index * 3) % 15)
+            rows[index] = {
+                Text = skills[index] .. " Skill " .. index,
+                Value = cooldown == 0 and "ready" or ("cooldown " .. cooldown .. "s"),
+                Tone = cooldown == 0 and "Success" or (cooldown > 10 and "Warning" or nil),
+            }
+        end
+        return rows -- 8 rows with MaxRows = 5, so the list scrolls
+    end,
+})
+
+-- Dependent controls: the slider only shows while the toggle is on.
+local Charge -- declared first so the toggle's callback can reach it
+Hotbar:CreateToggle({
+    Name = "Hold Skills",
+    CurrentValue = false,
+    Flag = "HoldSkills",
+    Callback = function(Value)
+        Charge:SetVisible(Value)
+    end,
+})
+Charge = Hotbar:CreateSlider({
+    Name = "Charge Distance",
+    Range = { 5, 60 },
+    Increment = 1,
+    CurrentValue = 20,
+    Visible = false, -- starts hidden, still saves and loads with the config
+    Flag = "ChargeDistance",
+})
 
 Farm:CreateSubTab({ Name = "Quests" }) -- an empty sub tab shows the empty state
 

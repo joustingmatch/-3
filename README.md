@@ -6,7 +6,7 @@
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
 ```
 
-Every constructor also works without the `Create` prefix. `Tab:Toggle` is the same as `Tab:CreateToggle`. Every element handle also has `Destroy()`, which removes the card, its listeners and its flag.
+Every constructor also works without the `Create` prefix. `Tab:Toggle` is the same as `Tab:CreateToggle`. Every element handle also has `Destroy()`, which removes the card, its listeners and its flag, and `SetVisible(bool)` / `IsVisible()`. Every constructor takes `Visible = false` to start hidden. See [Visibility](#visibility).
 
 ---
 
@@ -256,7 +256,7 @@ Mobs:CreateLabel("Status: idle")
 Auto:Expand()
 ```
 
-Inside a groupbox, elements are compact rows without their own card. Dropdowns and inputs take the same share of the row so their boxes line up, and buttons fill the width. Click the header or the `−` to collapse it. Without `Side`, each new groupbox goes to the column with fewer boxes.
+Inside a groupbox, elements are compact rows without their own card. Dropdowns and inputs take the same share of the row so their boxes line up, and buttons fill the width. Click the `−` on the header to collapse it. Without `Side`, each new groupbox goes to the column with fewer boxes.
 
 ### Properties
 
@@ -266,6 +266,7 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | `Icon` | string \| number \| table | — | Accent icon on the right of the header. |
 | `Side` | `"Left"` \| `"Right"` \| 1 \| 2 | balanced | Column. |
 | `Collapsed` | boolean | `false` | Start collapsed. |
+| `Visible` | boolean | `true` | Start hidden. |
 
 ### Handle
 
@@ -275,7 +276,25 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | `Collapse()` / `Expand()` / `SetCollapsed(bool)` | Animate closed or open. |
 | `IsCollapsed()` | Current state. |
 | `SetTitle(text)` | Rename the header. |
+| `SetVisible(bool)` / `IsVisible()` | Hide or show the whole card. Its column closes the gap. |
 | `Destroy()` | Remove the groupbox and its elements. |
+
+---
+
+## Visibility
+
+Any element or groupbox can be hidden and shown again. A hidden row takes no space, so its groupbox shrinks and grows with it.
+
+```lua
+local Charge -- declared first so the toggle's callback can reach it
+local Hold = Box:CreateToggle({ Name = "Hold Skills", Flag = "HoldSkills", Callback = function(v) Charge:SetVisible(v) end })
+Charge = Box:CreateSlider({ Name = "Charge Distance", Range = { 5, 60 }, Visible = false, Flag = "ChargeDistance" })
+```
+
+- Search never reveals something you hid, and clearing the search leaves it hidden.
+- Hidden elements keep their flag. They still save, load and run callbacks, so loading a config with `HoldSkills` on shows `Charge`. Visibility itself is not saved.
+- Hiding an open dropdown or colour picker closes it, and hiding a keybind stops a capture.
+- A hidden pinned status leaves the minimized bar until it is shown again.
 
 ---
 
@@ -403,6 +422,55 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | `SetTone(tone)` / `SetName(name)` | Recolour or rename. |
 | `SetUpdateRate(seconds)` | When `Update` is set. |
 | `Tab:CreateStatuses(entries, shared?)` | Several at once. Entries are names or option tables; `shared` fills missing options. Returns the handles by name. |
+
+---
+
+## Status List
+
+> A read-only block of rows that grows up to `MaxRows`, then scrolls inside itself. Built for groupboxes: hotbar skills, boss timers, a queue.
+
+```lua
+local Skills = Box:CreateStatusList({
+    Name = "Hotbar",
+    MaxRows = 5,
+    EmptyText = "no skills on the hotbar yet",
+    UpdateRate = 0.5,
+    Update = function()
+        return {
+            "Z Compound Eye Hexagon (on target, up to 3s)",
+            { Text = "X True Flutter", Value = "charges 3s" },
+            { Text = "B Illusory Light", Value = "cooldown 12s", Tone = "Warning" },
+        }
+    end,
+})
+Skills:Set({ "one row", "another row" })
+```
+
+A plain string is one muted line that wraps. A table `{ Text, Value?, Tone? }` puts `Text` on the left and `Value` on the right, like the `Row` status style. `Tone` is any theme colour name and tints the value, or the text when there is no value.
+
+Rows are reused between refreshes, and unchanged rows are skipped, so it never flickers. The scroll position survives a refresh. The mouse wheel scrolls the list, and at its top or bottom edge the page scrolls instead. `Update` only runs while the list is on screen: not while the window is hidden or minimized, another tab or sub tab is open, or the list or its groupbox is hidden. Search matches the list's `Name`, not its rows.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | Optional small muted heading above the rows. Omit it for no heading. |
+| `Rows` | table | `{}` | Initial rows. |
+| `MaxRows` | number | `5` | Rows shown before the list scrolls. |
+| `EmptyText` | string | `"Nothing yet"` | One muted line shown when there are no rows. |
+| `Update` / `UpdateRate` | function / number | — / `1` | Timer refresh. The return value is the row list. Returning `nil` keeps the current rows. |
+| `Visible` | boolean | `true` | Start hidden. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `Set(rows)` | Replace all rows. |
+| `Get()` | The current rows, as a copy. |
+| `Clear()` | Remove all rows. The `EmptyText` shows. |
+| `SetName(text)` | Change the heading. |
+| `SetUpdateRate(seconds)` | When `Update` is set. |
+| `SetVisible(bool)` / `IsVisible()` / `Destroy()` | Shared by every element. |
 
 ---
 
