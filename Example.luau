@@ -3503,7 +3503,7 @@ function Library.Window(_, opts)
     local logo = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 2),
-        Size = UDim2.fromOffset(34, 34),
+        Size = UDim2.fromOffset(42, 42),
         BackgroundTransparency = 1,
         Image = "",
         ImageColor3 = Theme.Accent,
@@ -4032,18 +4032,17 @@ function Window:_showLoader(opts)
     local loader = create("CanvasGroup", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 16),
-        Size = UDim2.fromOffset(300, 132),
+        Size = UDim2.fromOffset(340, 150),
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
         GroupTransparency = 1,
         ZIndex = 10,
         Parent = gui,
     })
-    local loaderCorner = corner(loader, UDim.new(0, 12))
+    local loaderCorner = corner(loader, UDim.new(0, 14))
     local loaderStroke = stroke(loader, Theme.Stroke, 1)
     edgeHighlight(loader)
-    glow(loader, UDim2.fromOffset(320, 140), UDim2.new(1, -20, 0, -20), 0.85, 90)
-    glow(loader, UDim2.fromOffset(240, 100), UDim2.new(0, 10, 1, 10), 0.9, 270)
+    glow(loader, UDim2.fromOffset(340, 150), UDim2.new(1, -20, 0, -20), 0.88, 90)
     local loaderScale = create("UIScale", { Scale = 0.92, Parent = loader })
     local loaderShadow = create("ImageLabel", {
         Position = UDim2.fromOffset(-25, -25),
@@ -4058,32 +4057,19 @@ function Window:_showLoader(opts)
         Parent = loader,
     })
 
+    -- Logo on the left, title and status beside it, progress along the bottom.
+    local TEXT_X = 104
     local logoHolder = create("Frame", {
-        Position = UDim2.fromOffset(24, 26),
-        Size = UDim2.fromOffset(40, 40),
+        Position = UDim2.fromOffset(24, 22),
+        Size = UDim2.fromOffset(64, 64),
         BackgroundTransparency = 1,
         Parent = loader,
-    })
-    -- A soft accent halo that breathes behind the logo while loading.
-    local halo = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromScale(0.6, 0.6),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        Parent = logoHolder,
-    })
-    corner(halo, UDim.new(1, 0))
-    local haloBreath = TweenService:Create(halo, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-        Size = UDim2.fromScale(1.35, 1.35),
-        BackgroundTransparency = 0.94,
     })
     local logo = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromScale(0.5, 0.5),
-        Rotation = -14,
+        Size = UDim2.fromScale(0.6, 0.6),
+        Rotation = -20,
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ImageTransparency = 1,
@@ -4091,40 +4077,48 @@ function Window:_showLoader(opts)
         Parent = logoHolder,
     })
     applyIcon(logo, opts.Icon or Assets.Logo, true)
-    task.delay(0.15, function()
-        tween(logo, { Size = UDim2.fromScale(0.85, 0.85), Rotation = 0, ImageTransparency = 0 }, 0.6, Enum.EasingStyle.Back)
-        halo.BackgroundTransparency = 0.8
-        haloBreath:Play()
+    -- The logo settles in, then drifts gently while the bar fills.
+    local float = TweenService:Create(logo, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        Position = UDim2.new(0.5, 0, 0.5, -3),
+    })
+    task.delay(0.1, function()
+        tween(logo, { Size = UDim2.fromScale(1, 1), Rotation = 0, ImageTransparency = 0 }, 0.7, Enum.EasingStyle.Back)
+        task.delay(0.7, function()
+            if loader.Parent then
+                float:Play()
+            end
+        end)
     end)
-    label({
-        Position = UDim2.fromOffset(78, 30),
-        Size = UDim2.new(1, -100, 0, 22),
+
+    local titleLabel = label({
+        Position = UDim2.fromOffset(TEXT_X + 10, 32),
+        Size = UDim2.new(1, -TEXT_X - 24, 0, 24),
         Text = opts.LoadingTitle or opts.Title or "Airflow",
-        TextSize = 20,
+        TextSize = 22,
+        TextTransparency = 1,
         Parent = loader,
     })
     local statusLabel = label({
-        Position = UDim2.fromOffset(78, 52),
-        Size = UDim2.new(1, -150, 0, 16),
+        Position = UDim2.fromOffset(TEXT_X + 10, 60),
+        Size = UDim2.new(1, -TEXT_X - 24, 0, 16),
         Text = opts.LoadingText or opts.Subtitle or "Loading",
         TextSize = 13,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
+        TextTransparency = 1,
         Parent = loader,
     })
-    local percentLabel = label({
-        Position = UDim2.new(1, -64, 0, 52),
-        Size = UDim2.fromOffset(40, 16),
-        Text = "0%",
-        TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = loader,
-    })
+    -- Title and status slide in a beat after the card.
+    task.delay(0.15, function()
+        tween(titleLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 32) }, 0.45, Enum.EasingStyle.Quint)
+    end)
+    task.delay(0.25, function()
+        tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 60) }, 0.45, Enum.EasingStyle.Quint)
+    end)
+
     local track = create("Frame", {
-        Position = UDim2.new(0, 24, 1, -30),
-        Size = UDim2.new(1, -48, 0, 4),
+        Position = UDim2.new(0, 24, 1, -34),
+        Size = UDim2.new(1, -100, 0, 6),
         BackgroundColor3 = Theme.Surface3,
         BorderSizePixel = 0,
         ClipsDescendants = true,
@@ -4133,16 +4127,20 @@ function Window:_showLoader(opts)
     corner(track, UDim.new(1, 0))
     local fill = create("Frame", {
         Size = UDim2.fromScale(0, 1),
-        BackgroundColor3 = Theme.Accent,
+        BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0,
         Parent = track,
     })
     corner(fill, UDim.new(1, 0))
+    create("UIGradient", {
+        Color = ColorSequence.new(Theme.Accent:Lerp(Color3.new(0, 0, 0), 0.25), Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.2)),
+        Parent = fill,
+    })
     local sheen = create("Frame", {
         Position = UDim2.fromScale(-0.4, 0),
         Size = UDim2.fromScale(0.4, 1),
         BackgroundColor3 = Color3.new(1, 1, 1),
-        BackgroundTransparency = 0.6,
+        BackgroundTransparency = 0.65,
         BorderSizePixel = 0,
         ZIndex = 2,
         Parent = track,
@@ -4155,10 +4153,19 @@ function Window:_showLoader(opts)
         }),
         Parent = sheen,
     })
+    local percentLabel = label({
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -24, 1, -31),
+        Size = UDim2.fromOffset(44, 16),
+        Text = "0%",
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = loader,
+    })
 
     tween(loader, { GroupTransparency = 0, Position = UDim2.fromScale(0.5, 0.5) }, 0.4, Enum.EasingStyle.Quint)
     tween(loaderScale, { Scale = 1 }, 0.5, Enum.EasingStyle.Back)
-    tween(loaderShadow, { ImageTransparency = 0.6 }, 0.4)
+    tween(loaderShadow, { ImageTransparency = 0.55 }, 0.4)
     local sweep = TweenService:Create(sheen, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1), {
         Position = UDim2.fromScale(1, 0),
     })
@@ -4187,14 +4194,14 @@ function Window:_showLoader(opts)
                 return
             end
             -- Old step drifts up and out, the new one rises in under it.
-            tween(statusLabel, { TextTransparency = 1, Position = UDim2.fromOffset(78, 48) }, 0.12)
+            tween(statusLabel, { TextTransparency = 1, Position = UDim2.fromOffset(TEXT_X, 56) }, 0.12)
             task.delay(0.12, function()
                 if not loader.Parent then
                     return
                 end
                 statusLabel.Text = text
-                statusLabel.Position = UDim2.fromOffset(78, 56)
-                tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(78, 52) }, 0.22, Enum.EasingStyle.Quint)
+                statusLabel.Position = UDim2.fromOffset(TEXT_X, 64)
+                tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 60) }, 0.22, Enum.EasingStyle.Quint)
             end)
         end)
     end
@@ -4203,18 +4210,13 @@ function Window:_showLoader(opts)
         tween(fill, { Size = UDim2.fromScale(1, 1) }, 0.25, Enum.EasingStyle.Quint)
         task.delay(0.25, function()
             sweep:Cancel()
-            haloBreath:Cancel()
-            tween(halo, { BackgroundTransparency = 1 }, 0.15)
+            float:Cancel()
             for _, item in ipairs(loader:GetChildren()) do
                 if item:IsA("TextLabel") then
                     tween(item, { TextTransparency = 1 }, 0.15)
                 end
             end
-            for _, item in ipairs(logoHolder:GetChildren()) do
-                if item:IsA("ImageLabel") then
-                    tween(item, { ImageTransparency = 1 }, 0.15)
-                end
-            end
+            tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
             tween(track, { BackgroundTransparency = 1 }, 0.15)
             tween(fill, { BackgroundTransparency = 1 }, 0.15)
             tween(sheen, { BackgroundTransparency = 1 }, 0.1)
@@ -9795,7 +9797,7 @@ function Window:_buildMiniBar()
 
     local brand = inline(1, 8)
     local logo = create("ImageLabel", {
-        Size = UDim2.fromOffset(20, 20),
+        Size = UDim2.fromOffset(24, 24),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
