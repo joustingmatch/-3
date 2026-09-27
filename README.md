@@ -67,7 +67,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | --- | --- | --- | --- |
 | `Name` | string | `"Airflow"` | Title in the sidebar header. Also names the ScreenGui. |
 | `LoadingSubtitle` | string | — | Small line under the title. |
-| `Icon` | string \| number \| table | bird logo | Lucide name, asset id, or `{ Image, RectOffset, RectSize, Tint }`. See [Icons](#icons). |
+| `Icon` | string \| number \| table | OuroFlow mark (theme tinted) | Lucide name, asset id, or `{ Image, RectOffset, RectSize, Tint }`. See [Icons](#icons). |
 | `ToggleUIKeybind` | string \| KeyCode | `"RightControl"` | Hides and shows the window. `"RightShift"`, `"LeftAlt"`, `"Insert"`, `"F1"`, or an `Enum.KeyCode`. |
 | `Size` | UDim2 | `760 × 520` | Starting size. |
 | `MinSize` | Vector2 | `480 × 360` | Smallest size the resize grip allows. |
