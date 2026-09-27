@@ -88,6 +88,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
+| `UnsupportedExecutor` | table \| false | on | When the executor is off `SupportedExecutors` (window or `Home` option) or, without a list, lacks the file, clipboard or request functions, the loading card turns into a warning with **Exit** and **Continue anyway** before the window opens. Shown even with `Loading = false`. `{ Title, Text, Block = true }` changes the wording or drops Continue; `false` turns it off. |
 | `Loading.Title` | string | `Name` | Title on the card. |
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
 | `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |
@@ -1061,7 +1062,7 @@ The config manager is a groupbox with, from top to bottom:
 - **Refresh list**
 - a **share** section: **Copy code** puts the current settings on the clipboard as a code, and **Import code** applies a pasted code and saves it. It's saved under the name in the name box, or else the name inside the code (with ` (2)`, ` (3)`... added rather than overwriting a config you already have).
 
-Save with nothing picked creates a config from the typed name. **Rename** renames the picked config to the typed name and moves the loaded name and autoloads with it. **Reset** puts every flagged element back to the value it was created with, after a confirm. Names can't contain `\ / : * ? " < > |`.
+Save with nothing picked creates a config from the typed name. **Rename** renames the picked config to the typed name and moves the loaded name and autoloads with it. **Reset** puts every flagged element back to the value it was created with and deletes the script's whole `FolderName` folder (configs, saved themes, the default theme, autoload, settings, execution count), after a confirm. Names can't contain `\ / : * ? " < > |`.
 
 `LoadAutoload` can run before every element exists. Values for flags that no element has claimed yet are held and applied as soon as an element with that flag is created, and saving writes them back, so a config never loses settings for elements that only exist some of the time (a game-specific tab, say).
 
@@ -1100,6 +1101,7 @@ Requires `writefile` / `readfile`.
 | `Window:RenameConfig(name, newName)` | Rename a config, carrying the loaded name and autoloads along. Refuses to overwrite. |
 | `Window:ConfigExists(name)` | Whether `<folder>/<name>.json` exists. |
 | `Window:ResetConfig(skipCallbacks?)` | Put every flagged element back to its starting value. |
+| `Window:ClearWorkspace()` | Delete the script's `FolderName` folder and everything in it. Returns `false` if some files could not be removed. |
 | `Window:ListConfigs()` | Saved names, sorted without regard to case. |
 | `Window.LoadedConfig` | Name of the loaded config, or `nil`. |
 | `Window:ExportConfig(name?)` | Share code (the config JSON) for a saved config, or for the current settings when `name` is `nil`. |

@@ -3360,6 +3360,37 @@ local function detectExecutor()
     return RunService:IsStudio() and "Studio" or "Unknown"
 end
 
+local function executorReport(opts)
+    local executor = detectExecutor()
+    local supported = opts.SupportedExecutors
+    if type(supported) == "table" then
+        local lowered = string.lower(executor)
+        for _, name in ipairs(supported) do
+            if string.find(lowered, string.lower(tostring(name)), 1, true) then
+                return executor, true, "Your executor is supported and fully compatible."
+            end
+        end
+        return executor, false, "Not on the supported list. Some features may not work."
+    end
+    local capabilities = {
+        { "writefile", writefile },
+        { "readfile", readfile },
+        { "getcustomasset", getcustomasset },
+        { "setclipboard", setclipboard or toclipboard },
+        { "request", request or http_request or (syn and syn.request) },
+    }
+    local missing = {}
+    for _, entry in ipairs(capabilities) do
+        if type(entry[2]) ~= "function" then
+            table.insert(missing, entry[1])
+        end
+    end
+    if #missing == 0 then
+        return executor, true, "Your executor is supported and fully compatible."
+    end
+    return executor, false, "Missing " .. table.concat(missing, ", ") .. ". Some features may not work."
+end
+
 local gameInfoCache = nil
 
 local function fetchGameInfo()
@@ -3856,6 +3887,26 @@ function Library.Window(_, opts)
         opts.LoadingTitle = loading.Title or opts.LoadingTitle
         loading = loading.Enabled ~= false
     end
+    -- An executor off the supported list (or missing the file / asset API)
+    -- stops at a warning card before the window opens.
+    local gate = opts.UnsupportedExecutor
+    if gate ~= false then
+        gate = type(gate) == "table" and gate or {}
+        local list = opts.SupportedExecutors or (type(opts.Home) == "table" and opts.Home.SupportedExecutors or nil)
+        local executor, supported, message = executorReport({ SupportedExecutors = list })
+        if not supported then
+            opts._unsupported = {
+                Executor = executor,
+                Title = gate.Title or "Unsupported executor",
+                Text = gate.Text or message,
+                Block = gate.Block == true,
+            }
+        end
+    end
+    if loading == false and opts._unsupported then
+        opts.LoadingDuration = opts.LoadingDuration or 0.5
+        loading = true
+    end
     if loading == false then
         task.defer(function()
             self:_playIntro()
@@ -4272,39 +4323,214 @@ function Window:_showLoader(opts)
         end)
     end
 
+    local function finish()
+        sweep:Cancel()
+        float:Cancel()
+        for _, item in ipairs(loader:GetChildren()) do
+            if item:IsA("TextLabel") then
+                tween(item, { TextTransparency = 1 }, 0.15)
+            end
+        end
+        tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
+        tween(track, { BackgroundTransparency = 1 }, 0.15)
+        tween(fill, { BackgroundTransparency = 1 }, 0.15)
+        tween(sheen, { BackgroundTransparency = 1 }, 0.1)
+
+        local fit = self._fitScale or 1
+        local target = self.Root.Size
+        tween(loader, {
+            Size = UDim2.fromOffset(target.X.Offset * fit, target.Y.Offset * fit),
+            Position = UDim2.fromScale(0.5, 0.5),
+        }, 0.5, Enum.EasingStyle.Quint)
+        tween(loaderCorner, { CornerRadius = UDim.new(0, 10) }, 0.5, Enum.EasingStyle.Quint)
+        tween(loaderScale, { Scale = 1 }, 0.5, Enum.EasingStyle.Quint)
+
+        task.delay(0.28, function()
+            self:_playIntro(true)
+            tween(loader, { GroupTransparency = 1 }, 0.25)
+            tween(loaderStroke, { Transparency = 1 }, 0.2)
+            tween(loaderShadow, { ImageTransparency = 1 }, 0.2)
+        end)
+        task.delay(0.6, function()
+            loader:Destroy()
+        end)
+    end
+
+    -- Unsupported executor: the bar gives way to a warning card with
+    -- Continue (unless blocked) and Exit.
+    local function warnUnsupported(info)
+        sweep:Cancel()
+        float:Cancel()
+        tween(titleLabel, { TextTransparency = 1 }, 0.15)
+        tween(statusLabel, { TextTransparency = 1 }, 0.15)
+        tween(percentLabel, { TextTransparency = 1 }, 0.15)
+        tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
+        tween(track, { BackgroundTransparency = 1 }, 0.15)
+        tween(fill, { BackgroundTransparency = 1 }, 0.15)
+        tween(sheen, { BackgroundTransparency = 1 }, 0.1)
+
+        local WIDTH, PAD = 360, 24
+        local warnCard = create("CanvasGroup", {
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            GroupTransparency = 1,
+            ZIndex = 5,
+            Parent = loader,
+        })
+        local badge = create("Frame", {
+            Position = UDim2.fromOffset(PAD, PAD),
+            Size = UDim2.fromOffset(44, 44),
+            BackgroundColor3 = Theme.Warning,
+            BackgroundTransparency = 0.86,
+            BorderSizePixel = 0,
+            Parent = warnCard,
+        })
+        corner(badge, UDim.new(0, 12))
+        stroke(badge, Theme.Warning, 1).Transparency = 0.6
+        local badgeIcon = create("ImageLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(22, 22),
+            BackgroundTransparency = 1,
+            ImageColor3 = Theme.Warning,
+            ScaleType = Enum.ScaleType.Fit,
+            Parent = badge,
+        })
+        applyIcon(badgeIcon, "shield-alert")
+        label({
+            Position = UDim2.fromOffset(PAD + 58, PAD + 3),
+            Size = UDim2.new(1, -(PAD * 2 + 58), 0, 20),
+            Text = info.Title,
+            TextSize = 17,
+            Parent = warnCard,
+        })
+        label({
+            Position = UDim2.fromOffset(PAD + 58, PAD + 25),
+            Size = UDim2.new(1, -(PAD * 2 + 58), 0, 16),
+            Text = info.Executor,
+            TextSize = 13,
+            TextColor3 = Theme.Warning,
+            Parent = warnCard,
+        })
+        local body = label({
+            Position = UDim2.fromOffset(PAD, PAD + 60),
+            Size = UDim2.new(1, -PAD * 2, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            Text = info.Block and (info.Text .. " This script can't run here.") or info.Text,
+            TextSize = 13,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextWrapped = true,
+            TextTruncate = Enum.TextTruncate.None,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            Parent = warnCard,
+        })
+        local row = create("Frame", {
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, PAD, 1, -PAD + 4),
+            Size = UDim2.new(1, -PAD * 2, 0, 34),
+            BackgroundTransparency = 1,
+            Parent = warnCard,
+        })
+        create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            HorizontalAlignment = Enum.HorizontalAlignment.Right,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 8),
+            Parent = row,
+        })
+
+        local chosen = false
+        local function button(text, primary, order, callback)
+            local frame = create("TextButton", {
+                Size = UDim2.fromOffset(0, 34),
+                AutomaticSize = Enum.AutomaticSize.X,
+                BackgroundColor3 = primary and Theme.Accent or Theme.Surface2,
+                BackgroundTransparency = primary and 0.12 or 0,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = order,
+                Parent = row,
+            })
+            corner(frame, UDim.new(0, 7))
+            local frameStroke = stroke(frame, primary and Theme.Accent or Theme.Stroke, 1)
+            frameStroke.Transparency = primary and 0.4 or 0
+            padding(frame, 14, 14)
+            label({
+                Size = UDim2.new(0, 0, 1, 0),
+                AutomaticSize = Enum.AutomaticSize.X,
+                Text = text,
+                TextSize = 13,
+                TextColor3 = primary and Theme.AccentDark or Theme.Text,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                Parent = frame,
+            })
+            frame.MouseEnter:Connect(function()
+                if primary then
+                    tween(frame, { BackgroundTransparency = 0 }, 0.12)
+                    tween(frameStroke, { Transparency = 0 }, 0.12)
+                else
+                    tween(frameStroke, { Color = Theme.StrokeHover }, 0.12)
+                end
+            end)
+            frame.MouseLeave:Connect(function()
+                if primary then
+                    tween(frame, { BackgroundTransparency = 0.12 }, 0.2)
+                    tween(frameStroke, { Transparency = 0.4 }, 0.2)
+                else
+                    tween(frameStroke, { Color = Theme.Stroke }, 0.2)
+                end
+            end)
+            frame.MouseButton1Click:Connect(function()
+                if chosen then
+                    return
+                end
+                chosen = true
+                callback()
+            end)
+        end
+        button("Exit", info.Block, 1, function()
+            tween(loader, { GroupTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, 12) }, 0.25, Enum.EasingStyle.Quint)
+            tween(loaderShadow, { ImageTransparency = 1 }, 0.2)
+            task.delay(0.25, function()
+                self:Destroy()
+            end)
+        end)
+        if not info.Block then
+            button("Continue anyway", true, 2, function()
+                tween(warnCard, { GroupTransparency = 1 }, 0.15)
+                task.delay(0.15, finish)
+            end)
+        end
+
+        -- The card grows to fit the message, then the warning fades in.
+        task.delay(0.15, function()
+            if not loader.Parent then
+                return
+            end
+            local height = PAD + 60 + math.max(body.TextBounds.Y, 16) + 18 + 34 + PAD - 4
+            tween(loader, { Size = UDim2.fromOffset(WIDTH, height) }, 0.35, Enum.EasingStyle.Quint)
+            task.delay(0.12, function()
+                tween(warnCard, { GroupTransparency = 0 }, 0.3)
+                badge.Size = UDim2.fromOffset(34, 34)
+                badge.Position = UDim2.fromOffset(PAD + 5, PAD + 5)
+                tween(badge, { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(PAD, PAD) }, 0.45, Enum.EasingStyle.Back)
+            end)
+        end)
+    end
+
     task.delay(duration, function()
         tween(fill, { Size = UDim2.fromScale(1, 1) }, 0.25, Enum.EasingStyle.Quint)
         task.delay(0.25, function()
-            sweep:Cancel()
-            float:Cancel()
-            for _, item in ipairs(loader:GetChildren()) do
-                if item:IsA("TextLabel") then
-                    tween(item, { TextTransparency = 1 }, 0.15)
-                end
+            if not loader.Parent then
+                return
             end
-            tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
-            tween(track, { BackgroundTransparency = 1 }, 0.15)
-            tween(fill, { BackgroundTransparency = 1 }, 0.15)
-            tween(sheen, { BackgroundTransparency = 1 }, 0.1)
-
-            local fit = self._fitScale or 1
-            local target = self.Root.Size
-            tween(loader, {
-                Size = UDim2.fromOffset(target.X.Offset * fit, target.Y.Offset * fit),
-                Position = UDim2.fromScale(0.5, 0.5),
-            }, 0.5, Enum.EasingStyle.Quint)
-            tween(loaderCorner, { CornerRadius = UDim.new(0, 10) }, 0.5, Enum.EasingStyle.Quint)
-            tween(loaderScale, { Scale = 1 }, 0.5, Enum.EasingStyle.Quint)
-
-            task.delay(0.28, function()
-                self:_playIntro(true)
-                tween(loader, { GroupTransparency = 1 }, 0.25)
-                tween(loaderStroke, { Transparency = 1 }, 0.2)
-                tween(loaderShadow, { ImageTransparency = 1 }, 0.2)
-            end)
-            task.delay(0.6, function()
-                loader:Destroy()
-            end)
+            if opts._unsupported then
+                warnUnsupported(opts._unsupported)
+            else
+                finish()
+            end
         end)
     end)
 end
@@ -5116,6 +5342,43 @@ function Window:ResetConfig(silent)
     return true
 end
 
+-- Empties a folder and removes it, one file at a time when the executor has
+-- no delfolder or it refuses a folder that still has files in it.
+local function wipeFolder(path)
+    if type(isfolder) ~= "function" or not isfolder(path) then
+        return true
+    end
+    if type(delfolder) == "function" and pcall(delfolder, path) and not isfolder(path) then
+        return true
+    end
+    if type(listfiles) == "function" then
+        local ok, entries = pcall(listfiles, path)
+        for _, entry in ipairs(ok and entries or {}) do
+            if isfolder(entry) then
+                wipeFolder(entry)
+            elseif type(delfile) == "function" then
+                pcall(delfile, entry)
+            end
+        end
+    end
+    if type(delfolder) == "function" then
+        pcall(delfolder, path)
+    end
+    return not isfolder(path)
+end
+
+-- Deletes the script's whole workspace folder: configs, themes, the default
+-- theme, autoload, settings and the execution count.
+function Window:ClearWorkspace()
+    local ok = wipeFolder(self.ConfigFolder)
+    self.LoadedConfig = nil
+    for _, handler in ipairs(self._workspaceListeners or {}) do
+        safeCall(handler)
+    end
+    self:_configChanged()
+    return ok
+end
+
 -- Share codes are the same JSON a config file holds.
 
 function Window:ExportConfig(name)
@@ -5724,37 +5987,6 @@ local function statTile(parent, order, icon, title)
         FontFace = Fonts.Bold,
         Parent = tile,
     })
-end
-
-local function executorReport(opts)
-    local executor = detectExecutor()
-    local supported = opts.SupportedExecutors
-    if type(supported) == "table" then
-        local lowered = string.lower(executor)
-        for _, name in ipairs(supported) do
-            if string.find(lowered, string.lower(tostring(name)), 1, true) then
-                return executor, true, "Your executor is supported and fully compatible."
-            end
-        end
-        return executor, false, "Not on the supported list. Some features may not work."
-    end
-    local capabilities = {
-        { "writefile", writefile },
-        { "readfile", readfile },
-        { "getcustomasset", getcustomasset },
-        { "setclipboard", setclipboard or toclipboard },
-        { "request", request or http_request or (syn and syn.request) },
-    }
-    local missing = {}
-    for _, entry in ipairs(capabilities) do
-        if type(entry[2]) ~= "function" then
-            table.insert(missing, entry[1])
-        end
-    end
-    if #missing == 0 then
-        return executor, true, "Your executor is supported and fully compatible."
-    end
-    return executor, false, "Missing " .. table.concat(missing, ", ") .. ". Some features may not work."
 end
 
 local function bumpExecutions(folder)
@@ -6473,12 +6705,18 @@ function Tab:ConfigManager(opts)
     function manager:Reset()
         window:Confirm({
             Title = "Reset settings",
-            Content = "Put every setting back to its default? Saved configs are not touched until you save.",
+            Content = "Put every setting back to its default and delete this script's folder? Saved configs, themes and autoload are removed for good.",
             Icon = "rotate-ccw",
             ConfirmText = "Reset",
             Callback = function()
                 window:ResetConfig()
-                notify(true, "Settings reset", "Everything is back to its default")
+                local wiped = window:ClearWorkspace()
+                window:_applyDefaultTheme()
+                list:Set(nil, true)
+                manager:Refresh()
+                modeList:Set("All accounts", true)
+                notify(wiped, wiped and "Settings reset" or "Reset incomplete",
+                    wiped and "Everything is back to its default" or "Some files in " .. window.ConfigFolder .. " could not be deleted")
             end,
         })
     end
@@ -6817,6 +7055,13 @@ function Tab:ThemeManager(opts)
             end)
         end
     end
+
+    -- A reset wipes the themes folder, so drop the stale list.
+    window._workspaceListeners = window._workspaceListeners or {}
+    table.insert(window._workspaceListeners, function()
+        themes:Set(nil, true)
+        manager:Refresh()
+    end)
 
     refreshStatus()
     return manager
