@@ -170,6 +170,22 @@ Library.ThemePresets = {
     Emerald = preset({ 13, 20, 17 }, { 16, 24, 20 }, { 20, 29, 24 }, { 33, 47, 40 }, { 30, 44, 37 }, { 62, 96, 78 }, { 132, 226, 170 }, { 12, 26, 18 }, { 228, 240, 233 }, { 110, 136, 122 }),
     Amber = preset({ 22, 18, 13 }, { 27, 22, 16 }, { 32, 26, 19 }, { 49, 41, 31 }, { 46, 38, 28 }, { 100, 82, 58 }, { 246, 196, 120 }, { 30, 22, 10 }, { 242, 236, 226 }, { 140, 126, 106 }),
     Mono = preset({ 16, 16, 17 }, { 20, 20, 21 }, { 25, 25, 26 }, { 40, 40, 42 }, { 38, 38, 40 }, { 84, 84, 88 }, { 236, 236, 240 }, { 20, 20, 22 }, { 234, 234, 236 }, { 122, 122, 128 }),
+    -- Colours here must not be pure white, pure black or any other colour the
+    -- library hard-codes, or those objects would get bound to the theme.
+    Obsidian = preset({ 12, 11, 16 }, { 16, 15, 21 }, { 20, 18, 27 }, { 34, 31, 45 }, { 31, 28, 41 }, { 76, 66, 104 }, { 167, 139, 250 }, { 18, 12, 34 }, { 236, 233, 245 }, { 118, 112, 138 }),
+    Nebula = preset({ 14, 12, 28 }, { 18, 15, 35 }, { 23, 19, 43 }, { 39, 32, 68 }, { 35, 29, 62 }, { 84, 68, 140 }, { 199, 125, 255 }, { 22, 10, 40 }, { 236, 230, 252 }, { 124, 114, 160 }),
+    Synthwave = preset({ 20, 12, 30 }, { 25, 15, 37 }, { 31, 18, 45 }, { 52, 30, 72 }, { 47, 27, 66 }, { 110, 58, 150 }, { 255, 94, 198 }, { 38, 8, 30 }, { 250, 232, 246 }, { 150, 118, 160 }),
+    Sakura = preset({ 24, 14, 20 }, { 29, 17, 24 }, { 35, 20, 29 }, { 54, 32, 45 }, { 50, 29, 41 }, { 112, 66, 92 }, { 255, 158, 200 }, { 36, 12, 24 }, { 248, 232, 240 }, { 150, 112, 132 }),
+    Velvet = preset({ 20, 10, 16 }, { 25, 12, 20 }, { 31, 15, 25 }, { 50, 25, 40 }, { 46, 23, 37 }, { 104, 52, 82 }, { 222, 110, 170 }, { 30, 8, 20 }, { 244, 228, 238 }, { 142, 106, 126 }),
+    Crimson = preset({ 18, 10, 12 }, { 23, 12, 15 }, { 28, 14, 18 }, { 46, 24, 29 }, { 42, 22, 27 }, { 104, 46, 56 }, { 244, 74, 94 }, { 32, 8, 12 }, { 244, 230, 232 }, { 142, 106, 112 }),
+    Sunset = preset({ 22, 13, 14 }, { 27, 16, 17 }, { 33, 19, 21 }, { 52, 31, 32 }, { 48, 28, 30 }, { 112, 62, 58 }, { 255, 138, 92 }, { 34, 14, 8 }, { 248, 234, 228 }, { 150, 118, 110 }),
+    Gold = preset({ 14, 13, 11 }, { 18, 17, 14 }, { 23, 21, 17 }, { 38, 35, 28 }, { 35, 32, 26 }, { 92, 80, 54 }, { 232, 196, 122 }, { 30, 22, 8 }, { 240, 234, 222 }, { 136, 126, 106 }),
+    Cyber = preset({ 13, 13, 15 }, { 17, 17, 19 }, { 21, 21, 24 }, { 36, 36, 40 }, { 33, 33, 37 }, { 86, 84, 70 }, { 250, 226, 72 }, { 30, 26, 4 }, { 240, 240, 232 }, { 126, 124, 118 }),
+    Toxic = preset({ 11, 14, 11 }, { 14, 18, 14 }, { 18, 23, 18 }, { 31, 39, 30 }, { 28, 36, 28 }, { 74, 98, 60 }, { 184, 255, 74 }, { 18, 30, 6 }, { 232, 242, 228 }, { 116, 134, 110 }),
+    Matcha = preset({ 16, 19, 14 }, { 20, 23, 17 }, { 24, 28, 21 }, { 40, 46, 34 }, { 37, 42, 31 }, { 84, 98, 70 }, { 176, 214, 140 }, { 18, 26, 10 }, { 236, 240, 228 }, { 128, 136, 116 }),
+    Aurora = preset({ 10, 20, 22 }, { 12, 25, 27 }, { 15, 30, 33 }, { 26, 50, 53 }, { 24, 45, 48 }, { 50, 104, 104 }, { 94, 240, 180 }, { 6, 30, 22 }, { 224, 246, 240 }, { 102, 142, 134 }),
+    Frost = preset({ 13, 17, 23 }, { 16, 21, 28 }, { 20, 26, 34 }, { 34, 43, 56 }, { 31, 40, 52 }, { 72, 92, 118 }, { 164, 214, 255 }, { 12, 22, 34 }, { 230, 238, 246 }, { 114, 128, 146 }),
+    Abyss = preset({ 7, 11, 22 }, { 9, 14, 28 }, { 12, 18, 35 }, { 22, 31, 58 }, { 20, 28, 52 }, { 44, 64, 120 }, { 72, 148, 255 }, { 6, 14, 34 }, { 226, 234, 250 }, { 100, 116, 152 }),
 }
 
 Library.ThemeName = "Airflow"
@@ -652,6 +668,26 @@ end
 
 local function isPress(input)
     return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function usingTouch()
+    return UserInputService:GetLastInputType() == Enum.UserInputType.Touch
+end
+
+-- A press that turned into a scroll is not a tap. Returns a check to call
+-- from the click handler.
+local function tapGuard(button, getScroller)
+    local startCanvas
+    button.InputBegan:Connect(function(input)
+        if isPress(input) then
+            local frame = getScroller()
+            startCanvas = frame and frame.CanvasPosition
+        end
+    end)
+    return function()
+        local frame = getScroller()
+        return not (startCanvas and frame and (frame.CanvasPosition - startCanvas).Magnitude > 4)
+    end
 end
 
 local function pointInside(point, object)
@@ -1696,7 +1732,7 @@ function Tab:Dropdown(opts)
     local compact = metrics.Compact
     local chipHeight = metrics.Chip
     local window = self.Window
-    local ROW = TOUCH and 36 or 30
+    local ROW = TOUCH and 40 or 30
     local MAX_ROWS = opts.MaxRows or 6
     -- Stacked: the chip spans the whole row, with the name (if any) above it.
     local stacked = compact and opts.Stacked == true
@@ -1938,11 +1974,12 @@ function Tab:Dropdown(opts)
         Size = UDim2.new(1, 0, 0, 100),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ScrollBarThickness = 3,
+        ScrollBarThickness = TOUCH and 4 or 3,
         ScrollBarImageColor3 = Theme.Accent,
         ScrollBarImageTransparency = 0.4,
         ScrollingDirection = Enum.ScrollingDirection.Y,
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        -- Sized by hand: AutomaticCanvasSize under the window's UIScale
+        -- sometimes leaves the canvas short, so the list would not scroll.
         CanvasSize = UDim2.new(),
         Parent = inner,
     })
@@ -2063,9 +2100,18 @@ function Tab:Dropdown(opts)
         noResults.Visible = count == 0
         local rows = math.clamp(count, 1, MAX_ROWS)
         local listHeight = rows * ROW + (rows - 1) * 2
+        list.CanvasSize = UDim2.fromOffset(0, math.max(count, 1) * (ROW + 2) - 2)
+        local scale = window.Scale.Scale
+        -- Shrink the list to whichever side of the chip has more room, so the
+        -- popup never runs off a short window (phones in landscape).
+        local bodyHeight = window.Body.AbsoluteSize.Y / scale
+        local chipTop = (chip.AbsolutePosition.Y - window.Body.AbsolutePosition.Y) / scale
+        local room = math.max(bodyHeight - (chipTop + chip.AbsoluteSize.Y / scale) - 14, chipTop - 14) - top - 16
+        if room >= ROW then
+            listHeight = math.min(listHeight, room)
+        end
         list.Position = UDim2.fromOffset(0, top)
         list.Size = UDim2.new(1, 0, 0, listHeight)
-        local scale = window.Scale.Scale
         local width = math.max(math.floor(chip.AbsoluteSize.X / scale), opts.PopupWidth or 210)
         local bodyWidth = window.Body.AbsoluteSize.X / scale
         width = math.min(width, math.max(bodyWidth - 16, 120))
@@ -2119,6 +2165,31 @@ function Tab:Dropdown(opts)
 
     local stopFollowing = nil
     local closeGeneration = 0
+    -- The page behind stops scrolling while the popup is open, so wheel and
+    -- swipe input always reach the list instead of dragging the page away.
+    local lockedScroller = nil
+    local function unlockScroller()
+        if lockedScroller then
+            lockedScroller.ScrollingEnabled = true
+            lockedScroller = nil
+        end
+    end
+    local function scrollToSelected()
+        list.CanvasPosition = Vector2.zero
+        if multi then
+            return
+        end
+        local value = currentValue()
+        if value == nil then
+            return
+        end
+        for index, option in ipairs(options) do
+            if option == value then
+                list.CanvasPosition = Vector2.new(0, math.max(0, (index - 2) * (ROW + 2)))
+                return
+            end
+        end
+    end
     local function setOpen(open)
         if open == self_.Open then
             return
@@ -2133,12 +2204,16 @@ function Tab:Dropdown(opts)
             end
             window._closePopup = self_._close
             scroller = frame:FindFirstAncestorWhichIsA("ScrollingFrame")
+            if scroller and scroller.ScrollingEnabled then
+                lockedScroller = scroller
+                scroller.ScrollingEnabled = false
+            end
             filter = ""
             searchBox.Text = ""
             applyFilter()
             layoutPopup(true)
             renderValue(false)
-            list.CanvasPosition = Vector2.zero
+            scrollToSelected()
             opened = true
             popup.Size = UDim2.fromOffset(targetSize.X, 0)
             place()
@@ -2153,6 +2228,7 @@ function Tab:Dropdown(opts)
             if window._closePopup == self_._close then
                 window._closePopup = nil
             end
+            unlockScroller()
             if searchBox:IsFocused() then
                 searchBox:ReleaseFocus()
             end
@@ -2244,7 +2320,14 @@ function Tab:Dropdown(opts)
                 Parent = row,
             })
             local entry = { Option = option, Frame = row, Box = box, BoxStroke = boxStroke, Check = check, CheckScale = checkScale, Label = text_, On = nil }
+            local isTap = tapGuard(row, function()
+                return list
+            end)
             row.MouseEnter:Connect(function()
+                -- Touch fires enter without a matching leave; skip the hover.
+                if usingTouch() then
+                    return
+                end
                 tween(row, { BackgroundTransparency = 0.55 }, 0.15)
                 tween(text_, { TextColor3 = Theme.Text }, 0.15)
                 if not selected[option] then
@@ -2259,6 +2342,9 @@ function Tab:Dropdown(opts)
                 end
             end)
             row.MouseButton1Click:Connect(function()
+                if not isTap() then
+                    return
+                end
                 if selected[option] then
                     if not multi and opts.AllowNone == false then
                         setOpen(false)
@@ -2331,8 +2417,13 @@ function Tab:Dropdown(opts)
         setOpen(open == true)
     end
 
+    local headerTap = tapGuard(header, function()
+        return frame:FindFirstAncestorWhichIsA("ScrollingFrame")
+    end)
     header.MouseButton1Click:Connect(function()
-        setOpen(not self_.Open)
+        if headerTap() then
+            setOpen(not self_.Open)
+        end
     end)
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         filter = string.lower(searchBox.Text)
@@ -2344,6 +2435,7 @@ function Tab:Dropdown(opts)
     self_._listeners = {
         function()
             setOpen(false)
+            unlockScroller()
             if stopFollowing then
                 stopFollowing()
                 stopFollowing = nil
@@ -3206,8 +3298,9 @@ function Library.Window(_, opts)
         self._autoSaveEnabled = configSettings.Autosave
     end
 
-    if opts.Theme then
-        Library:SetTheme(opts.Theme, true)
+    local startTheme = opts.DefaultTheme or opts.Theme
+    if startTheme ~= nil then
+        Library.DefaultTheme = startTheme
     end
     self:_applyDefaultTheme()
     local function dispatch(kind)
@@ -3358,6 +3451,33 @@ function Library.Window(_, opts)
     })
     corner(indicator, UDim.new(0, 10))
     stroke(indicator, Theme.Stroke)
+    -- An accent wash that fades out to the right, and a small accent pill in
+    -- the gutter beside the tile, both gliding with the highlight.
+    local sheen = create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.82,
+        BorderSizePixel = 0,
+        Parent = indicator,
+    })
+    corner(sheen, UDim.new(0, 10))
+    create("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+        Parent = sheen,
+    })
+    local pill = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(0, -3, 0.5, 0),
+        Size = UDim2.fromOffset(3, 20),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        Parent = indicator,
+    })
+    corner(pill, UDim.new(1, 0))
+    self._indicatorPill = pill
     self.Indicator = indicator
     local stack = create("Frame", {
         Name = "Stack",
@@ -3374,6 +3494,39 @@ function Library.Window(_, opts)
         Parent = stack,
     })
     self._tabStack = stack
+
+    -- Soft fades at the ends of the tab list while there is more to scroll.
+    local function scrollFade(top)
+        local fade = create("Frame", {
+            AnchorPoint = Vector2.new(0, top and 0 or 1),
+            Position = top and tabList.Position or UDim2.new(0, 0, tabList.Size.Y.Scale, tabList.Position.Y.Offset + tabList.Size.Y.Offset),
+            Size = UDim2.new(1, 0, 0, 22),
+            BackgroundColor3 = Theme.Surface2,
+            BorderSizePixel = 0,
+            Visible = false,
+            ZIndex = 3,
+            Parent = sidebar,
+        })
+        create("UIGradient", {
+            Rotation = top and 90 or 270,
+            Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(1, 1),
+            }),
+            Parent = fade,
+        })
+        return fade
+    end
+    local topFade, bottomFade = scrollFade(true), scrollFade(false)
+    local function refreshFades()
+        local overflow = tabList.AbsoluteCanvasSize.Y - tabList.AbsoluteWindowSize.Y
+        local y = tabList.CanvasPosition.Y
+        topFade.Visible = overflow > 1 and y > 1
+        bottomFade.Visible = overflow > 1 and y < overflow - 1
+    end
+    tabList:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshFades)
+    tabList:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(refreshFades)
+    tabList:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(refreshFades)
 
     if profileEnabled then
         self:_buildProfile(sidebar)
@@ -4812,6 +4965,29 @@ function Library:GetTheme()
     return copy
 end
 
+-- The script's starting theme: a preset name or a colour table. A default the
+-- player picked in the theme manager still wins over it.
+function Library:SetDefaultTheme(theme)
+    Library.DefaultTheme = theme
+    if theme == nil then
+        return true
+    end
+    local live = false
+    for _, window in ipairs(Library.Windows) do
+        if not window._destroyed then
+            if window:GetDefaultTheme() then
+                return true
+            end
+            live = true
+        end
+    end
+    return Library:SetTheme(theme, not live)
+end
+
+function Library:GetDefaultTheme()
+    return Library.DefaultTheme
+end
+
 local function themeFolder(self)
     return self.ConfigFolder .. "/themes"
 end
@@ -4905,7 +5081,13 @@ end
 function Window:_applyDefaultTheme()
     local name = self:GetDefaultTheme()
     if name then
-        pcall(self.LoadTheme, self, name, true)
+        local ok, loaded = pcall(self.LoadTheme, self, name, true)
+        if ok and loaded then
+            return
+        end
+    end
+    if Library.DefaultTheme ~= nil then
+        pcall(Library.SetTheme, Library, Library.DefaultTheme, true)
     end
 end
 
@@ -5963,7 +6145,10 @@ function Tab:ConfigManager(opts)
     return manager
 end
 
-local PRESET_ORDER = { "Airflow", "Midnight", "Ocean", "Rose", "Emerald", "Amber", "Mono" }
+local PRESET_ORDER = {
+    "Airflow", "Obsidian", "Nebula", "Synthwave", "Sakura", "Velvet", "Rose", "Crimson", "Sunset", "Amber", "Gold",
+    "Cyber", "Toxic", "Matcha", "Emerald", "Aurora", "Ocean", "Frost", "Midnight", "Abyss", "Mono",
+}
 
 local function presetNames()
     local names, seen = {}, {}
@@ -7355,11 +7540,22 @@ function Window:_buildProfile(sidebar)
     })
     corner(card)
     local cardStroke = stroke(card, Theme.Stroke, 1)
-    avatar(self, card, {
+    local head = avatar(self, card, {
         AnchorPoint = Vector2.new(0.5, 0),
         Position = UDim2.new(0.5, 0, 0, 7),
         Size = UDim2.fromOffset(40, 40),
     }, Theme.Accent, 0.55, 1.5)
+    local online = create("Frame", {
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, 1, 1, 1),
+        Size = UDim2.fromOffset(11, 11),
+        BackgroundColor3 = Theme.Success,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = head,
+    })
+    corner(online, UDim.new(1, 0))
+    stroke(online, Theme.Surface2, 0, 2)
     local name = label({
         Position = UDim2.fromOffset(4, 52),
         Size = UDim2.new(1, -8, 0, 15),
@@ -7383,6 +7579,9 @@ function Window:_buildProfile(sidebar)
         gameLabel.Text = detectGameName()
     end)
     card.MouseEnter:Connect(function()
+        if usingTouch() then
+            return
+        end
         tween(card, { BackgroundTransparency = 0.4 }, 0.12)
         tween(cardStroke, { Transparency = 0.5 }, 0.12)
     end)
@@ -8267,20 +8466,35 @@ function Window:Tab(opts, icon)
     tab._iconName = opts.Icon
     buildContainer(tab, page, listTop, opts.Icon or "layout-grid", opts.EmptyText or "Nothing here yet")
 
+    local pressScale = create("UIScale", { Parent = button })
+    local function release()
+        tween(pressScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+    end
     button.MouseEnter:Connect(function()
-        if self.CurrentTab ~= tab then
+        if self.CurrentTab ~= tab and not usingTouch() then
             tween(button, { BackgroundTransparency = 0.4 }, 0.12)
             tween(buttonStroke, { Transparency = 0.5 }, 0.12)
         end
     end)
     button.MouseLeave:Connect(function()
+        release()
         if self.CurrentTab ~= tab then
             tween(button, { BackgroundTransparency = 1 }, 0.2)
             tween(buttonStroke, { Transparency = 1 }, 0.2)
         end
     end)
+    button.MouseButton1Down:Connect(function()
+        tween(pressScale, { Scale = 0.94 }, 0.12)
+    end)
+    button.MouseButton1Up:Connect(release)
+    local isTap = tapGuard(button, function()
+        return self.TabList
+    end)
     button.MouseButton1Click:Connect(function()
-        self:SelectTab(tab)
+        release()
+        if isTap() then
+            self:SelectTab(tab)
+        end
     end)
     tab._stroke = buttonStroke
     self:_fitTitle(tab)
@@ -8300,6 +8514,60 @@ function Window:Tab(opts, icon)
 end
 
 Window.CreateTab = Window.Tab
+
+-- A small accent badge on the tab's sidebar tile: a number or short text, or
+-- true for a plain dot. nil, false, 0 or "" hides it.
+function Tab:SetBadge(value)
+    local show = value ~= nil and value ~= false and value ~= 0 and value ~= ""
+    local badge = self._badge
+    if not badge then
+        if not show then
+            return
+        end
+        badge = label({
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -6, 0, 5),
+            BackgroundColor3 = Theme.Accent,
+            BackgroundTransparency = 0,
+            TextColor3 = Theme.AccentDark,
+            TextSize = 10,
+            FontFace = Fonts.Bold,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextTruncate = Enum.TextTruncate.None,
+            ZIndex = 3,
+            Parent = self._button,
+        })
+        corner(badge, UDim.new(1, 0))
+        padding(badge, 4, 4, 0, 0)
+        self._badgeScale = create("UIScale", { Parent = badge })
+        self._badge = badge
+    end
+    local wasShown = badge.Visible and self._badgeShown
+    self._badgeShown = show
+    badge.Visible = show
+    if not show then
+        return
+    end
+    if value == true then
+        badge.AutomaticSize = Enum.AutomaticSize.None
+        badge.Size = UDim2.fromOffset(8, 8)
+        badge.Position = UDim2.new(1, -10, 0, 8)
+        badge.Text = ""
+    else
+        badge.AutomaticSize = Enum.AutomaticSize.X
+        badge.Size = UDim2.fromOffset(16, 16)
+        badge.Position = UDim2.new(1, -6, 0, 5)
+        badge.Text = tostring(value)
+    end
+    if not wasShown then
+        self._badgeScale.Scale = 0.4
+        tween(self._badgeScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+    end
+end
+
+function Tab:GetBadge()
+    return self._badgeShown and (self._badge.Text ~= "" and self._badge.Text or true) or nil
+end
 
 function Window:Dialog(opts)
     opts = normalize(opts, { Text = "Content", Message = "Content" })
@@ -8551,6 +8819,31 @@ function Window:_placeIndicator(tab)
         tween(indicator, { BackgroundTransparency = 0.35 }, 0.25)
     end
     tween(indicator, { Position = UDim2.fromOffset(8, targetY) }, 0.4, Enum.EasingStyle.Quint)
+    -- The pill stretches while it travels and settles back when it lands.
+    local pill = self._indicatorPill
+    if pill then
+        tween(pill, { Size = UDim2.fromOffset(3, 30) }, 0.16, Enum.EasingStyle.Quad)
+        task.delay(0.16, function()
+            tween(pill, { Size = UDim2.fromOffset(3, 20) }, 0.35, Enum.EasingStyle.Back)
+        end)
+    end
+end
+
+function Window:_scrollTabIntoView(tab)
+    local list = self.TabList
+    local scale = self.Scale.Scale
+    local top = (tab._button.AbsolutePosition.Y - list.AbsolutePosition.Y) / scale + list.CanvasPosition.Y
+    local bottom = top + tab._button.AbsoluteSize.Y / scale
+    local view = list.AbsoluteWindowSize.Y / scale
+    local y = list.CanvasPosition.Y
+    if top - 8 < y then
+        y = top - 8
+    elseif bottom + 8 > y + view then
+        y = bottom + 8 - view
+    else
+        return
+    end
+    tween(list, { CanvasPosition = Vector2.new(0, math.max(0, y)) }, 0.35, Enum.EasingStyle.Quint)
 end
 
 function Window:_closePopups()
@@ -8617,9 +8910,12 @@ function Window:SelectTab(tab)
     tween(tab._label, { TextColor3 = Theme.Text }, 0.2)
     if tab._icon then
         tintIcon(tab._icon, Theme.Accent, true, 0.2)
+        tab._icon.Size = UDim2.fromOffset(14, 14)
+        tween(tab._icon, { Size = UDim2.fromOffset(18, 18) }, 0.4, Enum.EasingStyle.Back)
     end
 
     self:_placeIndicator(tab)
+    self:_scrollTabIntoView(tab)
 
     local page = tab._page
     page.Position = UDim2.fromOffset(0, 0)
@@ -9347,6 +9643,7 @@ end
 local Airflow = Library
 
 Airflow:LoadFont({ Name = "ValleySans" }) -- downloads the font once into workspace/AirFlowFonts and uses it everywhere
+Airflow:SetDefaultTheme("Obsidian") -- starting theme: any preset name or a colour table. A default the player sets in the theme manager wins
 
 local Window = Airflow:CreateWindow({
     Name = "Airflow Hub",
@@ -9369,6 +9666,7 @@ local Window = Airflow:CreateWindow({
 -- Tabs hold sub tabs, sub tabs hold groupboxes, groupboxes hold elements.
 
 local Farm = Window:CreateTab({ Name = "Farm", Icon = "swords" })
+Farm:SetBadge("New") -- a number, short text, or true for a dot. nil hides it
 
 local MobFarm = Farm:CreateSubTab({ Name = "Mob Farm" })
 

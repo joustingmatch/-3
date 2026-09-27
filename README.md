@@ -58,7 +58,7 @@ The button in the top-right minimizes the window: it folds into a small floating
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
-The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
+The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile, an accent pill beside it, and fades at the ends when the list scrolls. The selected tile scrolls into view. `Tab:SetBadge(value)` puts a small accent badge on a tile: a number or short text, `true` for a dot, `nil` to hide it. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
 
 ### Properties
 
@@ -73,7 +73,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
-| `OpenButton` | boolean \|| `Icon` | string | number | table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
+| `OpenButton` | boolean \| table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
 | `ToggleButton.Platform` | string | `"Mobile"` | `"Mobile"` shows it on touch devices only, `"Both"` on PC and mobile. |
 | `ToggleButton.Icon` | string \| number \| table | `"layout-grid"` | Any [icon](#icons). |
@@ -81,14 +81,14 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `44` touch, `40` PC | Starting position and side length. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
-| `Loading` | boolean \|| `Icon` | string | number | table | `true` | Loading card before the window morphs in. `false` skips it. |
+| `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
 | `Loading.Title` | string | `Name` | Title on the card. |
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
-| `Loading.Steps` || `Icon` | string | number | table | 3 built-in lines | Status lines cycled over the duration. |
+| `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |
 | `Loading.Duration` | number | `1.6` | Seconds before the window appears. |
-| `ConfigurationSaving` || `Icon` | string | number | table | — | See [Configs](#configs). |
-| `Home` | boolean \|| `Icon` | string | number | table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
-| `Theme` | string \|| `Icon` | string | number | table | — | Theme applied before the window is built. See [Theme](#theme). |
+| `ConfigurationSaving` | table | — | See [Configs](#configs). |
+| `Home` | boolean \| table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
+| `Theme` / `DefaultTheme` | string \| table | — | Starting theme, same as `Airflow:SetDefaultTheme`. A default the player saved in the theme manager wins. See [Theme](#theme). |
 | `Parent` | Instance | `gethui()` / CoreGui | Where the ScreenGui goes. Falls back to PlayerGui. |
 
 ### Handle
@@ -171,19 +171,19 @@ The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest
 | `Tier` | string \| false | `"Free"` | Badge on the player card. `false` hides it. |
 | `TierIcon` | string | window icon | Icon in the badge. |
 | `Expiry` | number \| string \| function | — | Under the badge. A unix time counts down (`11h 57m`), a string is shown as is, a function is called every second. |
-| `Stats` || `Icon` | string | number | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
+| `Stats` | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
 | `StatsFolder` | string | config folder | Where the execution counter is stored. |
 | `TimeFormat` | string | `"%H:%M"` | `os.date` format for the time stat. |
-| `SupportedExecutors` || `Icon` | string | number | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
+| `SupportedExecutors` | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
 | `Discord` / `Website` | string | — | Link cards with a copy button. |
 | `DiscordTitle` / `WebsiteTitle` | string | `"Join the community"` / `"Supported games"` | Card titles. |
-| `Links` || `Icon` | string | number | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
+| `Links` | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
 | `HideName` / `HideAvatar` | boolean | `false` | Start with the privacy switches on. |
 | `OverviewName` / `TabIcon` | string | `"Overview"` / `"layout-grid"` | The first sub tab when `Pages` is set. |
-| `Pages` || `Icon` | string | number | table | — | Extra sub tabs. |
+| `Pages` | table | — | Extra sub tabs. |
 | `Pages[n].Name` / `Icon` | string | — | The sub tab button. |
 | `Pages[n].Content` | string | — | Wrapped text in a card. |
-| `Pages[n].Entries` || `Icon` | string | number | table | — | Cards with `Title`, `Tag` or `Date`, and `Changes` (a list) or `Content`. |
+| `Pages[n].Entries` | table | — | Cards with `Title`, `Tag` or `Date`, and `Changes` (a list) or `Content`. |
 | `Pages[n].Build` | function | — | `function(page, list)`. `page` is a sub tab, so every element constructor and `Groupbox` work on it. |
 
 ---
@@ -633,7 +633,7 @@ Click the value chip to type an exact number.
 | --- | --- | --- | --- |
 | `Name` | string | `"Slider"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Range` || `Icon` | string | number | table | `{ 0, 100 }` | `{ min, max }`. |
+| `Range` | table | `{ 0, 100 }` | `{ min, max }`. |
 | `Increment` | number | `1` | Snap size. Its decimals set how the value is shown. |
 | `Suffix` | string | `""` | Appended to the value chip. |
 | `CurrentValue` | number | min | The initial value. |
@@ -679,7 +679,7 @@ Hold either button to repeat.
 | --- | --- | --- | --- |
 | `Name` | string | `"Stepper"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Range` || `Icon` | string | number | table | `{ 0, 100 }` | `{ min, max }`. |
+| `Range` | table | `{ 0, 100 }` | `{ min, max }`. |
 | `Increment` | number | `1` | Step per press. Its decimals set how the value is shown. |
 | `Suffix` | string | `""` | Appended to the value. |
 | `CurrentValue` | number | min | The initial value. |
@@ -759,7 +759,7 @@ local Dropdown = Tab:CreateDropdown({
 Dropdown:Set({ "T1", "T3" })
 ```
 
-Clicking the chip unfolds a popup out of it, floating over the window under the chip, or above it when there's no room below. It follows the window while open and closes on an outside click, `Esc`, a tab switch, or when its row scrolls out of view. The popup has a search box, **Select all** / **Clear all** in multi mode, and flat rows with square checkboxes that highlight on hover. Select all only picks the rows matching the search. Clicking a selected row unchecks it.
+Clicking the chip unfolds a popup out of it, floating over the window under the chip, or above it when there's no room below. It follows the window while open and closes on an outside click, `Esc` or a tab switch. The popup has a search box, **Select all** / **Clear all** in multi mode, and flat rows with square checkboxes that highlight on hover. Select all only picks the rows matching the search. Clicking a selected row unchecks it. The page behind stays put while the popup is open, so wheel and swipe input always scroll the list. A single-select list opens scrolled to its current value, and the list shrinks to fit short windows. On touch, rows are taller and a swipe that scrolls the list never selects a row.
 
 ### Properties
 
@@ -767,8 +767,8 @@ Clicking the chip unfolds a popup out of it, floating over the window under the 
 | --- | --- | --- | --- |
 | `Name` | string | `"Dropdown"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Options` || `Icon` | string | number | table | `{}` | The rows. |
-| `CurrentOption` | string \|| `Icon` | string | number | table | — | The initial selection. A table in multi mode. |
+| `Options` | table | `{}` | The rows. |
+| `CurrentOption` | string \| table | — | The initial selection. A table in multi mode. |
 | `MultipleOptions` | boolean | `false` | Rows toggle independently and the callback receives a list. |
 | `Searchable` | boolean | `true` | Show the search box. |
 | `SearchAfter` | number | `0` | Only show search when there are more rows than this. |
@@ -1146,7 +1146,7 @@ Call it before `CreateWindow`. The TTFs are saved to the folder on first run and
 | --- | --- | --- | --- |
 | `Name` | string | — | Family name. `"ValleySans"` uses the built-in URLs. |
 | `Folder` | string | `"AirFlowFonts"` | Where the TTFs and family file are saved. |
-| `Weights` || `Icon` | string | number | table | preset | `Regular`, `Medium`, `SemiBold`, `Bold` → TTF URL. |
+| `Weights` | table | preset | `Regular`, `Medium`, `SemiBold`, `Bold` → TTF URL. |
 
 ---
 
@@ -1158,7 +1158,8 @@ Call it before `CreateWindow`. The TTFs are saved to the folder on first run and
 Airflow:SetTheme("Midnight")
 Airflow:SetTheme({ Accent = Color3.fromRGB(128, 160, 246), Background = "#0F121A" })
 
-local Window = Airflow:CreateWindow({ Name = "Airflow", Theme = "Ocean" })
+Airflow:SetDefaultTheme("Synthwave") -- the script's starting theme
+local Window = Airflow:CreateWindow({ Name = "Airflow", DefaultTheme = "Synthwave" }) -- same thing
 
 Settings:CreateThemeManager({ Name = "Themes", Side = "Right" })
 
@@ -1174,9 +1175,9 @@ Airflow.Assets.Glow = "rbxassetid://8992230677"
 Airflow.Assets.Shadow = "rbxassetid://6014261993"
 ```
 
-Presets: `Airflow` (default), `Midnight`, `Ocean`, `Rose`, `Emerald`, `Amber`, `Mono`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
+Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
-The theme manager is a groupbox with a **Preset** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). The default theme, a preset or a saved one, is applied when the window is created. Themes are saved in `<config folder>/themes`.
+The theme manager is a groupbox with a **Preset** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 
 ### Properties
 
@@ -1201,9 +1202,10 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | --- | --- |
 | `Airflow:SetTheme(nameOrTable, instant?)` | Apply a preset or colours live. |
 | `Airflow:GetTheme()` | Copy of the current colours. |
+| `Airflow:SetDefaultTheme(nameOrTable)` / `GetDefaultTheme()` | The script's starting theme. Call it before or after `CreateWindow`; it applies right away unless the player saved their own default. |
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
-| `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | Theme applied on start. |
+| `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
 | `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
