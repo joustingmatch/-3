@@ -597,7 +597,9 @@ local function edgeHighlight(parent)
     })
 end
 
-local function applyIcon(imageLabel, icon)
+local CUSTOM_ICON_SCALE = 1.35
+
+local function applyIcon(imageLabel, icon, fixedSize)
     local image, rectOffset, rectSize, custom, tint = resolveIcon(icon)
     if not image then
         return
@@ -614,6 +616,17 @@ local function applyIcon(imageLabel, icon)
     if keepColours then
         -- Original colours, and out of the theme's reach.
         tween(imageLabel, { ImageColor3 = Color3.new(1, 1, 1) }, 0)
+    end
+    -- Uploaded images usually carry transparent padding and read smaller than
+    -- the lucide set, so they are drawn larger. A table icon can pick its own
+    -- Scale. Brand logos pass fixedSize, their slots are already sized for them.
+    local scale = custom and not fixedSize and icon ~= Assets.Logo and (typeof(icon) == "table" and tonumber(icon.Scale) or CUSTOM_ICON_SCALE) or 1
+    local scaler = imageLabel:FindFirstChild("CustomIconScale")
+    if scale ~= 1 then
+        scaler = scaler or create("UIScale", { Name = "CustomIconScale", Parent = imageLabel })
+        scaler.Scale = scale
+    elseif scaler then
+        scaler:Destroy()
     end
 end
 
@@ -3449,7 +3462,7 @@ function Library.Window(_, opts)
         ScaleType = Enum.ScaleType.Fit,
         Parent = header,
     })
-    applyIcon(logo, opts.Icon or Assets.Logo)
+    applyIcon(logo, opts.Icon or Assets.Logo, true)
 
     local profileEnabled = opts.Profile ~= false
     local tabList = create("ScrollingFrame", {
@@ -3710,6 +3723,9 @@ function Library.Window(_, opts)
     if (opts.OpenButton ~= nil and opts.OpenButton ~= false) or (opts.OpenButton == nil and TOUCH and not toggleShown) then
         self:_createOpenButton(type(opts.OpenButton) == "table" and opts.OpenButton or {})
     end
+    if opts.Backdrop ~= false then
+        self:_buildBackdrop(type(opts.Backdrop) == "table" and opts.Backdrop or {})
+    end
     self._introDone = false
 
     table.insert(Library.Windows, self)
@@ -3918,6 +3934,7 @@ function Window:_playIntro(morph)
         return
     end
     self._introDone = true
+    self:_refreshBackdrop(true)
     task.delay(0.4, function()
         self:_refreshToggleButton()
     end)
@@ -4018,7 +4035,7 @@ function Window:_showLoader(opts)
         ScaleType = Enum.ScaleType.Fit,
         Parent = logoHolder,
     })
-    applyIcon(logo, opts.Icon or Assets.Logo)
+    applyIcon(logo, opts.Icon or Assets.Logo, true)
     task.delay(0.15, function()
         tween(logo, { Size = UDim2.fromScale(0.85, 0.85), Rotation = 0, ImageTransparency = 0 }, 0.6, Enum.EasingStyle.Back)
         halo.BackgroundTransparency = 0.8
@@ -4230,7 +4247,7 @@ function Window:_createOpenButton(opts)
         ZIndex = 31,
         Parent = pill,
     })
-    applyIcon(icon, opts.Icon or Assets.Logo)
+    applyIcon(icon, opts.Icon or Assets.Logo, true)
     label({
         Position = UDim2.fromOffset(28, 0),
         Size = UDim2.new(0, 0, 1, 0),
@@ -4293,18 +4310,37 @@ function Window:_refreshToggleButton()
     if shown and not button.Visible then
         button.Visible = true
         button.Size = UDim2.fromOffset(0, 0)
-        tween(button, { Size = UDim2.fromOffset(self._toggleSize, self._toggleSize) }, 0.35, Enum.EasingStyle.Back)
+        tween(button, { Size = UDim2.fromOffset(self._toggleSize, self._toggleSize) }, 0.4, Enum.EasingStyle.Back)
     elseif not shown then
         button.Visible = false
     end
+    -- Folded (window minimized or hidden): the ring lights up in the accent
+    -- and breathes so the button reads as "tap to bring it back".
     local folded = self.Minimized or not self.Open
-    tween(self._toggleStroke, { Color = folded and Theme.Accent or Theme.Stroke, Transparency = folded and 0.35 or 0 }, 0.2)
-    tween(self._toggleIcon, { Rotation = folded and 180 or 0 }, 0.35, Enum.EasingStyle.Quint)
+    tween(self._toggleStroke, { Color = folded and Theme.Accent or Theme.Stroke, Transparency = folded and 0.1 or 0 }, 0.25)
+    tween(self._toggleGlow, { BackgroundTransparency = folded and 0.72 or 0.9 }, 0.3)
+    local icon = self._toggleIcon
+    tween(icon, { Rotation = folded and 180 or 0 }, 0.4, Enum.EasingStyle.Quint)
+    if not icon:GetAttribute("CustomIcon") then
+        tween(icon, { ImageColor3 = folded and Theme.Text or Theme.Accent }, 0.25)
+    end
+    if folded and not self._togglePulse then
+        self._togglePulse = TweenService:Create(self._toggleRing, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+            Transparency = 0.75,
+        })
+        self._toggleRing.Transparency = 0.2
+        self._togglePulse:Play()
+    elseif not folded and self._togglePulse then
+        self._togglePulse:Cancel()
+        self._togglePulse = nil
+        tween(self._toggleRing, { Transparency = 1 }, 0.2)
+    end
 end
 
 function Window:_createToggleButton(opts)
     local gui = self.Gui
-    local size = tonumber(opts.Size) or (TOUCH and 44 or 40)
+    local size = tonumber(opts.Size) or (TOUCH and 56 or 50)
+    local iconSize = math.floor(size * 0.48)
     self._toggleEnabled = opts.Enabled ~= false
     self._togglePlatform = opts.Platform == "Both" and "Both" or "Mobile"
     self._toggleSize = size
@@ -4321,28 +4357,71 @@ function Window:_createToggleButton(opts)
         ZIndex = 30,
         Parent = gui,
     })
-    corner(button, UDim.new(0, 10))
-    local buttonStroke = stroke(button, Theme.Stroke)
+    corner(button, UDim.new(0, math.floor(size * 0.3)))
+    -- Lit from above, like the window body.
+    create("UIGradient", {
+        Rotation = 90,
+        Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(165, 165, 165)),
+        Parent = button,
+    })
+    local buttonStroke = stroke(button, Theme.Stroke, 0, 1.5)
+    edgeHighlight(button)
+    -- Soft accent glow pooled at the bottom.
+    local glowFrame = create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.9,
+        BorderSizePixel = 0,
+        ZIndex = 30,
+        Parent = button,
+    })
+    create("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.55, 0.7),
+            NumberSequenceKeypoint.new(1, 0),
+        }),
+        Parent = glowFrame,
+    })
+    -- Inner ring that pulses while the window is folded away.
+    local ring = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.new(1, -6, 1, -6),
+        BackgroundTransparency = 1,
+        ZIndex = 30,
+        Parent = button,
+    })
+    corner(ring, UDim.new(0, math.floor(size * 0.3) - 3))
+    local ringStroke = stroke(ring, Theme.Accent, 1, 1)
     local icon = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(math.floor(size * 0.45), math.floor(size * 0.45)),
+        Size = UDim2.fromOffset(iconSize, iconSize),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
         ZIndex = 31,
         Parent = button,
     })
+    local buttonScale = create("UIScale", { Parent = button })
     self.ToggleButton = button
     self._toggleStroke = buttonStroke
+    self._toggleGlow = glowFrame
+    self._toggleRing = ringStroke
     self._toggleIcon = icon
     self:SetToggleButtonIcon(opts.Icon or "layout-grid")
 
     button.MouseEnter:Connect(function()
         tween(button, { BackgroundColor3 = Theme.Surface2 }, 0.12)
+        tween(buttonScale, { Scale = 1.06 }, 0.25, Enum.EasingStyle.Quint)
+        tween(glowFrame, { BackgroundTransparency = 0.7 }, 0.2)
     end)
     button.MouseLeave:Connect(function()
         tween(button, { BackgroundColor3 = Theme.Background }, 0.2)
+        tween(buttonScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
+        tween(glowFrame, { BackgroundTransparency = (self.Minimized or not self.Open) and 0.72 or 0.9 }, 0.25)
     end)
 
     local dragging, moved = false, false
@@ -4352,7 +4431,8 @@ function Window:_createToggleButton(opts)
             dragging = true
             moved = false
             grab = pointerPosition() - button.AbsolutePosition
-            tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.38), math.floor(size * 0.38)) }, 0.1)
+            tween(buttonScale, { Scale = 0.92 }, 0.1)
+            tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.4), math.floor(size * 0.4)) }, 0.1)
         end
     end)
     table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
@@ -4376,7 +4456,8 @@ function Window:_createToggleButton(opts)
             return
         end
         dragging = false
-        tween(icon, { Size = UDim2.fromOffset(math.floor(size * 0.45), math.floor(size * 0.45)) }, 0.25, Enum.EasingStyle.Back)
+        tween(buttonScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+        tween(icon, { Size = UDim2.fromOffset(iconSize, iconSize) }, 0.3, Enum.EasingStyle.Back)
         if moved then
             return
         end
@@ -4410,6 +4491,9 @@ function Window:SetToggleButtonIcon(icon)
     applyIcon(image, icon)
     if image.Image == "" then
         applyIcon(image, Assets.Logo)
+    end
+    if not image:GetAttribute("CustomIcon") then
+        tween(image, { ImageColor3 = (self.Minimized or not self.Open) and Theme.Text or Theme.Accent }, 0)
     end
 end
 
@@ -9271,6 +9355,304 @@ function Window:_settleTransition()
     self:_settleIn()
 end
 
+-- Backdrop: a black tint over the game while the window is up, with an
+-- optional weather layer (rain, snow or hell fire embers) drifting through it.
+-- It fades out when the window is minimized or hidden and sweeps back in with
+-- a gust when it comes back.
+
+local WEATHER = {
+    Rain = { Image = "rbxassetid://241868005", Count = 90 },
+    Snow = { Image = "rbxassetid://99851851", Count = 60 },
+    Ember = { Image = "rbxassetid://242205518", Count = 55 },
+}
+local WEATHER_NAMES = {
+    rain = "Rain",
+    snow = "Snow",
+    ember = "Ember",
+    embers = "Ember",
+    fire = "Ember",
+    hellfire = "Ember",
+}
+local weatherRandom = Random.new()
+
+local function weatherName(name)
+    if type(name) ~= "string" then
+        return "None"
+    end
+    return WEATHER_NAMES[(name:lower():gsub("[%s_%-]", ""))] or "None"
+end
+
+local function roll(min, max)
+    return weatherRandom:NextNumber(min, max)
+end
+
+-- Places a particle. `anywhere` scatters it over the whole screen (first
+-- frame after the backdrop appears), otherwise it enters from its edge.
+local function seedParticle(kind, particle, width, height, anywhere)
+    particle.Time = roll(0, 10)
+    particle.Phase = roll(0, math.pi * 2)
+    if kind == "Rain" then
+        local w = roll(3, 6)
+        particle.Size = Vector2.new(w, w * roll(5, 8))
+        particle.VY = roll(950, 1400)
+        particle.VX = particle.VY * 0.12
+        particle.Sway, particle.Spin = 0, 0
+        particle.Rotation = -math.deg(math.atan2(particle.VX, particle.VY))
+        particle.Alpha = roll(0.25, 0.6)
+        particle.X = roll(-0.15 * width, width)
+        particle.Y = anywhere and roll(-40, height) or roll(-120, -particle.Size.Y)
+    elseif kind == "Snow" then
+        local s = roll(6, 17)
+        particle.Size = Vector2.new(s, s)
+        particle.VY = roll(30, 55) * (0.6 + s / 17)
+        particle.VX = roll(-8, 14)
+        particle.Sway = roll(12, 38)
+        particle.Frequency = roll(0.5, 1.3)
+        particle.Spin = roll(-60, 60)
+        particle.Rotation = roll(0, 360)
+        particle.Alpha = roll(0.05, 0.45)
+        particle.X = roll(0, width)
+        particle.Y = anywhere and roll(-20, height) or roll(-60, -s)
+    else
+        local s = roll(4, 12)
+        particle.Size = Vector2.new(s, s)
+        particle.VY = -roll(60, 170)
+        particle.VX = roll(-12, 12)
+        particle.Sway = roll(8, 28)
+        particle.Frequency = roll(1, 2.4)
+        particle.Spin = roll(-140, 140)
+        particle.Rotation = roll(0, 360)
+        particle.Alpha = roll(0, 0.3)
+        particle.Color = Color3.fromRGB(255, 70, 20):Lerp(Color3.fromRGB(255, 190, 70), roll(0, 1))
+        particle.X = roll(0, width)
+        particle.Y = anywhere and roll(height * 0.2, height + 10) or height + roll(10, 80)
+    end
+    local label = particle.Label
+    label.Size = UDim2.fromOffset(particle.Size.X, particle.Size.Y)
+    label.ImageColor3 = particle.Color
+        or (kind == "Rain" and Color3.fromRGB(190, 210, 245) or Color3.new(1, 1, 1))
+end
+
+function Window:_buildBackdrop(opts)
+    local layer = create("Frame", {
+        Name = "Backdrop",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        Visible = false,
+        ZIndex = 0,
+        Parent = self.Gui,
+    })
+    local tint = create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Parent = layer,
+    })
+    -- Darker towards the top and bottom edges.
+    create("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.5, 0.3),
+            NumberSequenceKeypoint.new(1, 0),
+        }),
+        Parent = tint,
+    })
+    -- Heat rising from the bottom of the screen, hell fire only.
+    local heat = create("Frame", {
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.fromScale(0, 1),
+        Size = UDim2.fromScale(1, 0.5),
+        BackgroundColor3 = Color3.fromRGB(255, 60, 15),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 1,
+        Parent = layer,
+    })
+    create("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new(1, 0),
+        Parent = heat,
+    })
+    local field = create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        ClipsDescendants = true,
+        ZIndex = 2,
+        Parent = layer,
+    })
+    self._backdrop = layer
+    self._backdropTintFrame = tint
+    self._backdropHeat = heat
+    self._weatherField = field
+    self._weatherParticles = {}
+    self._backdropFade = 0
+    self._weatherKick = 0
+    self._backdropShown = false
+    self._backdropEnabled = opts.Enabled ~= false
+    self._backdropTint = math.clamp(tonumber(opts.Tint) or 0.45, 0, 1)
+    self._weatherDensity = math.clamp(tonumber(opts.Density) or 1, 0, 3)
+    self._weatherSpeed = math.clamp(tonumber(opts.Speed) or 1, 0.1, 3)
+    self.Weather = weatherName(opts.Weather == nil and "Rain" or opts.Weather)
+    self:_rebuildWeather()
+    table.insert(self._frameSteps, function(deltaTime)
+        self:_stepBackdrop(deltaTime)
+    end)
+end
+
+function Window:_rebuildWeather()
+    for _, particle in ipairs(self._weatherParticles) do
+        particle.Label:Destroy()
+    end
+    self._weatherParticles = {}
+    local definition = WEATHER[self.Weather]
+    if not definition then
+        return
+    end
+    local size = self.Gui.AbsoluteSize
+    for _ = 1, math.floor(definition.Count * self._weatherDensity + 0.5) do
+        local particle = {
+            Label = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                BackgroundTransparency = 1,
+                Image = definition.Image,
+                ImageTransparency = 1,
+                ScaleType = Enum.ScaleType.Fit,
+                ZIndex = 2,
+                Parent = self._weatherField,
+            }),
+        }
+        seedParticle(self.Weather, particle, size.X, size.Y, true)
+        table.insert(self._weatherParticles, particle)
+    end
+end
+
+function Window:_stepBackdrop(deltaTime)
+    local target = self._backdropShown and 1 or 0
+    local fade = self._backdropFade
+    if fade == target and target == 0 then
+        return
+    end
+    if fade < target then
+        fade = math.min(fade + deltaTime / 0.45, target)
+    elseif fade > target then
+        fade = math.max(fade - deltaTime / 0.25, target)
+    end
+    self._backdropFade = fade
+    if fade <= 0 then
+        self._backdrop.Visible = false
+        return
+    end
+    local eased = 1 - (1 - fade) ^ 3
+    local kind = self.Weather
+    self._backdropTintFrame.BackgroundTransparency = 1 - self._backdropTint * eased
+    self._backdropHeat.BackgroundTransparency = kind == "Ember"
+        and 1 - (0.22 + math.sin(os.clock() * 2.1) * 0.05) * eased
+        or 1
+
+    -- The gust on restore: particles rush in fast and settle back.
+    local kick = self._weatherKick
+    self._weatherKick = math.max(kick - deltaTime * 1.3, 0)
+    local speed = self._weatherSpeed * (1 + kick * kick * 2.5)
+    local size = self.Gui.AbsoluteSize
+    local width, height = size.X, size.Y
+    for _, particle in ipairs(self._weatherParticles) do
+        particle.Time += deltaTime
+        particle.X += particle.VX * deltaTime * speed
+        particle.Y += particle.VY * deltaTime * speed
+        particle.Rotation += particle.Spin * deltaTime * speed
+        local margin = math.max(particle.Size.X, particle.Size.Y)
+        if (particle.VY > 0 and particle.Y > height + margin) or (particle.VY < 0 and particle.Y < -margin) then
+            seedParticle(kind, particle, width, height, false)
+        elseif particle.X > width + margin * 4 then
+            particle.X -= width + margin * 6
+        elseif particle.X < -margin * 4 then
+            particle.X += width + margin * 6
+        end
+        local x = particle.X
+        local alpha = 1 - particle.Alpha
+        if particle.Sway ~= 0 then
+            x += math.sin(particle.Time * particle.Frequency + particle.Phase) * particle.Sway
+        end
+        if kind == "Ember" then
+            -- Flicker, and burn out on the way up.
+            alpha *= math.clamp(particle.Y / (height * 0.85), 0, 1) ^ 0.6
+            alpha *= 0.75 + math.sin(particle.Time * 9 + particle.Phase) * 0.25
+        end
+        local label = particle.Label
+        label.Position = UDim2.fromOffset(x, particle.Y)
+        label.Rotation = particle.Rotation
+        label.ImageTransparency = 1 - alpha * eased
+    end
+end
+
+function Window:_refreshBackdrop(gust)
+    if not self._backdrop then
+        return
+    end
+    local shown = self._backdropEnabled and self._introDone and self.Open and not self.Minimized and not self._destroyed
+    if shown and not self._backdropShown then
+        self._backdrop.Visible = true
+        if self._backdropFade <= 0 then
+            local size = self.Gui.AbsoluteSize
+            for _, particle in ipairs(self._weatherParticles) do
+                seedParticle(self.Weather, particle, size.X, size.Y, true)
+            end
+        end
+        if gust then
+            self._weatherKick = 1
+        end
+    end
+    self._backdropShown = shown == true
+end
+
+function Window:SetBackdrop(enabled)
+    if not self._backdrop then
+        return
+    end
+    self._backdropEnabled = enabled ~= false
+    self:_refreshBackdrop(true)
+end
+
+function Window:SetBackdropTint(amount)
+    if not self._backdrop then
+        return
+    end
+    self._backdropTint = math.clamp(tonumber(amount) or 0.45, 0, 1)
+end
+
+function Window:SetWeather(name)
+    if not self._backdrop then
+        return
+    end
+    local kind = weatherName(name)
+    if kind == self.Weather then
+        return
+    end
+    self.Weather = kind
+    self:_rebuildWeather()
+    if self._backdropShown then
+        self._weatherKick = 1
+    end
+end
+
+function Window:SetWeatherDensity(density)
+    if not self._backdrop then
+        return
+    end
+    self._weatherDensity = math.clamp(tonumber(density) or 1, 0, 3)
+    self:_rebuildWeather()
+end
+
+function Window:SetWeatherSpeed(speed)
+    if not self._backdrop then
+        return
+    end
+    self._weatherSpeed = math.clamp(tonumber(speed) or 1, 0.1, 3)
+end
+
 -- Minimize: the window folds into a floating bar that keeps the essentials in
 -- view (current tab, running toggles, pinned statuses) and unfolds back into
 -- the window from wherever the bar was dragged.
@@ -9395,7 +9777,7 @@ function Window:_buildMiniBar()
         LayoutOrder = 1,
         Parent = brand,
     })
-    applyIcon(logo, self._logoIcon)
+    applyIcon(logo, self._logoIcon, true)
     label({
         Size = UDim2.new(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -9584,6 +9966,14 @@ function Window:_buildMiniBar()
             tabIcon.ImageRectOffset = tab._icon.ImageRectOffset
             tabIcon.ImageRectSize = tab._icon.ImageRectSize
             tween(tabIcon, { ImageColor3 = tab._icon:GetAttribute("CustomIcon") and Color3.new(1, 1, 1) or Theme.Muted }, 0)
+            local source = tab._icon:FindFirstChild("CustomIconScale")
+            local scaler = tabIcon:FindFirstChild("CustomIconScale")
+            if source and not scaler then
+                scaler = create("UIScale", { Name = "CustomIconScale", Parent = tabIcon })
+            end
+            if scaler then
+                scaler.Scale = source and source.Scale or 1
+            end
         else
             tabIcon.Visible = false
         end
@@ -9670,6 +10060,7 @@ function Window:Minimize()
     local generation = self._minimizeGeneration
     self:_closePopups()
     self:_refreshToggleButton()
+    self:_refreshBackdrop()
     local bar = self:_buildMiniBar()
     self:_refreshMini()
     local gui = self.Gui
@@ -9720,6 +10111,7 @@ function Window:Restore()
     self._minimizeGeneration = (self._minimizeGeneration or 0) + 1
     local generation = self._minimizeGeneration
     self:_refreshToggleButton()
+    self:_refreshBackdrop(true)
     local gui = self.Gui
     local bar = self.MiniBar
     local fit = self._fitScale or 1
@@ -9779,6 +10171,7 @@ function Window:Toggle(open)
     end
     self.Open = open
     self:_refreshToggleButton()
+    self:_refreshBackdrop(open)
     if open then
         self.Root.Visible = true
         tween(self.Scale, { Scale = self._fitScale or 1 }, 0.4, Enum.EasingStyle.Back)
@@ -10026,6 +10419,12 @@ function Window:Destroy()
         if self.MiniBar and self.MiniBar.Visible then
             tween(self.MiniBar, { GroupTransparency = 1 }, 0.18)
         end
+        if self._backdrop then
+            -- Frame steps are already cut, so the weather stops where it is.
+            self._weatherField.Visible = false
+            tween(self._backdropTintFrame, { BackgroundTransparency = 1 }, 0.2)
+            tween(self._backdropHeat, { BackgroundTransparency = 1 }, 0.2)
+        end
         for _, button in ipairs({ self.ToggleButton, self.OpenButton }) do
             if typeof(button) == "Instance" and button:IsA("GuiObject") then
                 tween(button, { Size = UDim2.fromOffset(0, 0) }, 0.2, Enum.EasingStyle.Quint)
@@ -10068,6 +10467,7 @@ local Window = Airflow:CreateWindow({
     -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift
     ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample", FileName = "default" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
+    Backdrop = { Weather = "Rain", Tint = 0.45 }, -- black tint + weather behind the open window: "Rain", "Snow", "Hell Fire" or "None". false turns it off
     Home = {
         Tier = "Free",
         Expiry = os.time() + 12 * 3600, -- countdown under the tier badge. A string or a function also works
@@ -10460,6 +10860,50 @@ Interface:CreateDropdown({
     Flag = "ToggleButtonPlatform",
     Callback = function(Option)
         Window:SetToggleButtonPlatform(Option == "Mobile & PC" and "Both" or "Mobile")
+    end,
+})
+
+Interface:CreateToggle({
+    Name = "Backdrop",
+    CurrentValue = true,
+    Flag = "Backdrop",
+    Callback = function(Value)
+        Window:SetBackdrop(Value)
+    end,
+})
+
+Interface:CreateDropdown({
+    Name = "Weather",
+    Options = { "None", "Rain", "Snow", "Hell Fire" },
+    CurrentOption = "Rain",
+    AllowNone = false,
+    Flag = "BackdropWeather",
+    Callback = function(Option)
+        Window:SetWeather(Option)
+    end,
+})
+
+Interface:CreateSlider({
+    Name = "Backdrop Tint",
+    Range = { 0, 90 },
+    Increment = 5,
+    Suffix = "%",
+    CurrentValue = 45,
+    Flag = "BackdropTint",
+    Callback = function(Value)
+        Window:SetBackdropTint(Value / 100)
+    end,
+})
+
+Interface:CreateSlider({
+    Name = "Weather Density",
+    Range = { 25, 200 },
+    Increment = 25,
+    Suffix = "%",
+    CurrentValue = 100,
+    Flag = "WeatherDensity",
+    Callback = function(Value)
+        Window:SetWeatherDensity(Value / 100)
     end,
 })
 

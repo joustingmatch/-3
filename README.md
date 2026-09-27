@@ -27,6 +27,7 @@ local Window = Airflow:CreateWindow({
     KeepOnScreen = true,
     OpenButton = { Title = "Airflow", Icon = "wind" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" },
+    Backdrop = { Weather = "Rain", Tint = 0.45 },
     Profile = true,
     Search = true,
     Loading = {
@@ -78,7 +79,12 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `ToggleButton.Platform` | string | `"Mobile"` | `"Mobile"` shows it on touch devices only, `"Both"` on PC and mobile. |
 | `ToggleButton.Icon` | string \| number \| table | `"layout-grid"` | Any [icon](#icons). |
 | `ToggleButton.Enabled` | boolean | `true` | `false` builds it hidden, to show later with `SetToggleButton(true)`. |
-| `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `44` touch, `40` PC | Starting position and side length. |
+| `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `56` touch, `50` PC | Starting position and side length. |
+| `Backdrop` | boolean \| table | `{ Weather = "Rain" }` | Black tint over the game while the window is up, with weather drifting through it. It fades out when the window is minimized or hidden and sweeps back in with a gust on restore. `false` removes it. |
+| `Backdrop.Weather` | string | `"Rain"` | `"Rain"`, `"Snow"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
+| `Backdrop.Tint` | number | `0.45` | Tint strength, `0` to `1`. |
+| `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
+| `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
@@ -107,6 +113,10 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
 | `SetToggleButtonIcon(icon)` | Swap its icon. |
 | `.ToggleButton` | The toggle button, when it was built. |
+| `SetBackdrop(enabled)` | Turn the tint and weather on or off. |
+| `SetWeather(name)` / `.Weather` | `"Rain"`, `"Snow"`, `"Hell Fire"` or `"None"`. |
+| `SetBackdropTint(amount)` | Tint strength, `0` to `1`. |
+| `SetWeatherDensity(n)` / `SetWeatherSpeed(n)` | Particle count and speed multipliers. |
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
@@ -1127,7 +1137,7 @@ Tab:CreateButton({
 | `132608042600488` / `"132608042600488"` / `"rbxassetid://…"` / `"rbxthumb://…"` | Your own image, shown in its own colours. |
 | `{ Image, RectOffset, RectSize, Tint }` | Your own image or a sprite. `Tint = true` lets the theme colour it like a lucide icon. |
 
-Custom images keep their colours through theme changes. On tabs and sub tabs, a custom icon shows the selection by going from dimmed to full opacity instead of changing colour. The default bird logo is still tinted with the accent.
+Custom images keep their colours through theme changes and are drawn 35% larger than their slot, since uploaded images usually carry transparent padding. A table icon can set its own `Scale` (`Scale = 1` for the exact slot size). On tabs and sub tabs, a custom icon shows the selection by going from dimmed to full opacity instead of changing colour. The default bird logo is still tinted with the accent.
 
 Names resolve through the [Footagesus/Icons](https://github.com/Footagesus/Icons) list, fetched once on first use; `Airflow:PreloadIcons()` fetches it up front.
 
