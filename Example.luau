@@ -814,6 +814,21 @@ local function safeCall(callback, ...)
     end
 end
 
+-- Runs a user callback on its own thread and waits for it with task.wait.
+-- A callback that yields inside an engine call (InvokeServer and the like)
+-- resumes at game identity, which can no longer touch the GUI in CoreGui;
+-- keeping that on a separate thread leaves the caller's identity intact.
+local function isolatedCall(callback)
+    local result = nil
+    task.spawn(function()
+        result = table.pack(pcall(callback))
+    end)
+    while result == nil do
+        task.wait()
+    end
+    return table.unpack(result, 1, result.n)
+end
+
 local function numberFormat(min, max, step)
     local decimals = 0
     local text = tostring(step)
@@ -1078,7 +1093,7 @@ function Tab:Label(opts)
         end)
         task.spawn(function()
             while running and text_.Parent do
-                local ok, value = pcall(opts.Update)
+                local ok, value = isolatedCall(opts.Update)
                 if ok and value ~= nil then
                     text_.Text = tostring(value)
                 elseif not ok then
@@ -6430,7 +6445,7 @@ function Tab:Status(opts)
         end)
         task.spawn(function()
             while running and frame.Parent do
-                local ok, value, extra = pcall(opts.Update)
+                local ok, value, extra = isolatedCall(opts.Update)
                 if ok then
                     if value ~= nil then
                         handle.Value = value
@@ -6778,14 +6793,13 @@ function Tab:StatusList(opts)
             while alive and frame.Parent do
                 if first or onScreen() then
                     first = false
-                    local ok, err = pcall(function()
-                        local result = opts.Update()
+                    local ok, result = isolatedCall(opts.Update)
+                    if ok then
                         if result ~= nil then
                             handle:Set(result)
                         end
-                    end)
-                    if not ok then
-                        warn("[AirFlow] status list update error: " .. tostring(err))
+                    else
+                        warn("[AirFlow] status list update error: " .. tostring(result))
                     end
                 end
                 task.wait(rate)
