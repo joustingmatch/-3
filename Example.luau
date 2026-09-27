@@ -244,15 +244,35 @@ function Library:PreloadIcons()
     return loadLucide() ~= false
 end
 
+-- Numbers, digit strings and asset URLs are custom images; anything else is
+-- a lucide name.
+local function assetId(value)
+    if type(value) == "number" then
+        return "rbxassetid://" .. string.format("%.0f", value)
+    end
+    if type(value) == "string" then
+        if value:match("^%d+$") then
+            return "rbxassetid://" .. value
+        end
+        if value:find("^rbxassetid://") or value:find("^rbxasset://") or value:find("^rbxthumb://") or value:find("^http") then
+            return value
+        end
+    end
+    return nil
+end
+
+-- Returns image, rect offset, rect size, whether it is a custom image, and
+-- whether that custom image should still take the theme tint.
 local function resolveIcon(icon)
     if typeof(icon) == "table" then
-        return icon.Image, icon.RectOffset, icon.RectSize
+        return assetId(icon.Image) or icon.Image, icon.RectOffset, icon.RectSize, true, icon.Tint == true
+    end
+    local asset = assetId(icon)
+    if asset then
+        return asset, nil, nil, true, false
     end
     if type(icon) ~= "string" then
         return nil
-    end
-    if icon:find("^rbxassetid://") or icon:find("^rbxasset://") or icon:find("^http") then
-        return icon
     end
     local name = icon:gsub("^lucide:", "")
     local set = loadLucide()
@@ -533,13 +553,33 @@ local function edgeHighlight(parent)
 end
 
 local function applyIcon(imageLabel, icon)
-    local image, rectOffset, rectSize = resolveIcon(icon)
+    local image, rectOffset, rectSize, custom, tint = resolveIcon(icon)
     if not image then
         return
     end
     imageLabel.Image = image
     imageLabel.ImageRectOffset = rectOffset or Vector2.zero
     imageLabel.ImageRectSize = rectSize or Vector2.zero
+    -- The built-in logo is a white mark meant to be tinted.
+    if icon == Assets.Logo then
+        tint = true
+    end
+    local keepColours = custom and not tint
+    imageLabel:SetAttribute("CustomIcon", keepColours or nil)
+    if keepColours then
+        -- Original colours, and out of the theme's reach.
+        tween(imageLabel, { ImageColor3 = Color3.new(1, 1, 1) }, 0)
+    end
+end
+
+-- Selection state for icons: tinted icons change colour, custom images keep
+-- their colours and dim instead.
+local function tintIcon(imageLabel, color, active, duration)
+    if imageLabel:GetAttribute("CustomIcon") then
+        tween(imageLabel, { ImageTransparency = active and 0 or 0.4 }, duration)
+    else
+        tween(imageLabel, { ImageColor3 = color }, duration)
+    end
 end
 
 local function defaultParent()
@@ -5964,6 +6004,9 @@ function Tab:SubTab(opts, icon)
             Parent = button,
         })
         applyIcon(image, opts.Icon)
+        if image:GetAttribute("CustomIcon") then
+            image.ImageTransparency = 0.4
+        end
         sub._iconImage = image
     end
     sub._label = label({
@@ -6030,12 +6073,12 @@ function Tab:SelectSubTab(sub, instant)
     if previous then
         tween(previous._label, { TextColor3 = Theme.Muted }, fade)
         if previous._iconImage then
-            tween(previous._iconImage, { ImageColor3 = Theme.Muted }, fade)
+            tintIcon(previous._iconImage, Theme.Muted, false, fade)
         end
     end
     tween(sub._label, { TextColor3 = Theme.Text }, fade)
     if sub._iconImage then
-        tween(sub._iconImage, { ImageColor3 = Theme.Accent }, fade)
+        tintIcon(sub._iconImage, Theme.Accent, true, fade)
     end
     self:_placeSubHighlight(sub, instant)
 
@@ -7167,6 +7210,9 @@ function Window:Tab(opts, icon)
             Parent = button,
         })
         applyIcon(iconImage, opts.Icon)
+        if iconImage:GetAttribute("CustomIcon") then
+            iconImage.ImageTransparency = 0.4
+        end
         tab._icon = iconImage
     end
     tab._label = label({
@@ -7546,7 +7592,7 @@ function Window:SelectTab(tab)
     if previous then
         tween(previous._label, { TextColor3 = Theme.Muted }, 0.2)
         if previous._icon then
-            tween(previous._icon, { ImageColor3 = Theme.Muted }, 0.2)
+            tintIcon(previous._icon, Theme.Muted, false, 0.2)
         end
         local outLayer = self._outLayer
         previous._page.Parent = outLayer
@@ -7566,7 +7612,7 @@ function Window:SelectTab(tab)
     tween(tab._stroke, { Transparency = 1 }, 0.2)
     tween(tab._label, { TextColor3 = Theme.Text }, 0.2)
     if tab._icon then
-        tween(tab._icon, { ImageColor3 = Theme.Accent }, 0.2)
+        tintIcon(tab._icon, Theme.Accent, true, 0.2)
     end
 
     self:_placeIndicator(tab)
@@ -7878,6 +7924,7 @@ function Window:_buildMiniBar()
             tabIcon.Image = tab._icon.Image
             tabIcon.ImageRectOffset = tab._icon.ImageRectOffset
             tabIcon.ImageRectSize = tab._icon.ImageRectSize
+            tween(tabIcon, { ImageColor3 = tab._icon:GetAttribute("CustomIcon") and Color3.new(1, 1, 1) or Theme.Muted }, 0)
         else
             tabIcon.Visible = false
         end
@@ -8289,6 +8336,7 @@ Airflow:LoadFont({ Name = "ValleySans" }) -- downloads the font once into worksp
 local Window = Airflow:CreateWindow({
     Name = "Airflow Hub",
     LoadingSubtitle = "Example",
+    Icon = 132608042600488, -- any asset id (number or "rbxassetid://..."), shown in its own colours
     ToggleUIKeybind = "RightControl", -- key that hides and shows the window
     -- examples: "RightShift", "RightControl", "LeftAlt", "Insert", "Home", "F1", "Backquote"
     -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift

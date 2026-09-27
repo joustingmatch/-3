@@ -63,24 +63,24 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | --- | --- | --- | --- |
 | `Name` | string | `"Airflow"` | Title in the sidebar header. Also names the ScreenGui. |
 | `LoadingSubtitle` | string | — | Small line under the title. |
-| `Icon` | string \| table | bird logo | Lucide name, `rbxassetid://` string, or `{ Image, RectOffset, RectSize }`. |
+| `Icon` | string \| number \| table | bird logo | Lucide name, asset id, or `{ Image, RectOffset, RectSize, Tint }`. See [Icons](#icons). |
 | `ToggleUIKeybind` | string \| KeyCode | `"RightControl"` | Hides and shows the window. `"RightShift"`, `"LeftAlt"`, `"Insert"`, `"F1"`, or an `Enum.KeyCode`. |
 | `Size` | UDim2 | `760 × 520` | Starting size. |
 | `MinSize` | Vector2 | `480 × 360` | Smallest size the resize grip allows. |
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
-| `OpenButton` | boolean \| table | touch-only devices | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
+| `OpenButton` | boolean \|| `Icon` | string | number | table | touch-only devices | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
-| `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
+| `Loading` | boolean \|| `Icon` | string | number | table | `true` | Loading card before the window morphs in. `false` skips it. |
 | `Loading.Title` | string | `Name` | Title on the card. |
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
-| `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |
+| `Loading.Steps` || `Icon` | string | number | table | 3 built-in lines | Status lines cycled over the duration. |
 | `Loading.Duration` | number | `1.6` | Seconds before the window appears. |
-| `ConfigurationSaving` | table | — | See [Configs](#configs). |
-| `Home` | boolean \| table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
-| `Theme` | string \| table | — | Theme applied before the window is built. See [Theme](#theme). |
+| `ConfigurationSaving` || `Icon` | string | number | table | — | See [Configs](#configs). |
+| `Home` | boolean \|| `Icon` | string | number | table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
+| `Theme` | string \|| `Icon` | string | number | table | — | Theme applied before the window is built. See [Theme](#theme). |
 | `Parent` | Instance | `gethui()` / CoreGui | Where the ScreenGui goes. Falls back to PlayerGui. |
 
 ### Handle
@@ -159,19 +159,19 @@ The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest
 | `Tier` | string \| false | `"Free"` | Badge on the player card. `false` hides it. |
 | `TierIcon` | string | window icon | Icon in the badge. |
 | `Expiry` | number \| string \| function | — | Under the badge. A unix time counts down (`11h 57m`), a string is shown as is, a function is called every second. |
-| `Stats` | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
+| `Stats` || `Icon` | string | number | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
 | `StatsFolder` | string | config folder | Where the execution counter is stored. |
 | `TimeFormat` | string | `"%H:%M"` | `os.date` format for the time stat. |
-| `SupportedExecutors` | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
+| `SupportedExecutors` || `Icon` | string | number | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
 | `Discord` / `Website` | string | — | Link cards with a copy button. |
 | `DiscordTitle` / `WebsiteTitle` | string | `"Join the community"` / `"Supported games"` | Card titles. |
-| `Links` | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
+| `Links` || `Icon` | string | number | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
 | `HideName` / `HideAvatar` | boolean | `false` | Start with the privacy switches on. |
 | `OverviewName` / `TabIcon` | string | `"Overview"` / `"layout-grid"` | The first sub tab when `Pages` is set. |
-| `Pages` | table | — | Extra sub tabs. |
+| `Pages` || `Icon` | string | number | table | — | Extra sub tabs. |
 | `Pages[n].Name` / `Icon` | string | — | The sub tab button. |
 | `Pages[n].Content` | string | — | Wrapped text in a card. |
-| `Pages[n].Entries` | table | — | Cards with `Title`, `Tag` or `Date`, and `Changes` (a list) or `Content`. |
+| `Pages[n].Entries` || `Icon` | string | number | table | — | Cards with `Title`, `Tag` or `Date`, and `Changes` (a list) or `Content`. |
 | `Pages[n].Build` | function | — | `function(page, list)`. `page` is a sub tab, so every element constructor and `Groupbox` work on it. |
 
 ---
@@ -200,7 +200,7 @@ The first tab created is selected automatically. An empty tab shows its icon wit
 | `Name` | string | `"Tab"` | Sidebar label and page title. |
 | `PageTitle` | string | `Name` | Page heading when it should differ from the sidebar label. |
 | `Desc` | string | — | Muted line under the page title. |
-| `Icon` | string \| table | — | Sidebar and page icon, accent-tinted. |
+| `Icon` | string \| number \| table | — | Sidebar and page icon, accent-tinted. |
 | `EmptyText` | string | `"Nothing here yet"` | Shown while the tab has no elements. |
 
 ### Handle
@@ -230,7 +230,7 @@ The first sub tab is selected automatically. Once a tab has sub tabs, add elemen
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Name` | string | `"Page n"` | Pill label. |
-| `Icon` | string \| table | — | Optional icon in the pill. |
+| `Icon` | string \| number \| table | — | Optional icon in the pill. |
 | `EmptyText` | string | `"Nothing here yet"` | Shown while the page is empty. |
 
 ### Handle
@@ -263,7 +263,7 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Name` | string | `"Groupbox"` | Header title. |
-| `Icon` | string \| table | — | Accent icon on the right of the header. |
+| `Icon` | string \| number \| table | — | Accent icon on the right of the header. |
 | `Side` | `"Left"` \| `"Right"` \| 1 \| 2 | balanced | Column. |
 | `Collapsed` | boolean | `false` | Start collapsed. |
 
@@ -458,7 +458,7 @@ Button:SetText("Respawn")
 | --- | --- | --- | --- |
 | `Name` | string | `"Button"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Icon` | string \| table | — | Leading icon. |
+| `Icon` | string \| number \| table | — | Leading icon. |
 | `Style` | string | — | `"Primary"` fills the card with the accent colour. |
 | `Callback` | function | — | Runs on click. |
 
@@ -552,7 +552,7 @@ Click the value chip to type an exact number.
 | --- | --- | --- | --- |
 | `Name` | string | `"Slider"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Range` | table | `{ 0, 100 }` | `{ min, max }`. |
+| `Range` || `Icon` | string | number | table | `{ 0, 100 }` | `{ min, max }`. |
 | `Increment` | number | `1` | Snap size. Its decimals set how the value is shown. |
 | `Suffix` | string | `""` | Appended to the value chip. |
 | `CurrentValue` | number | min | The initial value. |
@@ -598,7 +598,7 @@ Hold either button to repeat.
 | --- | --- | --- | --- |
 | `Name` | string | `"Stepper"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Range` | table | `{ 0, 100 }` | `{ min, max }`. |
+| `Range` || `Icon` | string | number | table | `{ 0, 100 }` | `{ min, max }`. |
 | `Increment` | number | `1` | Step per press. Its decimals set how the value is shown. |
 | `Suffix` | string | `""` | Appended to the value. |
 | `CurrentValue` | number | min | The initial value. |
@@ -686,8 +686,8 @@ Clicking the chip unfolds a popup out of it, floating over the window under the 
 | --- | --- | --- | --- |
 | `Name` | string | `"Dropdown"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Options` | table | `{}` | The rows. |
-| `CurrentOption` | string \| table | — | The initial selection. A table in multi mode. |
+| `Options` || `Icon` | string | number | table | `{}` | The rows. |
+| `CurrentOption` | string \|| `Icon` | string | number | table | — | The initial selection. A table in multi mode. |
 | `MultipleOptions` | boolean | `false` | Rows toggle independently and the callback receives a list. |
 | `Searchable` | boolean | `true` | Show the search box. |
 | `SearchAfter` | number | `0` | Only show search when there are more rows than this. |
@@ -738,7 +738,7 @@ Input:Set("Pookie")
 | --- | --- | --- | --- |
 | `Name` | string | `"Input"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
-| `Icon` | string \| table | — | Icon inside the box. |
+| `Icon` | string \| number \| table | — | Icon inside the box. |
 | `PlaceholderText` | string | `""` | Shown while empty. |
 | `CurrentValue` | string | `""` | The initial text. |
 | `Numeric` | boolean | `false` | Clears the box and skips the callback if the text is not a number. |
@@ -865,7 +865,7 @@ Notification:Dismiss()
 | --- | --- | --- | --- |
 | `Title` | string | `"Notification"` | Bold first line. |
 | `Content` | string | — | Wrapped body. |
-| `Icon` | string \| table | — | Icon before the title. |
+| `Icon` | string \| number \| table | — | Icon before the title. |
 | `Duration` | number | `4` | Seconds before it dismisses itself. |
 | `Type` | string | `"Info"` | `"Info"`, `"Success"`, `"Warning"` or `"Error"`. Tints the title. |
 
@@ -919,7 +919,7 @@ Airflow:Dialog({
 | --- | --- | --- | --- |
 | `Title` | string | `"Are you sure?"` | Heading. |
 | `Content` | string | — | Wrapped body. |
-| `Icon` | string \| table | — | Icon before the heading. |
+| `Icon` | string \| number \| table | — | Icon before the heading. |
 | `ConfirmText` | string | `"Confirm"` | Primary button. |
 | `CancelText` | string | `"Cancel"` | Secondary button. |
 | `Callback` | function | — | Runs when confirmed. |
@@ -989,20 +989,30 @@ Requires `writefile` / `readfile`. Keybinds are stored by key name, colours as R
 
 ## Icons
 
-> Any lucide icon, anywhere an `Icon` is accepted.
+> Any lucide icon or your own image, anywhere an `Icon` is accepted.
 
 ```lua
 Airflow:PreloadIcons()
 
 Window:CreateTab({ Name = "Main", Icon = "zap" })
-Tab:CreateButton({ Name = "Rejoin", Icon = "refresh-cw" })
 Tab:CreateInput({ Name = "Key", Icon = "lucide:key-round" })
-Window:CreateTab({ Name = "Custom", Icon = "rbxassetid://103859712365480" })
+
+local Window = Airflow:CreateWindow({ Name = "My Hub", Icon = 132608042600488 })
+Window:CreateTab({ Name = "Custom", Icon = "rbxassetid://132608042600488" })
+Tab:CreateButton({ Name = "Tinted", Icon = { Image = 132608042600488, Tint = true } })
 Tab:CreateButton({
     Name = "Sprite",
     Icon = { Image = "rbxassetid://122605056588923", RectOffset = Vector2.new(325, 775), RectSize = Vector2.new(24, 24) },
 })
 ```
+
+| Form | Treated as |
+| --- | --- |
+| `"zap"` / `"lucide:zap"` | Lucide icon, tinted by the theme. |
+| `132608042600488` / `"132608042600488"` / `"rbxassetid://…"` / `"rbxthumb://…"` | Your own image, shown in its own colours. |
+| `{ Image, RectOffset, RectSize, Tint }` | Your own image or a sprite. `Tint = true` lets the theme colour it like a lucide icon. |
+
+Custom images keep their colours through theme changes. On tabs and sub tabs, a custom icon shows the selection by going from dimmed to full opacity instead of changing colour. The default bird logo is still tinted with the accent.
 
 Names resolve through the [Footagesus/Icons](https://github.com/Footagesus/Icons) list, fetched once on first use; `Airflow:PreloadIcons()` fetches it up front.
 
@@ -1034,7 +1044,7 @@ Call it before `CreateWindow`. The TTFs are saved to the folder on first run and
 | --- | --- | --- | --- |
 | `Name` | string | — | Family name. `"ValleySans"` uses the built-in URLs. |
 | `Folder` | string | `"AirFlowFonts"` | Where the TTFs and family file are saved. |
-| `Weights` | table | preset | `Regular`, `Medium`, `SemiBold`, `Bold` → TTF URL. |
+| `Weights` || `Icon` | string | number | table | preset | `Regular`, `Medium`, `SemiBold`, `Bold` → TTF URL. |
 
 ---
 
