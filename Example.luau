@@ -3938,6 +3938,13 @@ function Window:_playIntro(morph)
     task.delay(0.4, function()
         self:_refreshToggleButton()
     end)
+    -- Build the minimized bar ahead of time so the first minimize doesn't
+    -- pay for it mid-click.
+    task.delay(1.5, function()
+        if not self._destroyed and not self.MiniBar then
+            self:_buildMiniBar()
+        end
+    end)
     local root, shadow, scale = self.Root, self.Shadow, self.Scale
     if self.CurrentTab then
         self:_revealCards(self.CurrentTab, morph and 0.15 or 0.25)
@@ -9311,7 +9318,10 @@ end
 -- a gust when it comes back.
 
 local WEATHER = {
-    Rain = { Image = "rbxassetid://241868005", Count = 90 },
+    -- The rain texture is a wide sheet with one faint streak down the middle
+    -- (about 1/60 of its width, 57% of its height), so it is stretched much
+    -- wider than the drop it draws. See RAIN_STREAK.
+    Rain = { Image = "rbxassetid://241868005", Count = 90, Stretch = true },
     Snow = { Image = "rbxassetid://99851851", Count = 60 },
     Ember = { Image = "rbxassetid://242205518", Count = 55 },
 }
@@ -9323,6 +9333,7 @@ local WEATHER_NAMES = {
     fire = "Ember",
     hellfire = "Ember",
 }
+local RAIN_STREAK = Vector2.new(7 / 420, 151 / 263)
 local weatherRandom = Random.new()
 
 local function weatherName(name)
@@ -9342,13 +9353,13 @@ local function seedParticle(kind, particle, width, height, anywhere)
     particle.Time = roll(0, 10)
     particle.Phase = roll(0, math.pi * 2)
     if kind == "Rain" then
-        local w = roll(3, 6)
-        particle.Size = Vector2.new(w, w * roll(5, 8))
+        local w = roll(2, 3.5)
+        particle.Size = Vector2.new(w, roll(26, 52))
         particle.VY = roll(950, 1400)
         particle.VX = particle.VY * 0.12
         particle.Sway, particle.Spin = 0, 0
         particle.Rotation = -math.deg(math.atan2(particle.VX, particle.VY))
-        particle.Alpha = roll(0.25, 0.6)
+        particle.Alpha = roll(0, 0.35)
         particle.X = roll(-0.15 * width, width)
         particle.Y = anywhere and roll(-40, height) or roll(-120, -particle.Size.Y)
     elseif kind == "Snow" then
@@ -9378,7 +9389,11 @@ local function seedParticle(kind, particle, width, height, anywhere)
         particle.Y = anywhere and roll(height * 0.2, height + 10) or height + roll(10, 80)
     end
     local label = particle.Label
-    label.Size = UDim2.fromOffset(particle.Size.X, particle.Size.Y)
+    if kind == "Rain" then
+        label.Size = UDim2.fromOffset(particle.Size.X / RAIN_STREAK.X, particle.Size.Y / RAIN_STREAK.Y)
+    else
+        label.Size = UDim2.fromOffset(particle.Size.X, particle.Size.Y)
+    end
     label.ImageColor3 = particle.Color
         or (kind == "Rain" and Color3.fromRGB(190, 210, 245) or Color3.new(1, 1, 1))
 end
@@ -9469,7 +9484,7 @@ function Window:_rebuildWeather()
                 BackgroundTransparency = 1,
                 Image = definition.Image,
                 ImageTransparency = 1,
-                ScaleType = Enum.ScaleType.Fit,
+                ScaleType = definition.Stretch and Enum.ScaleType.Stretch or Enum.ScaleType.Fit,
                 ZIndex = 2,
                 Parent = self._weatherField,
             }),
@@ -9610,32 +9625,44 @@ end
 local MINI_HEIGHT = 46
 local MAX_PINNED = 3
 
-local function morphGhost(window, fromPosition, fromSize, toPosition, toSize, fromRadius, toRadius, duration)
+-- The morph is carried by a plain "ghost" panel drawn over the window. The
+-- window body itself never moves or fades, so nothing has to be laid out
+-- again mid-animation: the ghost covers it, the window is hidden underneath,
+-- and on the way back the window is shown under the ghost before it clears.
+local function makeGhost(window, position, size, radius)
+    if window._ghost then
+        window._ghost:Destroy()
+    end
     local ghost = create("Frame", {
-        Position = UDim2.fromOffset(fromPosition.X, fromPosition.Y),
-        Size = UDim2.fromOffset(fromSize.X, fromSize.Y),
+        Position = UDim2.fromOffset(position.X, position.Y),
+        Size = UDim2.fromOffset(size.X, size.Y),
         BackgroundColor3 = Theme.Background,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ZIndex = 29,
         Parent = window.Gui,
     })
-    local ghostCorner = corner(ghost, UDim.new(0, fromRadius))
+    local ghostCorner = corner(ghost, UDim.new(0, radius))
     local ghostStroke = stroke(ghost, Theme.Stroke, 1)
-    tween(ghost, { BackgroundTransparency = 0 }, 0.12)
-    tween(ghostStroke, { Transparency = 0 }, 0.12)
-    tween(ghost, {
-        Position = UDim2.fromOffset(toPosition.X, toPosition.Y),
-        Size = UDim2.fromOffset(toSize.X, toSize.Y),
-    }, duration, Enum.EasingStyle.Quint)
-    tween(ghostCorner, { CornerRadius = UDim.new(0, toRadius) }, duration, Enum.EasingStyle.Quint)
-    return ghost, ghostStroke
+    window._ghost = ghost
+    return ghost, ghostStroke, ghostCorner
 end
 
-local function dissolve(ghost, ghostStroke, duration)
-    tween(ghost, { BackgroundTransparency = 1 }, duration)
-    tween(ghostStroke, { Transparency = 1 }, duration)
+local function morphGhost(ghost, ghostCorner, position, size, radius, duration)
+    tween(ghost, {
+        Position = UDim2.fromOffset(position.X, position.Y),
+        Size = UDim2.fromOffset(size.X, size.Y),
+    }, duration, Enum.EasingStyle.Quint)
+    tween(ghostCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
+end
+
+local function dissolve(window, ghost, ghostStroke, duration)
+    tween(ghost, { BackgroundTransparency = 1 }, duration, Enum.EasingStyle.Quad)
+    tween(ghostStroke, { Transparency = 1 }, duration, Enum.EasingStyle.Quad)
     task.delay(duration + 0.02, function()
+        if window._ghost == ghost then
+            window._ghost = nil
+        end
         ghost:Destroy()
     end)
 end
@@ -9863,12 +9890,16 @@ function Window:_buildMiniBar()
         tween(expandIcon, { ImageColor3 = Theme.Accent }, 0.15)
         tween(barScale, { Scale = 1.02 }, 0.25, Enum.EasingStyle.Quint)
     end)
-    hit.MouseLeave:Connect(function()
+    -- Also run on restore: the bar hides under the pointer, so MouseLeave
+    -- never fires and the hover look would stick for the next minimize.
+    local function unhover()
         tween(barStroke, { Color = Theme.Stroke }, 0.25)
         tween(expand, { BackgroundTransparency = 0.5 }, 0.25)
         tween(expandIcon, { ImageColor3 = Theme.Muted }, 0.25)
         tween(barScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
-    end)
+    end
+    hit.MouseLeave:Connect(unhover)
+    self._miniUnhover = unhover
 
     local dragging, moved = false, false
     local grab = Vector2.zero
@@ -9881,6 +9912,10 @@ function Window:_buildMiniBar()
     end)
     table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
         if not dragging or not isMove(input) then
+            return
+        end
+        if not self.Minimized then
+            dragging = false
             return
         end
         local point = pointerPosition() - grab - gui.AbsolutePosition
@@ -9899,7 +9934,7 @@ function Window:_buildMiniBar()
             dragging = false
             if moved then
                 self._miniPosition = bar.AbsolutePosition - gui.AbsolutePosition
-            else
+            elseif self.Minimized then
                 self:Restore()
             end
         end
@@ -9997,6 +10032,22 @@ function Window:_buildMiniBar()
         end
     end
 
+    -- Keep the bar reachable when the screen shrinks or rotates.
+    table.insert(self._connections, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if not bar.Visible then
+            return
+        end
+        local position = bar.AbsolutePosition - gui.AbsolutePosition
+        local clamped = Vector2.new(
+            math.clamp(position.X, 8, math.max(gui.AbsoluteSize.X - bar.AbsoluteSize.X - 8, 8)),
+            math.clamp(position.Y, 8, math.max(gui.AbsoluteSize.Y - bar.AbsoluteSize.Y - 8, 8))
+        )
+        if clamped ~= position then
+            bar.Position = UDim2.fromOffset(clamped.X, clamped.Y)
+            self._miniPosition = clamped
+        end
+    end))
+
     self.MiniBar = bar
     return bar
 end
@@ -10014,38 +10065,61 @@ function Window:Minimize()
     local bar = self:_buildMiniBar()
     self:_refreshMini()
     local gui = self.Gui
+
+    -- Starts from whatever is on screen: the window, or a ghost still
+    -- mid-flight if a restore was interrupted.
     local fromPosition = self.Root.AbsolutePosition - gui.AbsolutePosition
     local fromSize = self.Root.AbsoluteSize
+    local fromAlpha = 1
+    if self._ghost then
+        fromPosition = self._ghost.AbsolutePosition - gui.AbsolutePosition
+        fromSize = self._ghost.AbsoluteSize
+        fromAlpha = self._ghost.BackgroundTransparency
+    end
 
-    self:_fade(1, 0.16)
-    tween(self.BodyStroke, { Transparency = 1 }, 0.12)
-    tween(self.Shadow, { ImageTransparency = 1 }, 0.16)
-    task.spawn(function()
-        -- One frame so the bar's automatic width is known.
-        RunService.RenderStepped:Wait()
-        if self._minimizeGeneration ~= generation then
+    -- 1. The ghost fades in over the window while it eases back a touch.
+    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, 10)
+    ghost.BackgroundTransparency = fromAlpha
+    ghostStroke.Transparency = fromAlpha
+    tween(ghost, { BackgroundTransparency = 0 }, 0.11, Enum.EasingStyle.Quad)
+    tween(ghostStroke, { Transparency = 0 }, 0.11, Enum.EasingStyle.Quad)
+    tween(self.Scale, { Scale = (self._fitScale or 1) * 0.985 }, 0.11, Enum.EasingStyle.Quad)
+    tween(self.Shadow, { ImageTransparency = 1 }, 0.2)
+    -- Laid out now while fully transparent, so the bar's automatic width is
+    -- known by the time the ghost needs it.
+    bar.Position = UDim2.fromOffset(-10000, -10000)
+    bar.Visible = true
+    bar.GroupTransparency = 1
+
+    task.delay(0.11, function()
+        if self._minimizeGeneration ~= generation or self._destroyed then
             return
         end
+        -- 2. Covered by the ghost, the window is hidden and the ghost folds
+        -- down into the bar's spot.
+        self.Root.Visible = false
+        self.Scale.Scale = self._fitScale or 1
         local size = bar.AbsoluteSize
         local target = self._miniPosition or fromPosition
         target = Vector2.new(
             math.clamp(target.X, 8, math.max(gui.AbsoluteSize.X - size.X - 8, 8)),
             math.clamp(target.Y, 8, math.max(gui.AbsoluteSize.Y - size.Y - 8, 8))
         )
-        local ghost, ghostStroke = morphGhost(self, fromPosition, fromSize, target, size, 10, 12, 0.42)
-        task.delay(0.42, function()
-            if self._minimizeGeneration ~= generation then
-                ghost:Destroy()
+        bar.Position = UDim2.fromOffset(target.X, target.Y)
+        morphGhost(ghost, ghostCorner, target, size, 12, 0.36)
+        task.delay(0.3, function()
+            if self._minimizeGeneration ~= generation or self._destroyed then
                 return
             end
-            self.Root.Visible = false
-            bar.Position = UDim2.fromOffset(target.X, target.Y)
-            bar.Visible = true
-            self._miniScale.Scale = 0.96
-            tween(self._miniScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
-            tween(bar, { GroupTransparency = 0 }, 0.18)
-            dissolve(ghost, ghostStroke, 0.18)
+            -- 3. The bar fades in on top as the ghost lands.
+            self._miniScale.Scale = 0.97
+            tween(self._miniScale, { Scale = 1 }, 0.3, Enum.EasingStyle.Quint)
+            tween(bar, { GroupTransparency = 0 }, 0.18, Enum.EasingStyle.Quad)
+            dissolve(self, ghost, ghostStroke, 0.2)
         end)
+    end)
+
+    task.spawn(function()
         while self.Minimized and self._minimizeGeneration == generation and not self._destroyed do
             self:_refreshMini()
             task.wait(0.5)
@@ -10068,30 +10142,53 @@ function Window:Restore()
     local size = Vector2.new(self.Root.Size.X.Offset, self.Root.Size.Y.Offset) * fit
     local centre = self.Root.AbsolutePosition + self.Root.AbsoluteSize / 2 - gui.AbsolutePosition
     local target = centre - size / 2
+
+    -- Picks up from whatever is on screen: a ghost still mid-flight if
+    -- minimize was interrupted, otherwise the bar.
     local fromPosition, fromSize = target, size
-    if bar and bar.Visible then
+    local fromAlpha = 1
+    if self._ghost then
+        fromPosition = self._ghost.AbsolutePosition - gui.AbsolutePosition
+        fromSize = self._ghost.AbsoluteSize
+        fromAlpha = self._ghost.BackgroundTransparency
+    elseif bar and bar.Visible then
         fromPosition = bar.AbsolutePosition - gui.AbsolutePosition
         fromSize = bar.AbsoluteSize
-        tween(bar, { GroupTransparency = 1 }, 0.1)
-        task.delay(0.1, function()
+    end
+    if bar and bar.Visible then
+        if self._miniUnhover then
+            self._miniUnhover()
+        end
+        tween(bar, { GroupTransparency = 1 }, 0.12, Enum.EasingStyle.Quad)
+        task.delay(0.12, function()
             if self._minimizeGeneration == generation then
                 bar.Visible = false
             end
         end)
     end
-    local ghost, ghostStroke = morphGhost(self, fromPosition, fromSize, target, size, 12, 10, 0.42)
+
+    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, 12)
+    ghost.BackgroundTransparency = fromAlpha
+    ghostStroke.Transparency = fromAlpha
+    tween(ghost, { BackgroundTransparency = 0 }, 0.1, Enum.EasingStyle.Quad)
+    tween(ghostStroke, { Transparency = 0 }, 0.1, Enum.EasingStyle.Quad)
+    morphGhost(ghost, ghostCorner, target, size, 10, 0.4)
+    tween(self.Shadow, { ImageTransparency = 0.6 }, 0.45)
+
+    -- Shown under the ghost a little early so its first frames are drawn
+    -- while still covered, then the ghost clears to reveal it.
     task.delay(0.3, function()
-        if self._minimizeGeneration ~= generation then
+        if self._minimizeGeneration ~= generation or self._destroyed then
             return
         end
-        self.Root.Visible = true
         self.Scale.Scale = fit
-        self:_fade(0, 0.2)
-        tween(self.BodyStroke, { Transparency = 0 }, 0.2)
-        tween(self.Shadow, { ImageTransparency = 0.6 }, 0.25)
+        self.BodyStroke.Transparency = 0
+        self.Root.Visible = true
     end)
-    task.delay(0.42, function()
-        dissolve(ghost, ghostStroke, 0.16)
+    task.delay(0.4, function()
+        if self._ghost == ghost and self._minimizeGeneration == generation then
+            dissolve(self, ghost, ghostStroke, 0.22)
+        end
     end)
 end
 
