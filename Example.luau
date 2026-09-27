@@ -49,13 +49,6 @@ local function finishElement(tab, opts, element, frame, kind)
     if opts.Flag then
         Library.Flags[opts.Flag] = element
         if window then
-            local callback = opts.Callback
-            opts.Callback = function(...)
-                if type(callback) == "function" then
-                    callback(...)
-                end
-                window:_autoSave()
-            end
             window:_flagCreated(opts.Flag, element)
         end
     end
@@ -3326,22 +3319,11 @@ function Library.Window(_, opts)
         Title = opts.Title or "Airflow",
         _logoIcon = opts.Icon or Assets.Logo,
     }, Window)
-    local saving = opts.ConfigurationSaving
-    if type(saving) == "table" and saving.Enabled ~= false then
-        self.ConfigFolder = saving.FolderName or "AirflowUI"
-        self.ConfigName = saving.FileName or "default"
-        self._autoSaveEnabled = true
-    else
-        self.ConfigFolder = "AirflowUI"
-        self.ConfigName = "default"
-        self._autoSaveEnabled = false
-    end
+    local saving = type(opts.ConfigurationSaving) == "table" and opts.ConfigurationSaving or {}
+    self.ConfigFolder = saving.FolderName or "AirflowUI"
+    self.ConfigName = saving.FileName or "default"
     self._configListeners = {}
     self._pendingFlags = {}
-    local configSettings = self:_readConfigSettings()
-    if type(configSettings.Autosave) == "boolean" then
-        self._autoSaveEnabled = configSettings.Autosave
-    end
 
     local startTheme = opts.DefaultTheme or opts.Theme
     if startTheme ~= nil then
@@ -3936,9 +3918,6 @@ function Window:_playIntro(morph)
         return
     end
     self._introDone = true
-    task.delay(1, function()
-        self._autoSaveReady = true
-    end)
     task.delay(0.4, function()
         self:_refreshToggleButton()
     end)
@@ -4693,32 +4672,19 @@ local function collectFlags(self)
     return data
 end
 
-function Window:_withoutAutosave(callback)
-    local previous = self._autoSaveEnabled
-    self._autoSaveEnabled = false
-    local ok, err = pcall(callback)
-    self._autoSaveEnabled = previous
-    if not ok then
-        warn("[Airflow] " .. tostring(err))
-    end
-end
-
 function Window:_applyFlags(data, silent)
     silent = silent == true
     self._pendingFlags = {}
-    self:_withoutAutosave(function()
-        for flag, entry in pairs(data) do
-            local element = Library.Flags[flag]
-            if element and type(element.Set) == "function" then
-                if entryMatches(element, entry) then
-                    pcall(deserializeFlag, element, entry, silent)
-                end
-            elseif type(entry) == "table" then
-                self._pendingFlags[flag] = { Entry = entry, Silent = silent }
+    for flag, entry in pairs(data) do
+        local element = Library.Flags[flag]
+        if element and type(element.Set) == "function" then
+            if entryMatches(element, entry) then
+                pcall(deserializeFlag, element, entry, silent)
             end
+        elseif type(entry) == "table" then
+            self._pendingFlags[flag] = { Entry = entry, Silent = silent }
         end
-    end)
-    self._autoSaveReady = true
+    end
 end
 
 -- Every flagged element reports here: its starting value becomes its default,
@@ -4738,9 +4704,7 @@ function Window:_flagCreated(flag, element)
         end
         self._pendingFlags[flag] = nil
         if entryMatches(element, pending.Entry) then
-            self:_withoutAutosave(function()
-                deserializeFlag(element, pending.Entry, pending.Silent)
-            end)
+            pcall(deserializeFlag, element, pending.Entry, pending.Silent)
         end
     end)
 end
@@ -5000,32 +4964,13 @@ end
 -- Puts every flagged element back to the value it was created with.
 function Window:ResetConfig(silent)
     self._pendingFlags = {}
-    self:_withoutAutosave(function()
-        for _, element in pairs(Library.Flags) do
-            if element._defaultEntry and type(element.Set) == "function" then
-                pcall(deserializeFlag, element, element._defaultEntry, silent == true)
-            end
+    for _, element in pairs(Library.Flags) do
+        if element._defaultEntry and type(element.Set) == "function" then
+            pcall(deserializeFlag, element, element._defaultEntry, silent == true)
         end
-    end)
-    self:_autoSave()
+    end
     self:_configChanged()
     return true
-end
-
-function Window:_autoSave()
-    if not self._autoSaveEnabled or self._destroyed or not self._autoSaveReady then
-        return
-    end
-    if self._autoSavePending then
-        return
-    end
-    self._autoSavePending = true
-    task.delay(0.5, function()
-        self._autoSavePending = false
-        if not self._destroyed and self._autoSaveEnabled then
-            self:SaveConfig(self.ConfigName)
-        end
-    end)
 end
 
 -- Share codes are the same JSON a config file holds.
@@ -5101,7 +5046,7 @@ local function removeFile(path)
     end
 end
 
--- Manager settings (autoload mode, autosave) live beside the configs, apart
+-- Manager settings (autoload mode) live beside the configs, apart
 -- from the flags, so loading a config never changes them.
 
 local function settingsPath(self)
@@ -5131,16 +5076,6 @@ function Window:_writeConfigSettings(changes)
     end
     ensureFolder(self.ConfigFolder)
     return pcall(writefile, settingsPath(self), HttpService:JSONEncode(data))
-end
-
-function Window:GetConfigAutosave()
-    return self._autoSaveEnabled == true
-end
-
-function Window:SetConfigAutosave(enabled)
-    self._autoSaveEnabled = enabled ~= false
-    self:_writeConfigSettings({ Autosave = self._autoSaveEnabled })
-    self:_configChanged()
 end
 
 -- Autoload: one config name kept next to the configs, either for every
@@ -6224,7 +6159,7 @@ function Tab:ConfigManager(opts)
     local host = managerHost(self, opts, "Configs", "folder")
     local window = self.Window
     local manager = {}
-    local list, status, modeList, autosaveToggle
+    local list, status, modeList
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
@@ -6279,15 +6214,6 @@ function Tab:ConfigManager(opts)
         AllowNone = false,
         Callback = function(choice)
             manager:SetAutoloadMode(choice == "This account" and "Account" or "Global")
-        end,
-    })
-    autosaveToggle = host:Toggle({
-        Name = "Autosave loaded config",
-        Default = window:GetConfigAutosave(),
-        Callback = function(enabled)
-            if enabled ~= window:GetConfigAutosave() then
-                window:SetConfigAutosave(enabled)
-            end
         end,
     })
     host:Button({ Name = "Refresh list", Callback = function() manager:Refresh() end })
@@ -6411,7 +6337,7 @@ function Tab:ConfigManager(opts)
     function manager:Reset()
         window:Confirm({
             Title = "Reset settings",
-            Content = "Put every setting back to its default? Saved configs are not touched unless autosave is on.",
+            Content = "Put every setting back to its default? Saved configs are not touched until you save.",
             Icon = "rotate-ccw",
             ConfirmText = "Reset",
             Callback = function()
@@ -6525,9 +6451,6 @@ function Tab:ConfigManager(opts)
     local disconnect = window:OnConfigChanged(function()
         if window.LoadedConfig and list:Get() == nil then
             list:Set(window.LoadedConfig, true)
-        end
-        if autosaveToggle:Get() ~= window:GetConfigAutosave() then
-            autosaveToggle:Set(window:GetConfigAutosave(), true)
         end
         refreshStatus()
     end)

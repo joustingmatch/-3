@@ -1048,7 +1048,6 @@ The config manager is a groupbox with, from top to bottom:
 - **Create** / **Save**, **Load** / **Delete**, **Set autoload** / **Clear autoload**, **Rename** / **Reset**
 - a status line: `loaded: <name> | autoload: <name>`
 - **Autoload mode**: *All accounts* or *This account*
-- **Autosave loaded config**: when on, every flagged change is written into the loaded config half a second later
 - **Refresh list**
 - a **share** section: **Copy code** puts the current settings on the clipboard as a code, and **Import code** applies a pasted code and saves it. It's saved under the name in the name box, or else the name inside the code (with ` (2)`, ` (3)`... added rather than overwriting a config you already have).
 
@@ -1068,7 +1067,7 @@ A config file and a share code are the same readable JSON, so a code is just the
 - `Config` is the flags as their own JSON string. Each flag is `{ "Value": ..., "Type": ... }`. Colours are `{ "Hex": "rrggbb" }`, keybinds are key names (`"RightShift"`), and a dropdown with nothing picked has no `Value`.
 - Old `airflow:...` base64 codes and older config files (bare flag tables, colours as RGB arrays) still load, and are rewritten in the new format on the next save.
 
-The autoload mode and autosave switch live in `<folder>/configsettings.txt`, apart from the configs, so loading a config never flips them. *This account* keeps the autoload in `autoload_<UserId>.txt`, so other accounts on the same PC don't load it. Switching modes moves the current autoload across.
+Configs only change when you press **Create** or **Save** (or call `SaveConfig`); nothing is written automatically. The autoload mode lives in `<folder>/configsettings.txt`, apart from the configs, so loading a config never flips it. *This account* keeps the autoload in `autoload_<UserId>.txt`, so other accounts on the same PC don't load it. Switching modes moves the current autoload across.
 
 Requires `writefile` / `readfile`.
 
@@ -1076,9 +1075,8 @@ Requires `writefile` / `readfile`.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `Enabled` | boolean | `true` | Default for **Autosave loaded config**. The saved switch wins after the first change. |
 | `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. Can be nested, like `"MyHub/Game"`; missing folders are made. |
-| `FileName` | string | `"default"` | Config used when no name is given, and the autosave target before anything is loaded. |
+| `FileName` | string | `"default"` | Config used when `SaveConfig` / `LoadConfig` get no name. |
 
 `CreateConfigManager` takes `Name`, `Icon`, `Side` and `Placeholder`. Called on a groupbox it adds its rows there instead of making its own.
 
@@ -1099,7 +1097,6 @@ Requires `writefile` / `readfile`.
 | `Window:ImportConfig(code, saveAs?, force?)` | Apply a code. `saveAs` is a name, `true` for the name inside the code, or `nil` to only apply it. Codes for another `Folder` fail unless `force`. Returns `ok, err, savedName`. |
 | `Window:SetAutoload(name?, scope?)` / `GetAutoload(scope?)` / `LoadAutoload(skipCallbacks?)` | The config loaded on start. `nil` clears it. `scope` is `"Global"` or `"Account"`, defaulting to the current mode. |
 | `Window:SetAutoloadMode(mode)` / `GetAutoloadMode()` | `"Global"` (all accounts) or `"Account"` (this account). |
-| `Window:SetConfigAutosave(enabled)` / `GetConfigAutosave()` | The autosave switch. Saved between sessions. |
 | `Window:OnConfigChanged(fn)` | Runs `fn` after a load, delete, import or autoload change. Returns a disconnect function. |
 | `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / Rename / Reset / SetAutoload / ClearAutoload / ToggleAutoload / SetAutoloadMode / Export / Import / Refresh`. |
 
