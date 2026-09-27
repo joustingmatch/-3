@@ -3476,7 +3476,7 @@ function Window:_clampToScreen()
         math.clamp(centre.Y, math.min(half.Y, viewport.Y / 2), math.max(viewport.Y - half.Y, viewport.Y / 2))
     )
     if (clamped - centre).Magnitude > 0.5 then
-        tween(root, { Position = UDim2.fromOffset(clamped.X, clamped.Y) }, 0.25, Enum.EasingStyle.Quint)
+        self._clampTween = tween(root, { Position = UDim2.fromOffset(clamped.X, clamped.Y) }, 0.25, Enum.EasingStyle.Quint)
     end
 end
 
@@ -3600,6 +3600,11 @@ function Window:_enableResize(minSize)
     local function pin()
         if root.AnchorPoint == Vector2.zero then
             return
+        end
+        -- A clamp tween still writing centre coordinates would fight the new anchor.
+        if self._clampTween then
+            self._clampTween:Cancel()
+            self._clampTween = nil
         end
         local topLeft = root.AbsolutePosition - self.Gui.AbsolutePosition
         root.AnchorPoint = Vector2.zero
@@ -4440,9 +4445,10 @@ function Tab:Groupbox(opts, icon)
                 element:Destroy()
             end
         end
-        local index = table.find(self._groupboxes, group)
+        local owner = group.Parent
+        local index = table.find(owner._groupboxes, group)
         if index then
-            table.remove(self._groupboxes, index)
+            table.remove(owner._groupboxes, index)
         end
         set.Counts[side] = math.max(set.Counts[side] - 1, 0)
         window._controlsDirty = true
@@ -4840,6 +4846,16 @@ function Window:_resetSearch()
     end
 end
 
+-- Page titles stop short of the search box and close button.
+function Window:_fitTitle(tab)
+    local right = self.SearchBox and (self._searchWidth or SEARCH_WIDTH) + 72 or 56
+    local reserve = tab._titleX + right
+    tab._title.Size = UDim2.new(1, -reserve, 0, 24)
+    if tab._desc then
+        tab._desc.Size = UDim2.new(1, -reserve, 0, 16)
+    end
+end
+
 function Window:_buildSearch(content)
     local holder = create("Frame", {
         AnchorPoint = Vector2.new(1, 0),
@@ -4884,7 +4900,14 @@ function Window:_buildSearch(content)
     end)
     local function fit()
         local width = content.AbsoluteSize.X / self.Scale.Scale
-        holder.Size = UDim2.fromOffset(math.clamp(math.floor(width * 0.32), 110, SEARCH_WIDTH), 34)
+        local searchWidth = math.clamp(math.floor(width * 0.32), 110, SEARCH_WIDTH)
+        holder.Size = UDim2.fromOffset(searchWidth, 34)
+        if searchWidth ~= self._searchWidth then
+            self._searchWidth = searchWidth
+            for _, tab in ipairs(self.Tabs) do
+                self:_fitTitle(tab)
+            end
+        end
     end
     content:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
     task.defer(fit)
@@ -5864,18 +5887,18 @@ function Window:Tab(opts, icon)
         holder.Size = UDim2.fromOffset(20, 20)
         titleX = 54
     end
-    local reserve = titleX + SEARCH_WIDTH + 72
+    tab._titleX = titleX
     tab._title = label({
         Position = UDim2.fromOffset(titleX, 20),
-        Size = UDim2.new(1, -reserve, 0, 24),
+        Size = UDim2.new(1, -titleX, 0, 24),
         Text = opts.PageTitle or tab.Name,
         TextSize = 22,
         Parent = page,
     })
     if opts.Desc then
-        label({
+        tab._desc = label({
             Position = UDim2.fromOffset(titleX, 44),
-            Size = UDim2.new(1, -reserve, 0, 16),
+            Size = UDim2.new(1, -titleX, 0, 16),
             Text = opts.Desc,
             TextSize = 13,
             FontFace = Fonts.Regular,
@@ -5904,6 +5927,7 @@ function Window:Tab(opts, icon)
         self:SelectTab(tab)
     end)
     tab._stroke = buttonStroke
+    self:_fitTitle(tab)
 
     if not self._introDone then
         button.Visible = false
