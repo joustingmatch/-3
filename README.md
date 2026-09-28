@@ -55,7 +55,7 @@ Window:Toggle(false)
 
 Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport.
 
-The button in the top-right minimizes the window: it folds into a small floating box with accent corners, holding the logo, the current tab, how many toggles are on, and up to three pinned [statuses](#status) with live values. Drag the box anywhere; click it (or press the hide key) and it unfolds back into the window. Drag its bottom-right corner to resize it: sideways sets the width, up and down sets how many pinned statuses fit (one to eight). The grip is larger and always lit on touch screens, and the box never grows past the screen edge. The box remembers where you left it and how big you made it. On touch screens the box would cover too much of the game, so minimizing folds into a small pill at the top centre instead: just the logo and how many toggles are on. Tap it to restore, drag it to move it.
+The button in the top-right minimizes the window: it folds into a small orb with the logo, docked to whichever side of the screen the window was nearer. Each running toggle circles the orb as a dot (up to eight), the lead dot bright and the tail fading behind it. Left alone for a couple of seconds it tucks half behind the edge and dims, then slides back out when the cursor comes near. Hover it to see the current tab, how many toggles are on, up to six pinned [statuses](#status) with live values, and the key that reopens the window. Click or tap it (or press the hide key) and it unfolds back into the window. Drag it anywhere and let go: it snaps to the nearer side and remembers where you left it.
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
@@ -112,8 +112,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `.Home` | The home tab, unless `Home = false`. |
 | `.SearchBox` | The search TextBox. |
 | `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
-| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the floating box and back. |
-| `.Minimized` / `.MiniBar` | Whether it's minimized, and the box itself. |
+| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the orb and back. |
+| `.Minimized` / `.MiniBar` | Whether it's minimized, and the orb itself. |
 | `SetToggleButton(enabled)` | Show or hide the toggle button. |
 | `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
 | `SetToggleButtonIcon(icon)` | Swap its icon. |
@@ -325,7 +325,7 @@ Charge = Box:CreateSlider({ Name = "Charge Distance", Range = { 5, 60 }, Visible
 - Search never reveals something you hid, and clearing the search leaves it hidden.
 - Hidden elements keep their flag. They still save, load and run callbacks, so loading a config with `HoldSkills` on shows `Charge`. Visibility itself is not saved.
 - Hiding an open dropdown or colour picker closes it, and hiding a keybind stops a capture.
-- A hidden pinned status leaves the minimized box until it is shown again.
+- A hidden pinned status leaves the orb's hover card until it is shown again.
 
 ---
 
@@ -443,7 +443,7 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | `Prefix` / `Suffix` | string | — | Text around the value. |
 | `Placeholder` | string | `"-"` | Shown while the value is `nil`. |
 | `Update` / `UpdateRate` | function / number | — / `1` | Refresh on a timer. |
-| `Pin` | boolean | `false` | Also show it on the minimized box. |
+| `Pin` | boolean | `false` | Also show it on the minimized orb's hover card. |
 | `Pulse` / `Flash` | boolean | `true` | The `Dot` pulse and the change flash. |
 
 ### Handle
