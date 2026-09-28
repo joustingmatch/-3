@@ -1189,6 +1189,121 @@ Requires `writefile` / `readfile`.
 
 ---
 
+## Chat
+
+> A chat tab with channels, mentions and one-click config sharing. The library draws it; your script is the backend.
+
+```lua
+local Chat = Window:CreateChat({
+    Name = "Chat",
+    Channels = { "Global", "Configs" },
+    OnSend = function(Message)
+        -- Message = { Id, Channel, Text, Config, ConfigName }
+        local ok = pcall(request, {
+            Url = "https://my.api/chat",
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = game:GetService("HttpService"):JSONEncode(Message),
+        })
+        if not ok then
+            return false, "offline" -- the message shows "Not sent: offline · Retry"
+        end
+    end,
+})
+
+Chat:SetStatus("Connected", "Success")
+
+-- whatever your socket or poll loop receives:
+Chat:AddMessage({
+    Id = Data.Id, -- the Id OnSend got, when it's the player's own message coming back
+    Author = Data.Name,
+    UserId = Data.UserId, -- shows their headshot
+    Text = Data.Text,
+    Config = Data.Config, -- a config code, shown as an installable card
+    ConfigName = Data.ConfigName,
+    Channel = Data.Channel,
+    Time = Data.Time,
+})
+```
+
+`CreateChat` adds its own tab to the sidebar, like Home, and the whole page is the chat: a bar of channels with the connection status, the feed, and a composer at the bottom.
+
+- **Sending.** Enter or the send button sends. The message shows straight away, dimmed as *Sending...*, until `OnSend` returns. If it returns `false` (or errors) it's marked *Not sent* with a **Retry** link. `OnSend` may yield, so an HTTP call inside it is fine.
+- **Echoes.** Each sent message gets an `Id`. When your backend hands the same `Id` back to `AddMessage`, the shown message is updated in place instead of appearing twice. Pass `Echo = false` to show nothing until the backend sends it back.
+- **Configs.** The paperclip opens a strip with *Current settings* and every saved config. The pick sits above the box until sent, with an × to drop it. Sent configs appear as a card with the name, how many settings it holds, **Copy** (the code) and **Install**. Install asks first, then applies it and saves it under its own name (with ` (2)`... rather than overwriting). A config made for another `FolderName` is marked in the warning colour and says so in the confirm; only matching settings apply. The config manager's list picks the new config up by itself.
+- **Mentions.** `@name` is highlighted in every message. One that names the player (username or display name) gets an accent bar, and a notification when the chat isn't on screen. Clicking a name or the reply button puts `@name` in the box.
+- **Grouping and time.** Messages from the same author within three minutes stack under one header. Each header shows the time.
+- **Scrolling.** The feed follows new messages while it's at the bottom. Scroll up and it stays put, with a *3 new messages* pill that jumps back down.
+- **Unread.** Messages that arrive while the chat tab isn't showing count up on its sidebar badge; other channels get a dot on their chip.
+- **Typing.** `OnTyping(isTyping, channel)` fires when the player starts typing and again 4 seconds after they stop (or send). Show other people with `SetTyping`.
+- **Composer.** A counter appears near `MaxLength`, sends inside `Cooldown` show *Wait 0.6s*, and up / down walk back through what the player sent.
+- **Message actions.** Hovering a message (tapping it on touch) shows reply and copy, plus any `MessageActions` you add, such as report or delete.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | `"Chat"` | The tab's name. |
+| `Desc` | string | — | Line under the page title. |
+| `Icon` | string | `"messages-square"` | The tab icon. |
+| `Channels` | table | `{ "Global" }` | Channel names, the first one selected. |
+| `OnSend` | function | — | `(message)` for every send. Return `false, reason` to mark it not sent. |
+| `OnTyping` | function | — | `(isTyping, channel)` for the player's typing state. |
+| `OnChannelChanged` | function | — | `(channel)` when the player switches channel. |
+| `OnInstall` | function | — | `(message, savedName)` after a config from chat is installed. |
+| `MessageActions` | table | — | Extra hover buttons: `{ Icon, Name, Self?, Callback(message) }`. `Self = false` shows it only on other people's messages, `true` only on the player's. |
+| `Echo` | boolean | `true` | Show the player's message before the backend confirms it. |
+| `Configs` | boolean | `true` | Allow attaching and installing configs. |
+| `ConfirmInstall` | boolean | `true` | Ask before installing. A config for another script always asks. |
+| `MentionNotify` | boolean | `true` | Notify on mentions while the chat isn't showing. |
+| `Username` | string | display name | The name used for the player's own messages. |
+| `MaxLength` | number | `200` | Characters per message. |
+| `Cooldown` | number | `1` | Seconds between sends. |
+| `MaxMessages` | number | `200` | Messages kept per channel; the oldest go first. |
+| `Placeholder` | string | `"Message #<channel>"` | Text in the empty box. |
+| `EmptyText` | string | `"No messages yet. Say hi!"` | Shown in an empty channel. |
+| `Status` / `StatusTone` | string | `"Offline"` | Starting status text and dot colour (a theme key: `"Success"`, `"Warning"`, `"Error"`...). |
+
+### Messages
+
+`AddMessage` takes a table (or just a string):
+
+| Field | Description |
+| --- | --- |
+| `Id` | Any string or number. A message with an `Id` already shown updates it. Defaults to a new GUID. |
+| `Author` / `UserId` | Who sent it. `UserId` shows their headshot, and a message with the player's `UserId` counts as their own. |
+| `Text` | The message. Shown as plain text; only mentions are styled. |
+| `Channel` | Channel name. Missing channels are created. Defaults to the selected one. |
+| `Time` | Unix time. Defaults to now. |
+| `Config` / `ConfigName` | A config code (from `ExportConfig` or `OnSend`) and the name to show. `Config` may also be `{ Code, Name }`. |
+| `Tag` / `TagColor` | A small badge after the name, like `"DEV"` or `"BOT"`. |
+| `Color` | Name colour: a `Color3` or a theme key. |
+| `System` | A centred grey line with no author. |
+| `Self` | Force the player's own styling on or off. |
+| `State` / `Reason` | `"sending"`, `"failed"` or `nil` (sent), and why it failed. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `AddMessage(message)` | Show or update a message. Returns its `Id`. |
+| `AddSystem(text, channel?)` | A system line. |
+| `SetMessages(list, channel?)` | Replace a channel's messages, for history loaded on join. |
+| `RemoveMessage(id)` | Remove one message. |
+| `Clear(channel?)` | Empty one channel, or all of them. |
+| `GetMessages(channel?)` | The shown messages, oldest first. |
+| `Send(text?)` | Send `text`, or what's in the box, as if the player pressed send. Returns the `Id`, or `false`. |
+| `Attach(configName?)` / `Detach()` | Attach a saved config, or the current settings with no name. |
+| `SetStatus(text, tone?)` | The status in the corner. |
+| `SetOnline(count?)` | `"12 online"` beside the status. `nil` hides it. |
+| `SetTyping(names, channel?)` | Who else is typing: a list of names, empty to clear. |
+| `SetEnabled(enabled, reason?)` | Lock the composer, with `reason` as its placeholder (`"Connecting..."`, `"You are muted"`). |
+| `AddChannel(name)` / `RemoveChannel(name)` / `SelectChannel(name)` / `GetChannel()` | Channels. |
+| `SetInput(text)` / `Focus()` | Fill the box, or open the tab and focus it. |
+| `.Tab` | The chat's tab, for `SetBadge` and the like. |
+
+---
+
 ## Icons
 
 > Any lucide icon or your own image, anywhere an `Icon` is accepted.
