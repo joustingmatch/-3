@@ -1310,6 +1310,106 @@ Chat:AddMessage({
 
 ---
 
+## Cloud Configs
+
+> A tab for browsing, previewing, installing and publishing configs other players shared. The library draws it; your script is the backend.
+
+```lua
+local Cloud = Window:CreateCloudConfigs({
+    Name = "Cloud",
+    Tags = { "Farming", "PvP", "Safe", "Visuals" },
+    OnFetch = function(Query)
+        -- Query = { Search, Sort, Filter, Tag, Page, PageSize, Folder, UserId }
+        local ok, body = pcall(game.HttpGet, game, "https://my.api/configs?page=" .. Query.Page .. "&sort=" .. Query.Sort)
+        if not ok then
+            return nil, "Server is down" -- shown with a Try again button
+        end
+        local Data = game:GetService("HttpService"):JSONDecode(body)
+        return Data.Configs, Data.HasMore -- a list of configs, and whether there's another page
+    end,
+    OnPublish = function(Config)
+        -- Config = { Name, Description, Tags, Code, Count, Folder, Author, AuthorId, OwnerId, Streamer }
+        -- post it; return the stored config (with its Id), or false, "reason"
+    end,
+    OnFetchCode = function(Config) -- only needed when OnFetch leaves Code out
+        return game:HttpGet("https://my.api/configs/" .. Config.Id .. "/code")
+    end,
+})
+```
+
+`CreateCloudConfigs` adds its own sidebar tab, like Home and Chat. The page slides between three views: **browse**, a config's **details**, and the **publish** form. The first fetch waits until the tab is opened.
+
+**Browsing**
+
+- A search box (it waits for you to stop typing, or press Enter), a refresh button and **Publish** on top.
+- Filter chips: **All**, **Favorites**, **Mine**, **Installed**, then your `Tags` (one at a time, press again to clear). A sort chip on the right cycles *Popular*, *Newest*, *Top rated* and *Most installed*, and is remembered.
+- Configs are cards in one column, or two on a wide window: name, author, when it was updated, how many settings, two lines of description, up to three tags, likes, installs and an **Install** button. A badge marks configs you've **installed**, ones with an **update** since you installed them, **yours**, and ones made for **another script**. A star marks favorites.
+- Pulsing placeholder cards while a page loads. The next page loads when you scroll near the bottom (or press **Load more**). A slow reply to an old search is thrown away. Errors show a **Try again** button; no results say why ("No configs match your search").
+- **Favorites** and **Installed** are kept on this device, so they work without the backend and filter locally.
+
+**A config's page**
+
+- The full description, tags, likes and installs.
+- **Install** / **Update** / **Reinstall**, **Like**, **Favorite**, **Copy code**, and **Report** for other people's configs. Your own configs get **Edit** and **Delete** instead.
+- Every setting in the config, next to yours: the ones that would change come first with an accent dot, then the ones that match, then flags this script doesn't have. The heading sums it up: *24 settings, 5 different from yours*.
+
+**Installing** asks first, with three buttons: **Install** applies it and saves it as a config (under its own name, with ` (2)`... rather than overwriting), **Apply only** changes the current settings without saving, or **Cancel**. Installing an update overwrites the config the last install saved. A config for another `FolderName` warns that only matching settings apply. Likes show at once and roll back if `OnLike` fails.
+
+**Publishing** takes a name (40 characters), a description with a counter, up to `MaxTags` tags, and which settings to share: *Current settings* or any saved config, with a count of what's in it. It says who you publish as, and follows the chat's streamer mode: then `Author` is *Ouroboros User* and `AuthorId` is `nil`. `OwnerId` is always the player's UserId, so the backend can tell who owns what; keep it private. A draft stays in the form if you back out. **Edit** opens the same form filled in, with *Keep published settings* as the default, and calls `OnUpdate`.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` / `Desc` / `Icon` | string | `"Cloud"`, —, `"cloud"` | The tab. |
+| `Tags` | table | `{}` | Tags to filter by and to pick when publishing. |
+| `MaxTags` | number | `3` | Tags per config. |
+| `PageSize` | number | `20` | Sent to `OnFetch` as `Query.PageSize`. |
+| `Sort` | string | `"Popular"` | Starting sort until the player picks one: `"Popular"`, `"New"`, `"Top"`, `"Installs"`. |
+| `DescriptionLimit` | number | `300` | Characters in a description. |
+| `OnFetch` | function | — | `(query)` returns `configs, hasMore`, or `nil, reason`. `Query.Filter` is `"All"` or `"Mine"`. Leave it out to push results with `SetConfigs`. |
+| `OnFetchCode` | function | — | `(config)` returns the code, for lists sent without codes. |
+| `OnPublish` | function | — | `(config)` returns the stored config, `true`, or `false, reason`. Hides **Publish** when missing. |
+| `OnUpdate` | function | — | `(config, changes)` for **Edit**. `changes.Code` is `nil` when the settings are kept. |
+| `OnDelete` | function | — | `(config)` for **Delete**. Return `false, reason` to refuse. |
+| `OnLike` | function | — | `(config, liked)`. Return `false` to roll the like back. Hides **Like** when missing. |
+| `OnInstall` | function | — | `(config, savedName)` after an install, to count it. |
+| `OnReport` | function | — | `(config, reason)`. Hides **Report** when missing. |
+| `ReportReasons` | table | `{ "Broken", "Spam", "Inappropriate" }` | Choices in the report dialog. |
+| `MineFilter` | boolean | `true` | Show the **Mine** chip. |
+| `StreamerName` | string | `"Ouroboros User"` | The author name in streamer mode. |
+| `SearchPlaceholder` / `EmptyText` | string | — | Text in the search box and when there are no configs. |
+
+### Configs
+
+What `OnFetch` returns, and what the callbacks get back:
+
+| Field | Description |
+| --- | --- |
+| `Id` | Unique id. Favorites and installs are kept by it. |
+| `Name` / `Description` / `Tags` | Shown on the card and page. |
+| `Author` / `AuthorId` | Who published it. A matching `AuthorId` or `OwnerId`, or `Mine = true`, makes it the player's own. |
+| `Code` | The config code (`Window:ExportConfig()` format). Can be left out and served by `OnFetchCode`. |
+| `Count` | Number of settings, worked out from `Code` when missing. |
+| `Folder` | The `FolderName` it was made for. |
+| `Installs` / `Likes` / `Liked` | Counts, and whether the player liked it. |
+| `Updated` | Unix time of the last change. Newer than when the player installed it shows **Update**. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `Refresh()` / `LoadMore()` | Fetch the first page again, or the next one. |
+| `SetConfigs(list, hasMore?)` / `AddConfigs(list, hasMore?)` | Show configs pushed by the script instead of `OnFetch`. |
+| `UpdateConfig(id, changes)` / `RemoveConfig(id)` | Change or drop one config, like new like counts from a socket. |
+| `SetLoading(on)` / `SetError(text?)` | Show the placeholders, or an error with **Try again**. |
+| `Open(id)` / `OpenPublish()` / `Back()` | Jump to a config's page, the publish form, or back to the list. |
+| `GetQuery()` | The current search, sort, filter and tag. |
+| `GetFavorites()` / `GetInstalled()` | What this device kept. |
+| `.Tab` | The tab. |
+
+---
+
 ## Icons
 
 > Any lucide icon or your own image, anywhere an `Icon` is accepted.
