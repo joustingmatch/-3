@@ -10909,13 +10909,22 @@ function Window:_buildMiniPill()
     })
     corner(bar, UDim.new(1, 0))
     stroke(bar, Theme.Stroke)
-    padding(bar, 10, 12)
+    -- Content sits in its own row: the full-size tap button below must stay
+    -- out of the list layout, or the pill's automatic width chases it across
+    -- the whole screen.
+    local row = create("Frame", {
+        Size = UDim2.fromOffset(0, 40),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+        Parent = bar,
+    })
+    padding(row, 14, 14)
     create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, 8),
-        Parent = bar,
+        Parent = row,
     })
     local logo = create("ImageLabel", {
         Size = UDim2.fromOffset(20, 20),
@@ -10923,7 +10932,7 @@ function Window:_buildMiniPill()
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
         LayoutOrder = 1,
-        Parent = bar,
+        Parent = row,
     })
     applyIcon(logo, self._logoIcon, true)
     local active = create("Frame", {
@@ -10932,7 +10941,7 @@ function Window:_buildMiniPill()
         BackgroundTransparency = 1,
         LayoutOrder = 2,
         Visible = false,
-        Parent = bar,
+        Parent = row,
     })
     create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
