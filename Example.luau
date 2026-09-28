@@ -898,6 +898,12 @@ local function ripple(button)
     local mouse = pointerPosition()
     local diameter = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2.2
     local circle = table.remove(ripplePool)
+    -- A pooled circle can't be reparented if it was destroyed along the way.
+    if circle and not pcall(function()
+        circle.Parent = nil
+    end) then
+        circle = nil
+    end
     if not circle then
         circle = create("Frame", {
             AnchorPoint = Vector2.new(0.5, 0.5),
@@ -914,6 +920,11 @@ local function ripple(button)
     circle.Parent = button
     tween(circle, { Size = UDim2.fromOffset(diameter, diameter), BackgroundTransparency = 1 }, 0.55)
     task.delay(0.55, function()
+        -- A button destroyed mid-ripple takes the circle with it: drop it.
+        if circle.Parent ~= button or not button.Parent then
+            pcall(circle.Destroy, circle)
+            return
+        end
         circle.Parent = nil
         if #ripplePool < 4 then
             table.insert(ripplePool, circle)
@@ -11260,6 +11271,7 @@ function Window:Chat(opts)
         CanvasSize = UDim2.new(),
         Parent = picker,
     })
+    padding(pickerList, 1, 1)
     create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -12807,6 +12819,32 @@ function Window:CloudConfigs(opts)
         return os.date("%d %b %Y", stamp)
     end
 
+    local function escape(text)
+        return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&apos;"))
+    end
+
+    -- Rich text with every match of the search drawn in the accent.
+    local function highlight(text)
+        local needle = string.lower(query.Search)
+        if needle == "" then
+            return escape(text)
+        end
+        local lower = string.lower(text)
+        local hex = colorToHex(Theme.Accent)
+        local out, from = {}, 1
+        while true do
+            local first, last = string.find(lower, needle, from, true)
+            if not first then
+                break
+            end
+            table.insert(out, escape(text:sub(from, first - 1)))
+            table.insert(out, ('<font color="#%s"><b>%s</b></font>'):format(hex, escape(text:sub(first, last))))
+            from = last + 1
+        end
+        table.insert(out, escape(text:sub(from)))
+        return table.concat(out)
+    end
+
     local function normalizeRecord(raw)
         if type(raw) ~= "table" then
             return nil
@@ -13127,9 +13165,11 @@ function Window:CloudConfigs(opts)
     -- Layout: the page holds three views that slide over each other.
 
     local top = tab._headerBottom
+    -- One pixel wider than the content on every side: root clips the slide,
+    -- and the strokes along its edges would be clipped with it.
     local root = create("Frame", {
-        Position = UDim2.fromOffset(24, top),
-        Size = UDim2.new(1, -48, 1, -(top + 16)),
+        Position = UDim2.fromOffset(23, top - 1),
+        Size = UDim2.new(1, -46, 1, -(top + 14)),
         BackgroundTransparency = 1,
         ClipsDescendants = true,
         Parent = tab._page,
@@ -13141,6 +13181,7 @@ function Window:CloudConfigs(opts)
             Visible = false,
             Parent = root,
         })
+        padding(views[name], 1, 1, 1, 1)
     end
 
     local function showView(view)
@@ -13186,14 +13227,14 @@ function Window:CloudConfigs(opts)
     })
     corner(searchHolder, UDim.new(0, 8))
     local searchStroke = stroke(searchHolder)
-    local searchIcon = glowIcon(searchHolder, "search", Theme.Muted, UDim2.new(0, 10, 0.5, 0))
+    local searchIcon, searchImage = glowIcon(searchHolder, "search", Theme.Muted, UDim2.new(0, 10, 0.5, 0))
     searchIcon.Size = UDim2.fromOffset(14, 14)
     local searchBox = create("TextBox", {
         Position = UDim2.fromOffset(32, 0),
         Size = UDim2.new(1, -62, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
-        PlaceholderText = opts.SearchPlaceholder or "Search configs...",
+        PlaceholderText = opts.SearchPlaceholder or (TOUCH and "Search configs..." or "Search configs...   ( / )"),
         PlaceholderColor3 = Theme.Muted,
         TextColor3 = Theme.Text,
         TextSize = 13,
@@ -13208,24 +13249,142 @@ function Window:CloudConfigs(opts)
     searchClear.Position = UDim2.new(1, -4, 0.5, 0)
     searchClear.Visible = false
 
+    local fetch
+    local searchToken = 0
+    local recent = type(stored.CloudRecent) == "table" and stored.CloudRecent or {}
+    local recentFrame = create("Frame", {
+        Position = UDim2.fromOffset(0, ROW + 4),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = Theme.Surface2,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 5,
+        Parent = browse,
+    })
+    corner(recentFrame, UDim.new(0, 8))
+    stroke(recentFrame)
+    padding(recentFrame, 6, 6, 6, 6)
+    vlist(recentFrame, 2)
+
+    local function rememberSearch(text)
+        text = trim(text)
+        if #text < 2 then
+            return
+        end
+        for index = #recent, 1, -1 do
+            if string.lower(recent[index]) == string.lower(text) then
+                table.remove(recent, index)
+            end
+        end
+        table.insert(recent, 1, text)
+        while #recent > 6 do
+            table.remove(recent)
+        end
+        persist("CloudRecent", recent)
+    end
+
+    local function showRecent(show)
+        show = show and #recent > 0 and searchBox.Text == ""
+        if show == recentFrame.Visible then
+            return
+        end
+        recentFrame.Visible = show
+        if not show then
+            return
+        end
+        clear(recentFrame)
+        local header = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 20),
+            BackgroundTransparency = 1,
+            LayoutOrder = 0,
+            Parent = recentFrame,
+        })
+        label({
+            Position = UDim2.fromOffset(8, 0),
+            Size = UDim2.new(1, -60, 1, 0),
+            Text = "Recent searches",
+            TextSize = 11,
+            TextColor3 = Theme.Muted,
+            Parent = header,
+        })
+        local wipe = create("TextButton", {
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -6, 0, 0),
+            Size = UDim2.fromOffset(0, 20),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundTransparency = 1,
+            Text = "Clear",
+            TextSize = 11,
+            FontFace = Fonts.Medium,
+            TextColor3 = Theme.Accent,
+            AutoButtonColor = false,
+            Parent = header,
+        })
+        wipe.MouseButton1Down:Connect(function()
+            recent = {}
+            persist("CloudRecent", recent)
+            showRecent(false)
+        end)
+        for index, text in ipairs(recent) do
+            local row = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, TOUCH and 32 or 28),
+                BackgroundColor3 = Theme.Surface3,
+                BackgroundTransparency = 1,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = index,
+                Parent = recentFrame,
+            })
+            corner(row, UDim.new(0, 6))
+            local icon = glowIcon(row, "history", Theme.Muted, UDim2.new(0, 8, 0.5, 0))
+            icon.Size = UDim2.fromOffset(13, 13)
+            label({
+                Position = UDim2.fromOffset(28, 0),
+                Size = UDim2.new(1, -34, 1, 0),
+                Text = text,
+                TextSize = 13,
+                FontFace = Fonts.Regular,
+                Parent = row,
+            })
+            row.MouseEnter:Connect(function()
+                tween(row, { BackgroundTransparency = 0.5 }, 0.1)
+            end)
+            row.MouseLeave:Connect(function()
+                tween(row, { BackgroundTransparency = 1 }, 0.15)
+            end)
+            row.MouseButton1Down:Connect(function()
+                searchToken += 1
+                searchBox.Text = text
+                query.Search = text
+                rememberSearch(text)
+                showRecent(false)
+                searchBox:ReleaseFocus()
+                fetch(false)
+            end)
+        end
+    end
+
     local function fitToolbar()
         local scale = window.Scale.Scale
         local publishWidth = publishButton.Visible and (publishButton.AbsoluteSize.X / scale + 8) or 0
         refreshButton.Position = UDim2.new(1, -publishWidth, 0, 0)
         searchHolder.Size = UDim2.new(1, -(publishWidth + ROW + 8), 1, 0)
+        recentFrame.Size = UDim2.new(1, -(publishWidth + ROW + 8), 0, 0)
     end
     publishButton:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitToolbar)
     task.defer(fitToolbar)
 
+    -- A pixel taller than the chips on each side, so their strokes aren't clipped.
     local filterRow = create("Frame", {
-        Position = UDim2.fromOffset(0, ROW + 8),
-        Size = UDim2.new(1, 0, 0, CHIP),
+        Position = UDim2.fromOffset(0, ROW + 7),
+        Size = UDim2.new(1, 0, 0, CHIP + 2),
         BackgroundTransparency = 1,
         Parent = browse,
     })
     local sortButton = create("TextButton", {
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.fromScale(1, 0),
+        Position = UDim2.new(1, -1, 0, 1),
         Size = UDim2.fromOffset(0, CHIP),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundColor3 = Theme.Surface2,
@@ -13260,6 +13419,7 @@ function Window:CloudConfigs(opts)
     })
     filterStrip:SetAttribute("NoDrag", true)
     hlist(filterStrip, 6)
+    padding(filterStrip, 1, 1, 1, 1)
     local function fitFilters()
         local width = sortButton.AbsoluteSize.X / window.Scale.Scale
         filterStrip.Size = UDim2.new(1, -(width + 8), 1, 0)
@@ -13271,8 +13431,79 @@ function Window:CloudConfigs(opts)
     local results = scroller(browse)
     results.Position = UDim2.fromOffset(0, resultsTop)
     results.Size = UDim2.new(1, 0, 1, -resultsTop)
-    padding(results, 0, 6, 0, 12)
+    padding(results, 1, 6, 1, 12)
     vlist(results, 10)
+    local summaryRow = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        LayoutOrder = 0,
+        Parent = results,
+    })
+    local summaryLabel = label({
+        Size = UDim2.new(1, -100, 1, 0),
+        Text = "",
+        RichText = true,
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        Parent = summaryRow,
+    })
+    local resetButton = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.fromScale(1, 0),
+        Size = UDim2.fromOffset(0, 16),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+        Text = "Clear filters",
+        TextSize = 12,
+        FontFace = Fonts.Medium,
+        TextColor3 = Theme.Accent,
+        AutoButtonColor = false,
+        Visible = false,
+        Parent = summaryRow,
+    })
+    local resetFilters
+
+    local function filtered()
+        return query.Search ~= "" or query.Tag ~= nil or query.Filter ~= "All"
+    end
+
+    -- "12 configs in Favorites, tagged PvP, matching "boss"", or "Searching..."
+    local function renderSummary(pending)
+        local parts = {}
+        if query.Filter ~= "All" then
+            table.insert(parts, "in " .. query.Filter)
+        end
+        if query.Tag then
+            table.insert(parts, "tagged " .. escape(query.Tag))
+        end
+        if query.Search ~= "" then
+            table.insert(parts, ('matching <font color="#%s">"%s"</font>'):format(colorToHex(Theme.Accent), escape(query.Search)))
+        end
+        local context = #parts > 0 and (" " .. table.concat(parts, ", ")) or ""
+        if pending or (loading and #records == 0) then
+            summaryLabel.Text = "Searching" .. context .. "..."
+        else
+            local count = #records
+            summaryLabel.Text = ("%d%s config%s%s"):format(count, hasMore and "+" or "", (count == 1 and not hasMore) and "" or "s", context)
+        end
+        resetButton.Visible = filtered()
+    end
+
+    local spin = nil
+    local function busy(on)
+        loading = on
+        if on and not spin then
+            refreshIcon.Rotation = 0
+            spin = TweenService:Create(refreshIcon, TweenInfo.new(0.9, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), { Rotation = 360 })
+            spin:Play()
+        elseif not on and spin then
+            spin:Cancel()
+            spin = nil
+            tween(refreshIcon, { Rotation = 360 }, 0.35, Enum.EasingStyle.Quint)
+        end
+        renderSummary()
+    end
     local grid = create("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
@@ -13356,16 +13587,21 @@ function Window:CloudConfigs(opts)
         caption.TextWrapped = true
         caption.TextTruncate = Enum.TextTruncate.None
         caption.Size = UDim2.new(1, 0, 0, 32)
-        if kind == "error" then
-            softButton(stateFrame, "Try again", {
+        if kind == "error" or filtered() then
+            softButton(stateFrame, kind == "error" and "Try again" or "Clear filters", {
                 AnchorPoint = Vector2.new(0.5, 0),
                 Position = UDim2.new(0.5, 0, 0, 132),
                 Size = UDim2.fromOffset(0, 30),
                 AutomaticSize = Enum.AutomaticSize.X,
             }, function()
-                cloud:Refresh()
+                if kind == "error" then
+                    cloud:Refresh()
+                else
+                    resetFilters()
+                end
             end)
         end
+        renderSummary()
     end
 
     -- Cards
@@ -13374,7 +13610,7 @@ function Window:CloudConfigs(opts)
 
     local function renderCard(card)
         local record = card.Record
-        card.Title.Text = record.Name
+        card.Title.Text = highlight(record.Name)
         local meta = { "by " .. record.Author }
         local when = ago(record.Updated)
         if when then
@@ -13384,7 +13620,7 @@ function Window:CloudConfigs(opts)
             table.insert(meta, record.Count .. (record.Count == 1 and " setting" or " settings"))
         end
         card.Meta.Text = table.concat(meta, "  ·  ")
-        card.Desc.Text = record.Description ~= "" and record.Description or "No description"
+        card.Desc.Text = record.Description ~= "" and highlight(record.Description) or "No description"
         card.Desc.TextTransparency = record.Description ~= "" and 0.2 or 0.55
         card.Likes.Text = compact(record.Likes)
         card.Installs.Text = compact(record.Installs)
@@ -13433,6 +13669,7 @@ function Window:CloudConfigs(opts)
         local card = { Record = record, Frame = frame }
         card.Title = label({
             Size = UDim2.new(1, -110, 0, 18),
+            RichText = true,
             TextSize = 14,
             FontFace = Fonts.Bold,
             Parent = frame,
@@ -13480,6 +13717,7 @@ function Window:CloudConfigs(opts)
         })
         card.Desc = label({
             Position = UDim2.fromOffset(0, 41),
+            RichText = true,
             Size = UDim2.new(1, 0, 0, 30),
             TextSize = 12,
             FontFace = Fonts.Regular,
@@ -13542,6 +13780,9 @@ function Window:CloudConfigs(opts)
         end)
         frame.MouseButton1Click:Connect(function()
             if isTap() then
+                if query.Search ~= "" then
+                    rememberSearch(query.Search)
+                end
                 openDetail(record)
             end
         end)
@@ -13605,11 +13846,11 @@ function Window:CloudConfigs(opts)
         return tostring(opts.EmptyText or "No configs shared yet. Be the first!")
     end
 
-    local function fetch(more)
+    function fetch(more)
         token += 1
         local myToken = token
         if query.Filter == "Favorites" or query.Filter == "Installed" then
-            loading = false
+            busy(false)
             clearSkeletons()
             records = localRecords()
             hasMore = false
@@ -13634,12 +13875,11 @@ function Window:CloudConfigs(opts)
             renderList()
             results.CanvasPosition = Vector2.zero
         end
-        loading = true
+        busy(true)
         clearSkeletons()
         addSkeletons(more and 2 or 4)
         moreButton.Visible = false
         setState(nil)
-        tween(refreshIcon, { Rotation = refreshIcon.Rotation + 360 }, 0.6, Enum.EasingStyle.Quint)
         local fetchQuery = {
             Search = query.Search,
             Sort = query.Sort,
@@ -13657,7 +13897,7 @@ function Window:CloudConfigs(opts)
             if myToken ~= token then
                 return
             end
-            loading = false
+            busy(false)
             clearSkeletons()
             if not ok or type(list) ~= "table" then
                 if more then
@@ -13749,13 +13989,27 @@ function Window:CloudConfigs(opts)
         fetch(false)
     end)
 
-    local searchToken = 0
+    function resetFilters()
+        searchToken += 1
+        searchBox.Text = ""
+        query.Search, query.Tag, query.Filter = "", nil, "All"
+        renderFilters()
+        fetch(false)
+    end
+    resetButton.MouseButton1Click:Connect(resetFilters)
+
+    -- Typing searches after a short pause; Enter searches now.
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         searchClear.Visible = searchBox.Text ~= ""
+        showRecent(searchBox:IsFocused())
         searchToken += 1
         local mine = searchToken
+        local text = trim(searchBox.Text)
+        if text ~= query.Search then
+            renderSummary(true)
+        end
         task.delay(0.35, function()
-            local text = trim(searchBox.Text)
+            text = trim(searchBox.Text)
             if mine == searchToken and text ~= query.Search then
                 query.Search = text
                 fetch(false)
@@ -13763,19 +14017,49 @@ function Window:CloudConfigs(opts)
         end)
     end)
     searchBox.Focused:Connect(function()
-        tween(searchStroke, { Color = Theme.StrokeHover }, 0.15)
+        tween(searchStroke, { Color = Theme.Accent }, 0.15)
+        tween(searchImage, { ImageColor3 = Theme.Accent }, 0.15)
+        showRecent(true)
     end)
     searchBox.FocusLost:Connect(function(enterPressed)
         tween(searchStroke, { Color = Theme.Stroke }, 0.2)
+        tween(searchImage, { ImageColor3 = Theme.Muted }, 0.2)
+        rememberSearch(searchBox.Text)
+        -- Late enough for a press on a recent search to land first.
+        task.delay(0.15, function()
+            if not searchBox:IsFocused() then
+                showRecent(false)
+            end
+        end)
         if enterPressed then
             searchToken += 1
-            query.Search = trim(searchBox.Text)
-            fetch(false)
+            local text = trim(searchBox.Text)
+            if text ~= query.Search then
+                query.Search = text
+                fetch(false)
+            end
         end
     end)
     searchClear.MouseButton1Click:Connect(function()
+        searchToken += 1
         searchBox.Text = ""
+        if query.Search ~= "" then
+            query.Search = ""
+            fetch(false)
+        end
     end)
+    -- "/" jumps to the search box while the list is showing.
+    window:_listen("Began", function(input, processed)
+        if processed or input.KeyCode ~= Enum.KeyCode.Slash then
+            return
+        end
+        if window.Open and window.CurrentTab == tab and currentView == views.Browse and not UserInputService:GetFocusedTextBox() then
+            task.defer(function()
+                searchBox:CaptureFocus()
+                searchBox.Text = searchBox.Text:gsub("/$", "")
+            end)
+        end
+    end, cloud)
     refreshButton.MouseButton1Click:Connect(function()
         cloud:Refresh()
     end)
@@ -13984,7 +14268,7 @@ function Window:CloudConfigs(opts)
     -- Detail view
 
     local detailList = scroller(views.Detail)
-    padding(detailList, 0, 8, 0, 16)
+    padding(detailList, 1, 8, 1, 16)
     vlist(detailList, 10)
 
     local function valueText(entry)
@@ -14031,56 +14315,65 @@ function Window:CloudConfigs(opts)
         detail.Stats.Text = ("%s like%s  ·  %s install%s"):format(
             compact(record.Likes), record.Likes == 1 and "" or "s",
             compact(record.Installs), record.Installs == 1 and "" or "s")
-        local row = detail.Actions
-        clear(row)
-        local order = 0
-        local function action(text, style, callback)
-            order += 1
-            local button, text_ = softButton(row, text, {
-                Size = UDim2.new(0, 0, 0, 30),
-                AutomaticSize = Enum.AutomaticSize.X,
-                LayoutOrder = order,
-            }, callback)
-            text_.TextSize = 13
-            if style == "Primary" then
-                primary(button, text_)
-            elseif style == "Danger" then
-                tween(text_, { TextColor3 = Theme.Error }, 0)
+        if detail.BuiltFor ~= record or detail.BuiltMine ~= record.Mine then
+            detail.BuiltFor, detail.BuiltMine = record, record.Mine
+            local row = detail.Actions
+            clear(row)
+            local order = 0
+            local function action(text, style, callback)
+                order += 1
+                local button, text_ = softButton(row, text, {
+                    Size = UDim2.new(0, 0, 0, 30),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    LayoutOrder = order,
+                }, callback)
+                text_.TextSize = 13
+                if style == "Primary" then
+                    primary(button, text_)
+                elseif style == "Danger" then
+                    tween(text_, { TextColor3 = Theme.Error }, 0)
+                end
+                return text_
+            end
+            detail.InstallLabel = action("Install", "Primary", function()
+                installRecord(record)
+            end)
+            if type(opts.OnLike) == "function" then
+                detail.LikeLabel = action("Like", nil, function()
+                    toggleLike(record)
+                end)
+            end
+            detail.FavoriteLabel = action("Favorite", nil, function()
+                toggleFavorite(record)
+            end)
+            action("Copy code", nil, function()
+                withCode(record, function(code)
+                    window:CopyToClipboard(code, "Config code")
+                end)
+            end)
+            if record.Mine then
+                if type(opts.OnUpdate) == "function" then
+                    action("Edit", nil, function()
+                        cloud:OpenPublish(record)
+                    end)
+                end
+                if type(opts.OnDelete) == "function" then
+                    action("Delete", "Danger", function()
+                        deleteRecord(record)
+                    end)
+                end
+            elseif type(opts.OnReport) == "function" then
+                action("Report", "Danger", function()
+                    reportRecord(record)
+                end)
             end
         end
         local state = installState(record)
-        action(state == "Update" and "Update" or (state == "Installed" and "Reinstall" or "Install"), "Primary", function()
-            installRecord(record)
-        end)
-        if type(opts.OnLike) == "function" then
-            action((record.Liked and "Liked" or "Like") .. "  ·  " .. compact(record.Likes), nil, function()
-                toggleLike(record)
-            end)
+        detail.InstallLabel.Text = state == "Update" and "Update" or (state == "Installed" and "Reinstall" or "Install")
+        if detail.LikeLabel then
+            detail.LikeLabel.Text = (record.Liked and "Liked" or "Like") .. "  ·  " .. compact(record.Likes)
         end
-        action(favorites[record.Id] and "Favorited" or "Favorite", nil, function()
-            toggleFavorite(record)
-        end)
-        action("Copy code", nil, function()
-            withCode(record, function(code)
-                window:CopyToClipboard(code, "Config code")
-            end)
-        end)
-        if record.Mine then
-            if type(opts.OnUpdate) == "function" then
-                action("Edit", nil, function()
-                    cloud:OpenPublish(record)
-                end)
-            end
-            if type(opts.OnDelete) == "function" then
-                action("Delete", "Danger", function()
-                    deleteRecord(record)
-                end)
-            end
-        elseif type(opts.OnReport) == "function" then
-            action("Report", "Danger", function()
-                reportRecord(record)
-            end)
-        end
+        detail.FavoriteLabel.Text = favorites[record.Id] and "Favorited" or "Favorite"
     end
 
     -- Every setting in the config next to the player's own: changed ones
@@ -14256,7 +14549,7 @@ function Window:CloudConfigs(opts)
 
     local form = { Mode = "Publish", Record = nil, Source = false, Tags = {}, Busy = false }
     local publishList = scroller(views.Publish)
-    padding(publishList, 0, 8, 0, 16)
+    padding(publishList, 1, 8, 1, 16)
     vlist(publishList, 8)
     softButton(publishList, "Back", {
         Size = UDim2.new(0, 0, 0, 28),
@@ -14541,7 +14834,7 @@ function Window:CloudConfigs(opts)
     -- For backends that push results instead of answering OnFetch.
     function cloud:SetConfigs(list, more)
         token += 1
-        loading = false
+        busy(false)
         clearSkeletons()
         records = {}
         for _, raw in ipairs(type(list) == "table" and list or {}) do
@@ -14558,7 +14851,7 @@ function Window:CloudConfigs(opts)
 
     function cloud:AddConfigs(list, more)
         token += 1
-        loading = false
+        busy(false)
         clearSkeletons()
         for _, raw in ipairs(type(list) == "table" and list or {}) do
             local record = normalizeRecord(raw)
@@ -14594,7 +14887,7 @@ function Window:CloudConfigs(opts)
 
     function cloud:SetLoading(on)
         token += 1
-        loading = on == true
+        busy(on == true)
         clearSkeletons()
         if loading then
             addSkeletons(4)
@@ -14604,7 +14897,7 @@ function Window:CloudConfigs(opts)
 
     function cloud:SetError(text)
         token += 1
-        loading = false
+        busy(false)
         clearSkeletons()
         setState(text and "error" or nil, tostring(text or ""))
     end

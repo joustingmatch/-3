@@ -1341,10 +1341,10 @@ local Cloud = Window:CreateCloudConfigs({
 
 **Browsing**
 
-- A search box (it waits for you to stop typing, or press Enter), a refresh button and **Publish** on top.
+- A search box (it waits for you to stop typing, or press Enter), a refresh button that spins while a page loads, and **Publish** on top. Press `/` to jump to the search box. Focusing it empty drops down your last six searches. Matches are highlighted in the cards, and a line above them sums up what you are looking at (*3 configs in Favorites, tagged PvP, matching "boss"*) with a **Clear filters** link.
 - Filter chips: **All**, **Favorites**, **Mine**, **Installed**, then your `Tags` (one at a time, press again to clear). A sort chip on the right cycles *Popular*, *Newest*, *Top rated* and *Most installed*, and is remembered.
 - Configs are cards in one column, or two on a wide window: name, author, when it was updated, how many settings, two lines of description, up to three tags, likes, installs and an **Install** button. A badge marks configs you've **installed**, ones with an **update** since you installed them, **yours**, and ones made for **another script**. A star marks favorites.
-- Pulsing placeholder cards while a page loads. The next page loads when you scroll near the bottom (or press **Load more**). A slow reply to an old search is thrown away. Errors show a **Try again** button; no results say why ("No configs match your search").
+- Pulsing placeholder cards while a page loads. The next page loads when you scroll near the bottom (or press **Load more**). A slow reply to an old search is thrown away. Errors show a **Try again** button; no results say why ("No configs match your search") and offer **Clear filters**.
 - **Favorites** and **Installed** are kept on this device, so they work without the backend and filter locally.
 
 **A config's page**
