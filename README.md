@@ -92,7 +92,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
-| `UnsupportedExecutor` | table \| false | on | When the executor is off `SupportedExecutors` (window or `Home` option) or, without a list, lacks the file, clipboard or request functions, the loading card turns into a warning with **Exit** and **Continue anyway** before the window opens. Shown even with `Loading = false`. `{ Title, Text, Block = true }` changes the wording or drops Continue; `false` turns it off. |
+| `UnsupportedExecutor` | table \| false | on | When the executor is off `SupportedExecutors` (window or `Home` option) or, without a list, lacks the file, clipboard or request functions, the loading card turns into a warning with **Exit** and **Continue anyway** before the window opens. Shown even with `Loading = false`. Ticking **Don't ask again on this executor** before Continue saves the executor's name to `unsupported_skip.txt` in the `ConfigurationSaving` folder, and the warning is skipped while that executor is used (a different executor, or resetting the folder, brings it back). The tick box only shows when the executor can write files. `{ Title, Text, Block = true }` changes the wording or drops Continue (and the tick box); `false` turns it off. |
 | `Loading.Title` | string | `Name` | Title on the card. |
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
 | `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |

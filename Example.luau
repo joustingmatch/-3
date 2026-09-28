@@ -3391,6 +3391,46 @@ local function executorReport(opts)
     return executor, false, "Missing " .. table.concat(missing, ", ") .. ". Some features may not work."
 end
 
+-- "Don't ask again" on the unsupported executor warning: the executor's
+-- name goes in a file in the script folder, and the warning is skipped while
+-- the same executor is in use. Resetting the folder brings it back.
+local function unsupportedSkipPath(folder)
+    return tostring(folder) .. "/unsupported_skip.txt"
+end
+
+local function canRememberUnsupported()
+    return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+end
+
+local function unsupportedSkipped(folder, executor)
+    if not canRememberUnsupported() then
+        return false
+    end
+    local path = unsupportedSkipPath(folder)
+    local ok, saved = pcall(function()
+        return isfile(path) and readfile(path) or nil
+    end)
+    return ok and saved == executor
+end
+
+local function rememberUnsupported(folder, executor)
+    if not canRememberUnsupported() then
+        return false
+    end
+    return pcall(function()
+        if type(isfolder) == "function" and type(makefolder) == "function" then
+            local path = ""
+            for segment in tostring(folder):gmatch("[^/\\]+") do
+                path = path == "" and segment or path .. "/" .. segment
+                if not isfolder(path) then
+                    makefolder(path)
+                end
+            end
+        end
+        writefile(unsupportedSkipPath(folder), executor)
+    end)
+end
+
 local gameInfoCache = nil
 
 local function fetchGameInfo()
@@ -3900,7 +3940,7 @@ function Library.Window(_, opts)
         gate = type(gate) == "table" and gate or {}
         local list = opts.SupportedExecutors or (type(opts.Home) == "table" and opts.Home.SupportedExecutors or nil)
         local executor, supported, message = executorReport({ SupportedExecutors = list })
-        if not supported then
+        if not supported and not unsupportedSkipped(self.ConfigFolder, executor) then
             opts._unsupported = {
                 Executor = executor,
                 Title = gate.Title or "Unsupported executor",
@@ -4561,6 +4601,68 @@ function Window:_showLoader(opts)
             Parent = row,
         })
 
+        -- Don't ask again: only offered when Continue is, and the executor
+        -- can write the file that remembers it.
+        local remember = false
+        local rememberRow = nil
+        if not info.Block and canRememberUnsupported() then
+            local boxSize = TOUCH and 20 or 16
+            rememberRow = create("TextButton", {
+                AnchorPoint = Vector2.new(0, 1),
+                Position = UDim2.new(0, PAD, 1, -PAD + 4 - 34 - 12),
+                Size = UDim2.new(1, -PAD * 2, 0, TOUCH and 28 or 22),
+                BackgroundTransparency = 1,
+                Text = "",
+                AutoButtonColor = false,
+                Parent = warnCard,
+            })
+            local box = create("Frame", {
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.fromScale(0, 0.5),
+                Size = UDim2.fromOffset(boxSize, boxSize),
+                BackgroundColor3 = Theme.Surface2,
+                BorderSizePixel = 0,
+                Parent = rememberRow,
+            })
+            corner(box, UDim.new(0, 4))
+            local boxStroke = stroke(box, Theme.Stroke, 1)
+            local check = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(boxSize - 4, boxSize - 4),
+                BackgroundTransparency = 1,
+                ImageColor3 = Theme.AccentDark,
+                ImageTransparency = 1,
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = box,
+            })
+            applyIcon(check, "check")
+            local rememberLabel = label({
+                Position = UDim2.fromOffset(boxSize + 8, 0),
+                Size = UDim2.new(1, -(boxSize + 8), 1, 0),
+                Text = "Don't ask again on this executor",
+                TextSize = 12,
+                FontFace = Fonts.Regular,
+                TextColor3 = Theme.Muted,
+                Parent = rememberRow,
+            })
+            rememberRow.MouseEnter:Connect(function()
+                tween(boxStroke, { Color = remember and Theme.Accent or Theme.StrokeHover }, 0.12)
+                tween(rememberLabel, { TextColor3 = Theme.Text }, 0.12)
+            end)
+            rememberRow.MouseLeave:Connect(function()
+                tween(boxStroke, { Color = remember and Theme.Accent or Theme.Stroke }, 0.2)
+                tween(rememberLabel, { TextColor3 = remember and Theme.Text or Theme.Muted }, 0.2)
+            end)
+            rememberRow.MouseButton1Click:Connect(function()
+                remember = not remember
+                tween(box, { BackgroundColor3 = remember and Theme.Accent or Theme.Surface2 }, 0.15)
+                tween(boxStroke, { Color = remember and Theme.Accent or Theme.Stroke }, 0.15)
+                tween(check, { ImageTransparency = remember and 0 or 1 }, 0.15)
+                tween(rememberLabel, { TextColor3 = remember and Theme.Text or Theme.Muted }, 0.15)
+            end)
+        end
+
         local chosen = false
         local function button(text, primary, order, callback)
             local frame = create("TextButton", {
@@ -4620,6 +4722,9 @@ function Window:_showLoader(opts)
         end)
         if not info.Block then
             button("Continue anyway", true, 2, function()
+                if remember then
+                    rememberUnsupported(self.ConfigFolder, info.Executor)
+                end
                 tween(warnCard, { GroupTransparency = 1 }, 0.15)
                 task.delay(0.15, finish)
             end)
@@ -4631,6 +4736,9 @@ function Window:_showLoader(opts)
                 return
             end
             local height = PAD + 60 + math.max(body.TextBounds.Y, 16) + 18 + 34 + PAD - 4
+            if rememberRow then
+                height += rememberRow.Size.Y.Offset + 10
+            end
             tween(loader, { Size = UDim2.fromOffset(WIDTH, height) }, 0.35, Enum.EasingStyle.Quint)
             task.delay(0.12, function()
                 tween(warnCard, { GroupTransparency = 0 }, 0.3)
