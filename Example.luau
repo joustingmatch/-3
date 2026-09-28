@@ -45,7 +45,8 @@ local function finishElement(tab, opts, element, frame, kind)
     element._listeners = element._listeners or {}
     local window = tab and tab.Window
     local searchText = opts.Name or opts.Text or opts.Title
-    element._searchKey = type(searchText) == "string" and string.lower(searchText) or ""
+    element._searchName = type(searchText) == "string" and searchText or ""
+    element._searchKey = string.lower(element._searchName)
     if tab and tab._items then
         table.insert(tab._items, element)
     end
@@ -55,7 +56,6 @@ local function finishElement(tab, opts, element, frame, kind)
             window:_flagCreated(opts.Flag, element)
         end
     end
-    -- What the script asked for, kept apart from what search is currently hiding.
     element._userVisible = opts.Visible ~= false
     function element:IsVisible()
         return element._userVisible
@@ -78,13 +78,10 @@ local function finishElement(tab, opts, element, frame, kind)
             end
         end
         if frame then
-            frame.Visible = visible and element._searchMatch ~= false
+            frame.Visible = visible
         end
         if window then
             window._controlsDirty = true
-            if window._filtered and window.SearchBox then
-                window:_applySearch(window.SearchBox.Text)
-            end
         end
     end
     if frame and not element._userVisible then
@@ -6298,11 +6295,7 @@ function Tab:_refreshEmpty()
     end
     if self._subTabs then
         empty.Visible = false
-    elseif self._searchActive then
-        self._emptyCaption.Text = "No matches"
-        empty.Visible = (self._searchHits or 0) == 0
     else
-        self._emptyCaption.Text = self._emptyText
         empty.Visible = self._childCount == 0
     end
 end
@@ -6500,7 +6493,6 @@ function Tab:Groupbox(opts, icon)
         _metrics = METRICS.Row,
         _items = {},
     }, Tab)
-    group._searchKey = string.lower(group.Name)
     table.insert(self._groupboxes, group)
 
     local collapsed = false
@@ -6569,7 +6561,6 @@ function Tab:Groupbox(opts, icon)
     end
     function group:SetTitle(text)
         group.Name = tostring(text)
-        group._searchKey = string.lower(group.Name)
         title.Text = group.Name
     end
     group._userVisible = opts.Visible ~= false
@@ -6592,11 +6583,8 @@ function Tab:Groupbox(opts, icon)
                 end
             end
         end
-        box.Visible = visible and group._searchMatch ~= false
+        box.Visible = visible
         window._controlsDirty = true
-        if window._filtered and window.SearchBox then
-            window:_applySearch(window.SearchBox.Text)
-        end
     end
     if not group._userVisible then
         box.Visible = false
@@ -7919,6 +7907,7 @@ function Tab:StatusList(opts)
         text = tostring(text or "")
         heading.Text = string.upper(text)
         heading.Visible = text ~= ""
+        handle._searchName = text
         handle._searchKey = string.lower(text)
     end
     local rate = math.max(tonumber(opts.UpdateRate) or 1, 0.05)
@@ -8295,78 +8284,172 @@ function Tab:SelectSubTab(sub, instant)
     end)
 end
 
--- Search
+-- Search: one box over the whole window. Typing lists matching tabs, pages,
+-- groupboxes and controls from every tab; picking one opens its tab and page,
+-- scrolls it into view and flashes it.
 
-local function isStructural(element)
-    return element._type == "Section" or element._type == "Divider"
-end
+Window._searchIcons = {
+    Tab = "app-window",
+    Page = "panels-top-left",
+    Groupbox = "layout-grid",
+    Button = "mouse-pointer-click",
+    ButtonRow = "mouse-pointer-click",
+    Toggle = "toggle-right",
+    Slider = "sliders-horizontal",
+    Dropdown = "list",
+    Input = "text-cursor-input",
+    Keybind = "keyboard",
+    ColorPicker = "palette",
+    Stepper = "chevrons-up-down",
+    Progress = "activity",
+    Status = "activity",
+    StatusList = "activity",
+    Label = "type",
+    Paragraph = "type",
+}
 
-local function filterContainer(container, query)
-    local searching = query ~= ""
-    local function hit(key)
-        return key ~= nil and string.find(key, query, 1, true) ~= nil
-    end
-    local hits = 0
-    for _, element in ipairs(container._items or {}) do
-        local show = not searching or (not isStructural(element) and hit(element._searchKey))
-        element._searchMatch = show
-        if element._frame then
-            element._frame.Visible = show and element._userVisible ~= false
+function Window:_searchResults(query)
+    local results = {}
+    local function consider(name, entry)
+        if type(name) ~= "string" or name == "" then
+            return
         end
-        if show and element._userVisible ~= false then
-            hits += 1
+        local at = string.find(string.lower(name), query, 1, true)
+        if not at then
+            return
         end
+        entry.Name = name
+        entry.At = at
+        -- Name starts first, then word starts, then anywhere inside a word.
+        entry.Rank = at == 1 and 0 or (string.find(string.sub(name, at - 1, at - 1), "[%s%p]") and 1 or 2)
+        entry.Order = #results + 1
+        table.insert(results, entry)
     end
-    for _, group in ipairs(container._groupboxes or {}) do
-        local titleHit = not searching or hit(group._searchKey)
-        local any = false
-        for _, element in ipairs(group._items) do
-            local show = titleHit or (not isStructural(element) and hit(element._searchKey))
-            element._searchMatch = show
-            if element._frame then
-                element._frame.Visible = show and element._userVisible ~= false
+    local function shown(element)
+        return not element._destroyed
+            and element._type ~= "Section" and element._type ~= "Divider"
+            and (element._isShown == nil or element:_isShown())
+    end
+    for _, tab in ipairs(self.Tabs) do
+        consider(tab.Name, { Kind = "Tab", Tab = tab, Icon = tab._iconName })
+        for _, page in ipairs(tab._subTabs or { tab }) do
+            local sub = page._isSubTab and page or nil
+            local path = tab.Name
+            if sub then
+                consider(sub.Name, { Kind = "Page", Tab = tab, Sub = sub, Path = tab.Name })
+                path = tab.Name .. "  ›  " .. sub.Name
             end
-            any = any or (show and element._userVisible ~= false)
-        end
-        local visible = titleHit or any
-        group._searchMatch = visible
-        group._frame.Visible = visible and group._userVisible ~= false
-        if visible and group._userVisible ~= false then
-            hits += 1
+            if not page._noSearch then
+                for _, element in ipairs(page._items or {}) do
+                    if shown(element) then
+                        consider(element._searchName, { Kind = element._type, Tab = tab, Sub = sub, Target = element, Path = path })
+                    end
+                end
+                for _, group in ipairs(page._groupboxes or {}) do
+                    if group._userVisible ~= false then
+                        consider(group.Name, { Kind = "Groupbox", Tab = tab, Sub = sub, Target = group, Path = path })
+                        local groupPath = path .. "  ›  " .. group.Name
+                        for _, element in ipairs(group._items) do
+                            if shown(element) then
+                                consider(element._searchName, { Kind = element._type, Tab = tab, Sub = sub, Target = element, Group = group, Path = groupPath })
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
-    container._searchActive = searching
-    container._searchHits = hits
-    container:_refreshEmpty()
+    table.sort(results, function(a, b)
+        if a.Rank ~= b.Rank then
+            return a.Rank < b.Rank
+        end
+        return a.Order < b.Order
+    end)
+    return results
 end
 
-function Window:_searchTarget()
-    local tab = self.CurrentTab
-    if not tab then
-        return nil
+-- Pulses an accent wash and outline over a found control.
+function Window:_flash(frame, radius)
+    local old = frame:FindFirstChild("SearchFlash")
+    if old then
+        old:Destroy()
     end
-    return tab.CurrentSubTab or tab
+    local wash = create("Frame", {
+        Name = "SearchFlash",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 10,
+        Parent = frame,
+    })
+    corner(wash, UDim.new(0, radius or 8))
+    local ring = stroke(wash, Theme.Accent, 1, 1.5)
+    task.spawn(function()
+        for _ = 1, 2 do
+            tween(wash, { BackgroundTransparency = 0.84 }, 0.18)
+            tween(ring, { Transparency = 0 }, 0.18)
+            task.wait(0.22)
+            tween(wash, { BackgroundTransparency = 1 }, 0.45)
+            tween(ring, { Transparency = 0.6 }, 0.45)
+            task.wait(0.5)
+        end
+        tween(ring, { Transparency = 1 }, 0.6)
+        task.wait(0.65)
+        wash:Destroy()
+    end)
 end
 
-function Window:_applySearch(text)
-    local query = string.lower(text or "")
-    query = query:match("^%s*(.-)%s*$")
-    local target = self:_searchTarget()
-    if self._filtered and self._filtered ~= target then
-        filterContainer(self._filtered, "")
-        self._filtered = nil
+function Window:_revealResult(result)
+    local tab, sub, target, group = result.Tab, result.Sub, result.Target, result.Group
+    if self.CurrentTab ~= tab then
+        self:SelectTab(tab)
     end
-    if target and not target._noSearch then
-        filterContainer(target, query)
-        self._filtered = target
+    if sub then
+        tab:SelectSubTab(sub)
     end
+    if not target then
+        local button = sub and sub._button or tab._button
+        task.delay(0.1, function()
+            if button.Parent then
+                self:_flash(button, sub and 8 or 10)
+            end
+        end)
+        return
+    end
+    local expanding = group ~= nil and group:IsCollapsed()
+    if expanding then
+        group:Expand()
+    end
+    local list = (sub or tab).List
+    task.spawn(function()
+        -- Let the freshly shown page lay out before measuring it.
+        task.wait()
+        task.wait()
+        if expanding then
+            task.wait(0.3)
+        end
+        local frame = target._frame
+        if self._destroyed or target._destroyed or not frame or not frame.Parent or not list then
+            return
+        end
+        local scale = self.Scale.Scale
+        local top = (frame.AbsolutePosition.Y - list.AbsolutePosition.Y) / scale + list.CanvasPosition.Y
+        local height = frame.AbsoluteSize.Y / scale
+        local view = list.AbsoluteWindowSize.Y / scale
+        local limit = math.max(list.AbsoluteCanvasSize.Y / scale - view, 0)
+        local y = math.clamp(top + height / 2 - view / 2, 0, limit)
+        if math.abs(y - list.CanvasPosition.Y) > 2 then
+            tween(list, { CanvasPosition = Vector2.new(0, y) }, 0.45, Enum.EasingStyle.Quint)
+            task.wait(0.25)
+        end
+        if frame.Parent then
+            self:_flash(frame, target._groupbox and 10 or 8)
+        end
+    end)
 end
 
 function Window:_resetSearch()
-    if self._filtered then
-        filterContainer(self._filtered, "")
-        self._filtered = nil
-    end
     if self.SearchBox and self.SearchBox.Text ~= "" then
         self.SearchBox.Text = ""
     end
@@ -8413,17 +8496,320 @@ function Window:_buildSearch(content)
         Parent = holder,
     })
     self.SearchBox = box
+
+    -- Results float over the window under the box, like a dropdown popup.
+    local rowHeight = TOUCH and 46 or 42
+    local maxRows = 7
+    local popup = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0),
+        Size = UDim2.fromOffset(300, 0),
+        BackgroundTransparency = 1,
+        Visible = false,
+        ZIndex = 45,
+        Parent = self.Body,
+    })
+    popup:SetAttribute("NoDrag", true)
+    local popupShadow = create("ImageLabel", {
+        Position = UDim2.fromOffset(-18, -12),
+        Size = UDim2.new(1, 36, 1, 36),
+        BackgroundTransparency = 1,
+        Image = Assets.Shadow,
+        ImageColor3 = Color3.new(0, 0, 0),
+        ImageTransparency = 1,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = Rect.new(49, 49, 450, 450),
+        Parent = popup,
+    })
+    local panel = create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Parent = popup,
+    })
+    corner(panel, UDim.new(0, 10))
+    local panelStroke = stroke(panel, Theme.Stroke, 1)
+    local list = create("ScrollingFrame", {
+        Position = UDim2.fromOffset(6, 6),
+        Size = UDim2.new(1, -12, 1, -12),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = TOUCH and 4 or 3,
+        ScrollBarImageColor3 = Theme.Accent,
+        ScrollBarImageTransparency = 0.4,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        CanvasSize = UDim2.new(),
+        Parent = panel,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = list,
+    })
+    local noResults = label({
+        Size = UDim2.new(1, 0, 0, rowHeight),
+        Text = "No results",
+        TextSize = 13,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        LayoutOrder = 0,
+        Visible = false,
+        Parent = list,
+    })
+
+    local rows = {}
+    local results = {}
+    local selected = 1
+    local open = false
+    local generation = 0
+    local shownSize = Vector2.new(300, 0)
+    local stopFollowing = nil
+    local closeResults
+
+    local function place()
+        local scale = self.Scale.Scale
+        local bodyPosition = self.Body.AbsolutePosition
+        local bodyWidth = self.Body.AbsoluteSize.X / scale
+        local right = (holder.AbsolutePosition.X + holder.AbsoluteSize.X - bodyPosition.X) / scale
+        local top = (holder.AbsolutePosition.Y + holder.AbsoluteSize.Y - bodyPosition.Y) / scale + 6
+        right = math.clamp(right, shownSize.X + 8, math.max(bodyWidth - 8, shownSize.X + 8))
+        popup.Position = UDim2.fromOffset(right, top)
+    end
+
+    local function measure()
+        local scale = self.Scale.Scale
+        local bodySize = self.Body.AbsoluteSize / scale
+        local below = (holder.AbsolutePosition.Y + holder.AbsoluteSize.Y - self.Body.AbsolutePosition.Y) / scale + 6
+        local count = math.max(#rows, 1)
+        local height = math.min(count, maxRows) * (rowHeight + 2) - 2 + 12
+        height = math.max(math.min(height, bodySize.Y - below - 12), rowHeight + 12)
+        local width = math.min(math.max(holder.AbsoluteSize.X / scale, 300), math.max(bodySize.X - 16, 160))
+        shownSize = Vector2.new(width, height)
+    end
+
+    local function paintSelection()
+        for index, row in ipairs(rows) do
+            local on = index == selected
+            tween(row.Button, { BackgroundTransparency = on and 0.35 or 1 }, 0.12)
+            tintIcon(row.Icon, on and Theme.Accent or Theme.Muted, on, 0.12)
+        end
+    end
+
+    local function keepSelectionInView()
+        local rowTop = (selected - 1) * (rowHeight + 2)
+        local view = list.AbsoluteWindowSize.Y / self.Scale.Scale
+        local y = list.CanvasPosition.Y
+        if rowTop < y then
+            y = rowTop
+        elseif rowTop + rowHeight > y + view then
+            y = rowTop + rowHeight - view
+        else
+            return
+        end
+        list.CanvasPosition = Vector2.new(0, math.max(y, 0))
+    end
+
+    local function setOpen(value)
+        if value == open then
+            return
+        end
+        open = value
+        generation += 1
+        local current = generation
+        if value then
+            if self._closePopup and self._closePopup ~= closeResults then
+                self._closePopup()
+            end
+            self._closePopup = closeResults
+            place()
+            popup.Size = UDim2.fromOffset(shownSize.X, 0)
+            popup.Visible = true
+            tween(popup, { Size = UDim2.fromOffset(shownSize.X, shownSize.Y) }, 0.26, Enum.EasingStyle.Quint)
+            tween(panelStroke, { Transparency = 0 }, 0.12)
+            tween(popupShadow, { ImageTransparency = 0.55 }, 0.26)
+            if not stopFollowing then
+                stopFollowing = self:_listen("Render", place)
+            end
+        else
+            if self._closePopup == closeResults then
+                self._closePopup = nil
+            end
+            tween(popup, { Size = UDim2.fromOffset(shownSize.X, 0) }, 0.18, Enum.EasingStyle.Quint)
+            tween(popupShadow, { ImageTransparency = 1 }, 0.14)
+            task.delay(0.19, function()
+                if generation == current and not open then
+                    popup.Visible = false
+                    panelStroke.Transparency = 1
+                    if stopFollowing then
+                        stopFollowing()
+                        stopFollowing = nil
+                    end
+                end
+            end)
+        end
+    end
+    closeResults = function()
+        setOpen(false)
+    end
+
+    local function choose(result)
+        if not result then
+            return
+        end
+        setOpen(false)
+        box.Text = ""
+        if box:IsFocused() then
+            box:ReleaseFocus()
+        end
+        self:_revealResult(result)
+    end
+
+    local function escape(text)
+        return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+    end
+
+    local function render(query)
+        for _, row in ipairs(rows) do
+            row.Button:Destroy()
+        end
+        table.clear(rows)
+        results = self:_searchResults(query)
+        selected = 1
+        local accent = colorToHex(Theme.Accent)
+        for index, result in ipairs(results) do
+            if index > 50 then
+                break
+            end
+            local button = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, rowHeight),
+                BackgroundColor3 = Theme.Surface3,
+                BackgroundTransparency = 1,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = index,
+                Parent = list,
+            })
+            corner(button, UDim.new(0, 7))
+            local image = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.new(0, 10, 0.5, 0),
+                Size = UDim2.fromOffset(15, 15),
+                BackgroundTransparency = 1,
+                ImageColor3 = Theme.Muted,
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = button,
+            })
+            applyIcon(image, result.Icon or Window._searchIcons[result.Kind] or "search")
+            local name = result.Name
+            local stop = result.At + #query
+            local marked = escape(string.sub(name, 1, result.At - 1))
+                .. '<font color="#' .. accent .. '">' .. escape(string.sub(name, result.At, stop - 1)) .. "</font>"
+                .. escape(string.sub(name, stop))
+            local hasPath = result.Path ~= nil
+            label({
+                Position = UDim2.fromOffset(34, hasPath and 5 or 0),
+                Size = UDim2.new(1, -110, hasPath and 0 or 1, hasPath and 18 or 0),
+                Text = marked,
+                RichText = true,
+                TextSize = 13,
+                Parent = button,
+            })
+            if hasPath then
+                label({
+                    Position = UDim2.fromOffset(34, 23),
+                    Size = UDim2.new(1, -44, 0, 14),
+                    Text = result.Path,
+                    TextSize = 11,
+                    FontFace = Fonts.Regular,
+                    TextColor3 = Theme.Muted,
+                    Parent = button,
+                })
+            end
+            label({
+                AnchorPoint = Vector2.new(1, 0),
+                Position = UDim2.new(1, -10, 0, hasPath and 7 or math.floor((rowHeight - 14) / 2)),
+                Size = UDim2.fromOffset(70, 14),
+                Text = result.Kind,
+                TextSize = 11,
+                FontFace = Fonts.Regular,
+                TextColor3 = Theme.Muted,
+                TextXAlignment = Enum.TextXAlignment.Right,
+                Parent = button,
+            })
+            local isTap = tapGuard(button, function()
+                return list
+            end)
+            button.MouseEnter:Connect(function()
+                if not usingTouch() then
+                    selected = index
+                    paintSelection()
+                end
+            end)
+            button.MouseButton1Click:Connect(function()
+                if isTap() then
+                    choose(result)
+                end
+            end)
+            table.insert(rows, { Button = button, Icon = image })
+        end
+        noResults.Visible = #rows == 0
+        list.CanvasSize = UDim2.fromOffset(0, math.max(#rows, 1) * (rowHeight + 2) - 2)
+        list.CanvasPosition = Vector2.zero
+        paintSelection()
+        measure()
+        if open then
+            place()
+            tween(popup, { Size = UDim2.fromOffset(shownSize.X, shownSize.Y) }, 0.2, Enum.EasingStyle.Quint)
+        end
+    end
+
+    local function update()
+        local query = string.match(string.lower(box.Text), "^%s*(.-)%s*$")
+        if query == "" then
+            setOpen(false)
+            return
+        end
+        render(query)
+        setOpen(true)
+    end
+
     box.Focused:Connect(function()
         tween(holderStroke, { Color = Theme.StrokeHover }, 0.15)
         tween(icon, { ImageColor3 = Theme.Accent }, 0.15)
+        if box.Text ~= "" then
+            update()
+        end
     end)
-    box.FocusLost:Connect(function()
+    box.FocusLost:Connect(function(enterPressed)
         tween(holderStroke, { Color = Theme.Stroke }, 0.2)
         tween(icon, { ImageColor3 = Theme.Muted }, 0.2)
+        if enterPressed and open then
+            choose(results[selected])
+        end
     end)
-    box:GetPropertyChangedSignal("Text"):Connect(function()
-        self:_applySearch(box.Text)
+    box:GetPropertyChangedSignal("Text"):Connect(update)
+    self:_listen("Began", function(input)
+        if not open then
+            return
+        end
+        if input.KeyCode == Enum.KeyCode.Up or input.KeyCode == Enum.KeyCode.Down then
+            if #rows > 0 then
+                local step = input.KeyCode == Enum.KeyCode.Up and -1 or 1
+                selected = math.clamp(selected + step, 1, #rows)
+                paintSelection()
+                keepSelectionInView()
+            end
+        elseif input.KeyCode == Enum.KeyCode.Escape then
+            setOpen(false)
+        elseif isPress(input) then
+            local point = pointerPosition()
+            if not pointInside(point, popup) and not pointInside(point, holder) then
+                setOpen(false)
+            end
+        end
     end)
+
     local function fit()
         local width = content.AbsoluteSize.X / self.Scale.Scale
         local searchWidth = math.clamp(math.floor(width * 0.32), 110, SEARCH_WIDTH)
