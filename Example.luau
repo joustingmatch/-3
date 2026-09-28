@@ -1,3 +1,6 @@
+-- The library lives in its own function so its locals don't count against
+-- the script below it: Luau allows 200 locals per function.
+local Library = (function()
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -3394,27 +3397,30 @@ end
 -- "Don't ask again" on the unsupported executor warning: the executor's
 -- name goes in a file in the script folder, and the warning is skipped while
 -- the same executor is in use. Resetting the folder brings it back.
-local function unsupportedSkipPath(folder)
+-- A table, not separate locals: the main chunk is at Luau's 200 local limit.
+local UnsupportedSkip = {}
+
+function UnsupportedSkip.Path(folder)
     return tostring(folder) .. "/unsupported_skip.txt"
 end
 
-local function canRememberUnsupported()
+function UnsupportedSkip.Available()
     return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
 end
 
-local function unsupportedSkipped(folder, executor)
-    if not canRememberUnsupported() then
+function UnsupportedSkip.Saved(folder, executor)
+    if not UnsupportedSkip.Available() then
         return false
     end
-    local path = unsupportedSkipPath(folder)
+    local path = UnsupportedSkip.Path(folder)
     local ok, saved = pcall(function()
         return isfile(path) and readfile(path) or nil
     end)
     return ok and saved == executor
 end
 
-local function rememberUnsupported(folder, executor)
-    if not canRememberUnsupported() then
+function UnsupportedSkip.Save(folder, executor)
+    if not UnsupportedSkip.Available() then
         return false
     end
     return pcall(function()
@@ -3427,7 +3433,7 @@ local function rememberUnsupported(folder, executor)
                 end
             end
         end
-        writefile(unsupportedSkipPath(folder), executor)
+        writefile(UnsupportedSkip.Path(folder), executor)
     end)
 end
 
@@ -3940,7 +3946,7 @@ function Library.Window(_, opts)
         gate = type(gate) == "table" and gate or {}
         local list = opts.SupportedExecutors or (type(opts.Home) == "table" and opts.Home.SupportedExecutors or nil)
         local executor, supported, message = executorReport({ SupportedExecutors = list })
-        if not supported and not unsupportedSkipped(self.ConfigFolder, executor) then
+        if not supported and not UnsupportedSkip.Saved(self.ConfigFolder, executor) then
             opts._unsupported = {
                 Executor = executor,
                 Title = gate.Title or "Unsupported executor",
@@ -4605,7 +4611,7 @@ function Window:_showLoader(opts)
         -- can write the file that remembers it.
         local remember = false
         local rememberRow = nil
-        if not info.Block and canRememberUnsupported() then
+        if not info.Block and UnsupportedSkip.Available() then
             local boxSize = TOUCH and 20 or 16
             rememberRow = create("TextButton", {
                 AnchorPoint = Vector2.new(0, 1),
@@ -4723,7 +4729,7 @@ function Window:_showLoader(opts)
         if not info.Block then
             button("Continue anyway", true, 2, function()
                 if remember then
-                    rememberUnsupported(self.ConfigFolder, info.Executor)
+                    UnsupportedSkip.Save(self.ConfigFolder, info.Executor)
                 end
                 tween(warnCard, { GroupTransparency = 1 }, 0.15)
                 task.delay(0.15, finish)
@@ -10318,12 +10324,15 @@ end
 -- essentials in view (current tab, running toggles, pinned statuses) and
 -- unfolds back into the window from wherever the box was dragged.
 
-local MINI_WIDTH = 220
-local MINI_MIN_WIDTH = 180
-local MINI_MAX_WIDTH = 420
-local MAX_PINNED = 3
-local MINI_MAX_PINNED = 8
-local MINI_ROW_STEP = 22 -- one pinned status row plus its gap
+-- One table, not separate locals: the main chunk is at Luau's 200 local limit.
+local Mini = {
+    Width = 220,
+    MinWidth = 180,
+    MaxWidth = 420,
+    Pinned = 3,
+    MaxPinned = 8,
+    RowStep = 22, -- one pinned status row plus its gap
+}
 
 -- The morph is carried by a plain "ghost" panel drawn over the window. The
 -- window body itself never moves or fades, so nothing has to be laid out
@@ -10373,10 +10382,10 @@ function Window:_buildMiniBar()
     end
     local gui = self.Gui
     local function fitWidth(width)
-        local room = math.max(gui.AbsoluteSize.X - 16, MINI_MIN_WIDTH)
-        return math.floor(math.clamp(width, MINI_MIN_WIDTH, math.min(MINI_MAX_WIDTH, room)) + 0.5)
+        local room = math.max(gui.AbsoluteSize.X - 16, Mini.MinWidth)
+        return math.floor(math.clamp(width, Mini.MinWidth, math.min(Mini.MaxWidth, room)) + 0.5)
     end
-    self._miniWidth = fitWidth(self._miniWidth or MINI_WIDTH)
+    self._miniWidth = fitWidth(self._miniWidth or Mini.Width)
     local bar = create("CanvasGroup", {
         Size = UDim2.fromOffset(self._miniWidth, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
@@ -10651,7 +10660,7 @@ function Window:_buildMiniBar()
     end)
     local resizeStartPointer = Vector2.zero
     local resizeStartWidth = 0
-    local resizeStartCapacity = MAX_PINNED
+    local resizeStartCapacity = Mini.Pinned
     grip.InputBegan:Connect(function(input)
         if not isPress(input) or not self.Minimized then
             return
@@ -10659,7 +10668,7 @@ function Window:_buildMiniBar()
         resizingMini = true
         resizeStartPointer = pointerPosition()
         resizeStartWidth = bar.Size.X.Offset
-        resizeStartCapacity = self._miniCapacity or MAX_PINNED
+        resizeStartCapacity = self._miniCapacity or Mini.Pinned
         lightGrip(true)
     end)
     table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
@@ -10673,13 +10682,13 @@ function Window:_buildMiniBar()
         local delta = (pointerPosition() - resizeStartPointer) / barScale.Scale
         local left = bar.AbsolutePosition.X - gui.AbsolutePosition.X
         local room = gui.AbsoluteSize.X - left - 8
-        local width = math.min(fitWidth(resizeStartWidth + delta.X), math.max(room, MINI_MIN_WIDTH))
+        local width = math.min(fitWidth(resizeStartWidth + delta.X), math.max(room, Mini.MinWidth))
         if width ~= bar.Size.X.Offset then
             bar.Size = UDim2.fromOffset(width, 0)
             self._miniWidth = width
         end
-        local capacity = math.clamp(resizeStartCapacity + math.floor(delta.Y / MINI_ROW_STEP + 0.5), 1, MINI_MAX_PINNED)
-        if capacity ~= (self._miniCapacity or MAX_PINNED) then
+        local capacity = math.clamp(resizeStartCapacity + math.floor(delta.Y / Mini.RowStep + 0.5), 1, Mini.MaxPinned)
+        if capacity ~= (self._miniCapacity or Mini.Pinned) then
             self._miniCapacity = capacity
             self:_refreshMini()
         end
@@ -10814,7 +10823,7 @@ function Window:_buildMiniBar()
                 table.insert(list, handle)
             end
         end
-        local shown = math.min(#list, self._miniCapacity or MAX_PINNED)
+        local shown = math.min(#list, self._miniCapacity or Mini.Pinned)
         pinnedDivider.Visible = shown > 0
         pinned.Visible = shown > 0
         for index = 1, math.max(shown, #chips) do
@@ -11464,6 +11473,9 @@ for _, class in ipairs({ Library, Window, Tab }) do
         end
     end
 end
+
+return Library
+end)()
 
 local Airflow = Library
 
