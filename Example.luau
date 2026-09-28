@@ -10988,6 +10988,16 @@ function Window:Chat(opts)
     local echo = opts.Echo ~= false
     local sharing = opts.Configs ~= false
     local myName = tostring(opts.Username or LocalPlayer.DisplayName)
+    -- Streamer mode shows and sends the player as a stand-in name, with no
+    -- headshot. It is remembered in the script's settings file.
+    local anonName = tostring(opts.StreamerName or "Ouroboros User")
+    local streamer = window:_readConfigSettings().StreamerMode
+    if type(streamer) ~= "boolean" then
+        streamer = opts.StreamerMode == true or window._hideName == true
+    end
+    local function shownName()
+        return streamer and anonName or myName
+    end
     local mentionKeys = {
         [string.lower(LocalPlayer.Name)] = true,
         [string.lower(LocalPlayer.DisplayName)] = true,
@@ -11108,6 +11118,8 @@ function Window:Chat(opts)
         Padding = UDim.new(0, 6),
         Parent = statusHolder,
     })
+    local streamerButton, streamerIcon = iconButton(statusHolder, "eye-off", "S", 24)
+    streamerButton.LayoutOrder = 0
     local onlineLabel = label({
         Size = UDim2.fromOffset(0, 20),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -11748,6 +11760,19 @@ function Window:Chat(opts)
         openActions = show and entry or (openActions ~= entry and openActions or nil)
     end
 
+    -- The player's own messages follow streamer mode, including ones already
+    -- shown, and a message sent while hidden stays hidden. Everyone else's
+    -- show as the backend sent them.
+    local function renderIdentity(entry)
+        local hidden = entry.Self and (streamer or entry.Streamer)
+        local name = hidden and anonName or entry.Author
+        entry.NameButton.Text = name
+        entry.Initial.Text = string.upper(name:sub(1, 1))
+        if entry.Headshot then
+            entry.Headshot.Visible = not hidden
+        end
+    end
+
     local function buildRow(channel, entry)
         order += 1
         local row = create("TextButton", {
@@ -11789,24 +11814,23 @@ function Window:Chat(opts)
         })
         corner(avatar, UDim.new(1, 0))
         entry.Avatar = avatar
+        entry.Initial = label({
+            Size = UDim2.fromScale(1, 1),
+            Text = "",
+            TextSize = 14,
+            FontFace = Fonts.Bold,
+            TextColor3 = Theme.Accent,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            Parent = avatar,
+        })
         if entry.UserId and entry.UserId > 0 then
-            create("ImageLabel", {
+            entry.Headshot = create("ImageLabel", {
                 Size = UDim2.fromScale(1, 1),
                 BackgroundTransparency = 1,
                 Image = ("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48"):format(entry.UserId),
                 Parent = avatar,
             })
-            corner(avatar:FindFirstChildOfClass("ImageLabel"), UDim.new(1, 0))
-        else
-            label({
-                Size = UDim2.fromScale(1, 1),
-                Text = string.upper(entry.Author:sub(1, 1)),
-                TextSize = 14,
-                FontFace = Fonts.Bold,
-                TextColor3 = Theme.Accent,
-                TextXAlignment = Enum.TextXAlignment.Center,
-                Parent = avatar,
-            })
+            corner(entry.Headshot, UDim.new(1, 0))
         end
 
         local body = create("Frame", {
@@ -11840,7 +11864,7 @@ function Window:Chat(opts)
             Size = UDim2.fromOffset(0, 18),
             AutomaticSize = Enum.AutomaticSize.X,
             BackgroundTransparency = 1,
-            Text = entry.Author,
+            Text = "",
             TextSize = 13,
             FontFace = Fonts.Bold,
             TextColor3 = nameColor,
@@ -11853,6 +11877,8 @@ function Window:Chat(opts)
                 mention(entry.Author)
             end
         end)
+        entry.NameButton = nameButton
+        renderIdentity(entry)
         if entry.Tag then
             local tag = label({
                 Size = UDim2.fromOffset(0, 15),
@@ -12094,6 +12120,7 @@ function Window:Chat(opts)
             Color = colorOf(message.Color),
             State = message.State,
             Reason = message.Reason,
+            Streamer = message.Streamer == true,
             Config = type(config) == "string" and config ~= "" and config or nil,
             ConfigName = configName and tostring(configName) or nil,
         }
@@ -12388,7 +12415,7 @@ function Window:Chat(opts)
         if name then
             code, err = window:ExportConfig(name)
         else
-            title = window.LoadedConfig or (myName .. "'s config")
+            title = window.LoadedConfig or (shownName() .. "'s config")
             local ok, encoded = pcall(encodeConfig, window, title, collectFlags(window))
             code, err = ok and encoded or nil, "could not encode config"
         end
@@ -12449,6 +12476,9 @@ function Window:Chat(opts)
         dispatch(entry, {
             Id = entry.Id,
             Channel = entry.Channel.Name,
+            Author = entry.Streamer and anonName or myName,
+            UserId = not entry.Streamer and LocalPlayer.UserId or nil,
+            Streamer = entry.Streamer,
             Text = entry.Text,
             Config = entry.Config,
             ConfigName = entry.ConfigName,
@@ -12477,6 +12507,9 @@ function Window:Chat(opts)
         local message = {
             Id = HttpService:GenerateGUID(false),
             Channel = current.Name,
+            Author = shownName(),
+            UserId = not streamer and LocalPlayer.UserId or nil,
+            Streamer = streamer,
             Text = text,
             Config = attachment and attachment.Code or nil,
             ConfigName = attachment and attachment.Name or nil,
@@ -12500,6 +12533,7 @@ function Window:Chat(opts)
                 Text = text,
                 Author = myName,
                 UserId = LocalPlayer.UserId,
+                Streamer = streamer,
                 Self = true,
                 State = "sending",
                 Config = message.Config,
@@ -12599,6 +12633,59 @@ function Window:Chat(opts)
     attachRemove.MouseButton1Click:Connect(function()
         chat:Detach()
     end)
+
+    local function renderStreamer(duration)
+        tween(streamerButton, {
+            BackgroundColor3 = streamer and Theme.Accent or Theme.Surface3,
+            BackgroundTransparency = streamer and 0.8 or 1,
+        }, duration)
+        paint(streamerIcon, streamer and Theme.Accent or Theme.Muted, duration)
+    end
+
+    function chat:SetStreamerMode(on, silent)
+        on = on == true
+        if on == streamer then
+            return
+        end
+        streamer = on
+        window:_writeConfigSettings({ StreamerMode = on })
+        for _, channel in pairs(channels) do
+            for _, entry in ipairs(channel.Entries) do
+                if entry.Self and not entry.System then
+                    renderIdentity(entry)
+                end
+            end
+        end
+        renderStreamer(0.2)
+        if not silent then
+            window:Notify({
+                Title = on and "Streamer mode on" or "Streamer mode off",
+                Content = "You show as " .. shownName(),
+                Icon = on and "eye-off" or "eye",
+                Duration = 2.5,
+            })
+        end
+        if opts.OnStreamerMode then
+            task.spawn(safeCall, opts.OnStreamerMode, on)
+        end
+    end
+
+    function chat:GetStreamerMode()
+        return streamer
+    end
+
+    streamerButton.MouseEnter:Connect(function()
+        if not streamer and not usingTouch() then
+            paint(streamerIcon, Theme.Text, 0.12)
+        end
+    end)
+    streamerButton.MouseLeave:Connect(function()
+        renderStreamer(0.2)
+    end)
+    streamerButton.MouseButton1Click:Connect(function()
+        chat:SetStreamerMode(not streamer)
+    end)
+    renderStreamer(0)
 
     local channelList = type(opts.Channels) == "table" and #opts.Channels > 0 and opts.Channels or { "Global" }
     for _, name in ipairs(channelList) do

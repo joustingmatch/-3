@@ -1198,7 +1198,7 @@ local Chat = Window:CreateChat({
     Name = "Chat",
     Channels = { "Global", "Configs" },
     OnSend = function(Message)
-        -- Message = { Id, Channel, Text, Config, ConfigName }
+        -- Message = { Id, Channel, Author, UserId, Streamer, Text, Config, ConfigName }
         local ok = pcall(request, {
             Url = "https://my.api/chat",
             Method = "POST",
@@ -1237,6 +1237,7 @@ Chat:AddMessage({
 - **Unread.** Messages that arrive while the chat tab isn't showing count up on its sidebar badge; other channels get a dot on their chip.
 - **Typing.** `OnTyping(isTyping, channel)` fires when the player starts typing and again 4 seconds after they stop (or send). Show other people with `SetTyping`.
 - **Composer.** A counter appears near `MaxLength`, sends inside `Cooldown` show *Wait 0.6s*, and up / down walk back through what the player sent.
+- **Streamer mode.** The eye button in the top bar hides the player's name: their messages show and are sent as *Ouroboros User* with no headshot, and `OnSend` gets `Author = "Ouroboros User"`, `UserId = nil` and `Streamer = true`, so post `Message.Author` rather than the player's real name. Messages already shown switch too. The choice is remembered in the script's settings file, and starts on when the Home tab's hide-name switch is on.
 - **Message actions.** Hovering a message (tapping it on touch) shows reply and copy, plus any `MessageActions` you add, such as report or delete.
 
 ### Properties
@@ -1257,6 +1258,9 @@ Chat:AddMessage({
 | `ConfirmInstall` | boolean | `true` | Ask before installing. A config for another script always asks. |
 | `MentionNotify` | boolean | `true` | Notify on mentions while the chat isn't showing. |
 | `Username` | string | display name | The name used for the player's own messages. |
+| `StreamerMode` | boolean | `false` | Start in streamer mode, until the player picks. |
+| `StreamerName` | string | `"Ouroboros User"` | The name shown and sent in streamer mode. |
+| `OnStreamerMode` | function | — | `(on)` when streamer mode changes. |
 | `MaxLength` | number | `200` | Characters per message. |
 | `Cooldown` | number | `1` | Seconds between sends. |
 | `MaxMessages` | number | `200` | Messages kept per channel; the oldest go first. |
@@ -1280,6 +1284,7 @@ Chat:AddMessage({
 | `Color` | Name colour: a `Color3` or a theme key. |
 | `System` | A centred grey line with no author. |
 | `Self` | Force the player's own styling on or off. |
+| `Streamer` | Sent in streamer mode: shown as the streamer name. |
 | `State` / `Reason` | `"sending"`, `"failed"` or `nil` (sent), and why it failed. |
 
 ### Handle
@@ -1299,6 +1304,7 @@ Chat:AddMessage({
 | `SetTyping(names, channel?)` | Who else is typing: a list of names, empty to clear. |
 | `SetEnabled(enabled, reason?)` | Lock the composer, with `reason` as its placeholder (`"Connecting..."`, `"You are muted"`). |
 | `AddChannel(name)` / `RemoveChannel(name)` / `SelectChannel(name)` / `GetChannel()` | Channels. |
+| `SetStreamerMode(on, silent?)` / `GetStreamerMode()` | Streamer mode. `silent` skips the notification. |
 | `SetInput(text)` / `Focus()` | Fill the box, or open the tab and focus it. |
 | `.Tab` | The chat's tab, for `SetBadge` and the like. |
 
