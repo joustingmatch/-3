@@ -4271,38 +4271,8 @@ function Library.Window(_, opts)
     })
     self._tabStack = stack
 
-    -- Soft fades at the ends of the tab list while there is more to scroll.
-    local function scrollFade(top)
-        local fade = create("Frame", {
-            AnchorPoint = Vector2.new(0, top and 0 or 1),
-            Position = top and tabList.Position or UDim2.new(0, 0, tabList.Size.Y.Scale, tabList.Position.Y.Offset + tabList.Size.Y.Offset),
-            Size = UDim2.new(1, 0, 0, 22),
-            BackgroundColor3 = Theme.Surface2,
-            BorderSizePixel = 0,
-            Visible = false,
-            ZIndex = 3,
-            Parent = sidebar,
-        })
-        create("UIGradient", {
-            Rotation = top and 90 or 270,
-            Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0),
-                NumberSequenceKeypoint.new(1, 1),
-            }),
-            Parent = fade,
-        })
-        return fade
-    end
-    local topFade, bottomFade = scrollFade(true), scrollFade(false)
-    local function refreshFades()
-        local overflow = tabList.AbsoluteCanvasSize.Y - tabList.AbsoluteWindowSize.Y
-        local y = tabList.CanvasPosition.Y
-        topFade.Visible = overflow > 1 and y > 1
-        bottomFade.Visible = overflow > 1 and y < overflow - 1
-    end
-    tabList:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshFades)
-    tabList:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(refreshFades)
-    tabList:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(refreshFades)
+    -- More tabs than fit: a fade and a small "more" chip at the hidden end.
+    self:_overflowHint(sidebar, tabList, stack, true, Theme.Surface2)
 
     if profileEnabled then
         self:_buildProfile(sidebar)
@@ -7293,7 +7263,10 @@ local function managerHost(tab, opts, name, icon)
     if tab._groupbox then
         return tab
     end
-    return tab:Groupbox({ Name = opts.Name or name, Icon = opts.Icon or icon, Side = opts.Side })
+    local host = tab:Groupbox({ Name = opts.Name or name, Icon = opts.Icon or icon, Side = opts.Side })
+    -- Library chrome, not a script feature: the feature list skips it.
+    host._manager = true
+    return host
 end
 
 function Tab:ConfigManager(opts)
@@ -8586,6 +8559,7 @@ function Tab:_setupSubTabs()
         Padding = UDim.new(0, 4),
         Parent = row,
     })
+    self.Window:_overflowHint(page, strip, row, false, Theme.Background)
     local areaTop = top + 36
     local area = create("Frame", {
         Name = "SubPages",
@@ -8852,6 +8826,7 @@ Window._searchIcons = {
     StatusList = "activity",
     Label = "type",
     Paragraph = "type",
+    OrderList = "list-ordered",
 }
 
 function Window:_searchResults(query)
@@ -10037,6 +10012,550 @@ function Window:_homeLinks(list, opts, order)
     end
 end
 
+-- Feature list: every control the script adds, grouped by tab, or a list the
+-- script writes itself. Items that match a control jump to it when picked.
+
+Window._featureKinds = {
+    Toggle = true,
+    Slider = true,
+    Dropdown = true,
+    Input = true,
+    Keybind = true,
+    ColorPicker = true,
+    Stepper = true,
+    Button = true,
+    ButtonRow = true,
+    OrderList = true,
+}
+
+function Window:_featureGroups()
+    local found, byName = {}, {}
+    for _, tab in ipairs(self.Tabs) do
+        if tab ~= self.Home and tab._userVisible ~= false then
+            local group = { Name = tab.Name, Icon = tab._iconName, Items = {} }
+            for _, page in ipairs(tab._subTabs or { tab }) do
+                local sub = page._isSubTab and page or nil
+                local function add(name, element, box, path)
+                    if type(name) ~= "string" or name == "" then
+                        return
+                    end
+                    local item = {
+                        Name = name,
+                        Kind = element._type == "ButtonRow" and "Button" or element._type,
+                        Path = path,
+                        Result = { Tab = tab, Sub = sub, Target = element, Group = box },
+                    }
+                    table.insert(group.Items, item)
+                    byName[string.lower(name)] = byName[string.lower(name)] or item
+                end
+                local function addElement(element, box, path)
+                    if element._destroyed or not self._featureKinds[element._type] or (element._isShown and not element:_isShown()) then
+                        return
+                    end
+                    if element._type == "ButtonRow" and element.Buttons then
+                        for _, button in ipairs(element.Buttons) do
+                            add(button.Label.Text, element, box, path)
+                        end
+                    else
+                        add(element._searchName, element, box, path)
+                    end
+                end
+                if not page._noSearch then
+                    for _, element in ipairs(page._items or {}) do
+                        addElement(element, nil, sub and sub.Name or nil)
+                    end
+                    for _, box in ipairs(page._groupboxes or {}) do
+                        if box._userVisible ~= false and not box._manager then
+                            for _, element in ipairs(box._items) do
+                                addElement(element, box, sub and (sub.Name .. "  ›  " .. box.Name) or box.Name)
+                            end
+                        end
+                    end
+                end
+            end
+            if #group.Items > 0 then
+                table.insert(found, group)
+            end
+        end
+    end
+    local custom = self._features
+    if type(custom) ~= "table" then
+        return found
+    end
+    -- A written list: groups of items, or bare items, which gather into one
+    -- group where the first one appears.
+    local function customItem(entry)
+        if type(entry) ~= "table" then
+            entry = { Name = entry }
+        end
+        local name = tostring(entry.Name or entry.Title or entry[1] or "")
+        local link = byName[string.lower(name)]
+        return {
+            Name = name,
+            Desc = entry.Desc or entry.Description,
+            Tag = entry.Tag,
+            Icon = entry.Icon,
+            Kind = link and link.Kind,
+            Path = link and link.Path,
+            Result = link and link.Result,
+            Callback = entry.Callback,
+        }
+    end
+    local groups, loose = {}, nil
+    for _, entry in ipairs(custom) do
+        if type(entry) == "table" and type(entry.Items) == "table" then
+            local group = { Name = tostring(entry.Name or entry.Title or "Features"), Icon = entry.Icon, Items = {} }
+            for _, item in ipairs(entry.Items) do
+                table.insert(group.Items, customItem(item))
+            end
+            table.insert(groups, group)
+        else
+            if not loose then
+                loose = { Name = self._featuresTitle or "Features", Items = {} }
+                table.insert(groups, loose)
+            end
+            table.insert(loose.Items, customItem(entry))
+        end
+    end
+    return groups
+end
+
+function Window:_featureSummary()
+    local groups = self:_featureGroups()
+    local count = 0
+    for _, group in ipairs(groups) do
+        count += #group.Items
+    end
+    local text = count .. (count == 1 and " feature" or " features")
+    if type(self._features) ~= "table" and #groups > 0 then
+        text ..= " across " .. #groups .. (#groups == 1 and " tab" or " tabs")
+    end
+    return text, groups, count
+end
+
+function Window:_homeFeatures(list, opts, order)
+    local features = opts.Features
+    if features == false then
+        return function() end
+    end
+    if type(features) == "table" then
+        self._featuresTitle = features.Title
+        self._features = features.List or (#features > 0 and features or nil)
+    end
+    local panel = panelCard(list, 64, order)
+    local iconHolder = glowIcon(panel, type(features) == "table" and features.Icon or "list-checks", Theme.Accent, UDim2.new(0, 16, 0.5, 0))
+    iconHolder.Size = UDim2.fromOffset(18, 18)
+    local button = softButton(panel, type(features) == "table" and features.Button or "View Features", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.fromOffset(0, 30),
+        AutomaticSize = Enum.AutomaticSize.X,
+    }, function()
+        self:ShowFeatures()
+    end)
+    local title = label({
+        Position = UDim2.fromOffset(46, 13),
+        Size = UDim2.new(1, -150, 0, 18),
+        Text = type(features) == "table" and features.Title or "Feature list",
+        TextSize = 14,
+        Parent = panel,
+    })
+    local text_ = label({
+        Position = UDim2.fromOffset(46, 32),
+        Size = UDim2.new(1, -150, 0, 16),
+        Text = "",
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        Parent = panel,
+    })
+    local function reserve()
+        local width = button.AbsoluteSize.X / self.Scale.Scale + 14 + 58
+        title.Size = UDim2.new(1, -width, 0, 18)
+        text_.Size = UDim2.new(1, -width, 0, 16)
+    end
+    button:GetPropertyChangedSignal("AbsoluteSize"):Connect(reserve)
+    task.defer(reserve)
+    local function refresh()
+        local desc = type(features) == "table" and features.Desc
+        text_.Text = desc or (self:_featureSummary())
+    end
+    task.defer(refresh)
+    return refresh
+end
+
+-- Opens the feature list over the window. Search filters it; picking an item
+-- linked to a control closes the list and jumps to that control.
+function Window:ShowFeatures()
+    if self._dialog then
+        self._dialog.Close()
+    end
+    local summary, groups, total = self:_featureSummary()
+    local PAD = 16
+    local ROW = TOUCH and 44 or 38
+    local body = self.Body
+
+    local overlay = create("TextButton", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 40,
+        Parent = body,
+    })
+    -- A canvas group so the whole list fades as one on open and close.
+    local card_ = create("CanvasGroup", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 10),
+        Size = UDim2.fromOffset(420, 460),
+        BackgroundColor3 = Theme.Background,
+        BorderSizePixel = 0,
+        GroupTransparency = 1,
+        Active = true,
+        Parent = overlay,
+    })
+    corner(card_, UDim.new(0, 12))
+    local cardStroke = stroke(card_, Theme.Stroke, 1)
+    local cardScale = create("UIScale", { Scale = 0.94, Parent = card_ })
+    local function fit()
+        local scale = self.Scale.Scale
+        local size = body.AbsoluteSize / scale
+        card_.Size = UDim2.fromOffset(math.min(440, size.X - 24), math.min(480, size.Y - 24))
+    end
+    fit()
+    local fitConnection = body:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+
+    local iconHolder = glowIcon(card_, "list-checks", Theme.Accent, UDim2.new(0, PAD, 0, PAD + 10))
+    iconHolder.Size = UDim2.fromOffset(18, 18)
+    label({
+        Position = UDim2.fromOffset(PAD + 28, PAD),
+        Size = UDim2.new(1, -(PAD * 2 + 28 + 36), 0, 18),
+        Text = self._featuresTitle or "Features",
+        TextSize = 15,
+        Parent = card_,
+    })
+    label({
+        Position = UDim2.fromOffset(PAD + 28, PAD + 19),
+        Size = UDim2.new(1, -(PAD * 2 + 28 + 36), 0, 14),
+        Text = summary,
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        Parent = card_,
+    })
+    local closeButton = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -(PAD - 6), 0, PAD - 6),
+        Size = TOUCH and UDim2.fromOffset(40, 40) or UDim2.fromOffset(32, 32),
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+        Parent = card_,
+    })
+    corner(closeButton, UDim.new(0, 8))
+    local closeIcon = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = closeButton,
+    })
+    applyIcon(closeIcon, "x")
+    if closeIcon.Image == "" then
+        closeIcon:Destroy()
+        label({ Size = UDim2.fromScale(1, 1), Text = "×", TextSize = 20, TextColor3 = Theme.Muted, TextXAlignment = Enum.TextXAlignment.Center, Parent = closeButton })
+    end
+    closeButton.MouseEnter:Connect(function()
+        tween(closeButton, { BackgroundTransparency = 0.5 }, 0.12)
+    end)
+    closeButton.MouseLeave:Connect(function()
+        tween(closeButton, { BackgroundTransparency = 1 }, 0.2)
+    end)
+
+    local top = PAD + 44
+    local searchHolder = create("Frame", {
+        Position = UDim2.fromOffset(PAD, top),
+        Size = UDim2.new(1, -PAD * 2, 0, TOUCH and 36 or 32),
+        BackgroundColor3 = Theme.Surface,
+        BorderSizePixel = 0,
+        Parent = card_,
+    })
+    corner(searchHolder, UDim.new(0, 7))
+    local searchStroke = stroke(searchHolder)
+    local _, searchIcon = glowIcon(searchHolder, "search", Theme.Muted, UDim2.new(0, 10, 0.5, 0))
+    searchIcon.Parent.Size = UDim2.fromOffset(14, 14)
+    local searchBox = create("TextBox", {
+        Position = UDim2.fromOffset(32, 0),
+        Size = UDim2.new(1, -40, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        PlaceholderText = "Search features",
+        PlaceholderColor3 = Theme.Muted,
+        TextColor3 = Theme.Text,
+        TextSize = 13,
+        FontFace = Fonts.Regular,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        ClearTextOnFocus = false,
+        Parent = searchHolder,
+    })
+    searchBox.Focused:Connect(function()
+        tween(searchStroke, { Color = Theme.StrokeHover }, 0.15)
+        tween(searchIcon, { ImageColor3 = Theme.Accent }, 0.15)
+    end)
+    searchBox.FocusLost:Connect(function()
+        tween(searchStroke, { Color = Theme.Stroke }, 0.2)
+        tween(searchIcon, { ImageColor3 = Theme.Muted }, 0.2)
+    end)
+    top += (TOUCH and 36 or 32) + 10
+
+    local scroller = create("ScrollingFrame", {
+        Position = UDim2.fromOffset(PAD, top),
+        Size = UDim2.new(1, -PAD * 2 + 6, 1, -(top + PAD - 4)),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = TOUCH and 4 or 3,
+        ScrollBarImageColor3 = Theme.Accent,
+        ScrollBarImageTransparency = 0.4,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        CanvasSize = UDim2.new(),
+        Parent = card_,
+    })
+    local content = create("Frame", {
+        Size = UDim2.new(1, -10, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = scroller,
+    })
+    local layout = create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = content,
+    })
+    -- Canvas sized by hand, as elsewhere, so it scrolls under UIScale.
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroller.CanvasSize = UDim2.fromOffset(0, layout.AbsoluteContentSize.Y / self.Scale.Scale + 4)
+    end)
+    local noResults = label({
+        Size = UDim2.new(1, 0, 0, 60),
+        Text = total == 0 and "No features yet" or "No matches",
+        TextSize = 13,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        LayoutOrder = 0,
+        Visible = total == 0,
+        Parent = content,
+    })
+
+    local dialog = {}
+    local closed = false
+    local stopEscape = nil
+    function dialog.Close()
+        if closed then
+            return
+        end
+        closed = true
+        if self._dialog == dialog then
+            self._dialog = nil
+        end
+        fitConnection:Disconnect()
+        if stopEscape then
+            -- Deferred: Close can run from inside the input dispatch loop.
+            task.defer(stopEscape)
+        end
+        if searchBox:IsFocused() then
+            searchBox:ReleaseFocus()
+        end
+        tween(overlay, { BackgroundTransparency = 1 }, 0.18)
+        tween(card_, { Position = UDim2.new(0.5, 0, 0.5, 8), GroupTransparency = 1 }, 0.18, Enum.EasingStyle.Quint)
+        tween(cardScale, { Scale = 0.96 }, 0.18, Enum.EasingStyle.Quint)
+        tween(cardStroke, { Transparency = 1 }, 0.12)
+        task.delay(0.2, function()
+            overlay:Destroy()
+        end)
+    end
+
+    local sections = {}
+    local order = 0
+    for _, group in ipairs(groups) do
+        order += 1
+        local header = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundTransparency = 1,
+            LayoutOrder = order,
+            Parent = content,
+        })
+        local headIcon = glowIcon(header, group.Icon or "layout-grid", Theme.Accent, UDim2.new(0, 2, 0, 18))
+        headIcon.Size = UDim2.fromOffset(14, 14)
+        label({
+            Position = UDim2.fromOffset(24, 10),
+            Size = UDim2.new(1, -70, 0, 16),
+            Text = string.upper(group.Name),
+            TextSize = 11,
+            TextColor3 = Theme.Muted,
+            Parent = header,
+        })
+        local countLabel = label({
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -4, 0, 10),
+            Size = UDim2.new(0, 40, 0, 16),
+            Text = tostring(#group.Items),
+            TextSize = 11,
+            TextColor3 = Theme.Muted,
+            TextXAlignment = Enum.TextXAlignment.Right,
+            Parent = header,
+        })
+        local section = { Header = header, Count = countLabel, Rows = {} }
+        for _, item in ipairs(group.Items) do
+            order += 1
+            local sub = item.Desc or item.Path
+            local clickable = item.Result ~= nil or type(item.Callback) == "function"
+            local row = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, sub and ROW + 4 or ROW - 4),
+                BackgroundColor3 = Theme.Surface2,
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = order,
+                Parent = content,
+            })
+            corner(row, UDim.new(0, 8))
+            local rowIcon = glowIcon(row, item.Icon or self._searchIcons[item.Kind] or "check", Theme.Muted, UDim2.new(0, 10, 0.5, 0))
+            rowIcon.Size = UDim2.fromOffset(14, 14)
+            local right = 12 + (clickable and 22 or 0)
+            local tag
+            if item.Tag then
+                tag = create("Frame", {
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Position = UDim2.new(1, -(clickable and 30 or 10), 0.5, 0),
+                    Size = UDim2.fromOffset(0, 20),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    BackgroundColor3 = Theme.Accent,
+                    BackgroundTransparency = 0.85,
+                    BorderSizePixel = 0,
+                    Parent = row,
+                })
+                corner(tag, UDim.new(0, 5))
+                padding(tag, 7, 7)
+                label({
+                    Size = UDim2.new(0, 0, 1, 0),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    Text = tostring(item.Tag),
+                    TextSize = 11,
+                    TextColor3 = Theme.Accent,
+                    TextTruncate = Enum.TextTruncate.None,
+                    Parent = tag,
+                })
+            end
+            local nameLabel = label({
+                Position = UDim2.fromOffset(34, sub and 5 or 0),
+                Size = UDim2.new(1, -(34 + right), 0, sub and 18 or ROW - 4),
+                Text = item.Name,
+                TextSize = 13,
+                Parent = row,
+            })
+            local subLabel
+            if sub then
+                subLabel = label({
+                    Position = UDim2.fromOffset(34, 23),
+                    Size = UDim2.new(1, -(34 + right), 0, 14),
+                    Text = sub,
+                    TextSize = 11,
+                    FontFace = Fonts.Regular,
+                    TextColor3 = Theme.Muted,
+                    Parent = row,
+                })
+            end
+            if tag then
+                local function reserveTag()
+                    local width = 34 + right + tag.AbsoluteSize.X / self.Scale.Scale + 8
+                    nameLabel.Size = UDim2.new(1, -width, 0, nameLabel.Size.Y.Offset)
+                    if subLabel then
+                        subLabel.Size = UDim2.new(1, -width, 0, 14)
+                    end
+                end
+                tag:GetPropertyChangedSignal("AbsoluteSize"):Connect(reserveTag)
+                task.defer(reserveTag)
+            end
+            if clickable then
+                local go = create("ImageLabel", {
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Position = UDim2.new(1, -10, 0.5, 0),
+                    Size = UDim2.fromOffset(14, 14),
+                    BackgroundTransparency = 1,
+                    ImageColor3 = Theme.Muted,
+                    ImageTransparency = 0.4,
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = row,
+                })
+                applyIcon(go, "arrow-up-right")
+            end
+            local isTap = tapGuard(row, function()
+                return scroller
+            end)
+            row.MouseEnter:Connect(function()
+                if not usingTouch() then
+                    tween(row, { BackgroundTransparency = 0.3 }, 0.12)
+                end
+            end)
+            row.MouseLeave:Connect(function()
+                tween(row, { BackgroundTransparency = 1 }, 0.2)
+            end)
+            row.MouseButton1Click:Connect(function()
+                if not clickable or not isTap() then
+                    return
+                end
+                dialog.Close()
+                if item.Result then
+                    self:_revealResult(item.Result)
+                end
+                safeCall(item.Callback)
+            end)
+            table.insert(section.Rows, { Frame = row, Key = string.lower(item.Name .. " " .. (sub or "")) })
+        end
+        table.insert(sections, section)
+    end
+
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local query = string.lower(searchBox.Text)
+        local any = false
+        for _, section in ipairs(sections) do
+            local shown = 0
+            for _, row in ipairs(section.Rows) do
+                local match = query == "" or string.find(row.Key, query, 1, true) ~= nil
+                row.Frame.Visible = match
+                if match then
+                    shown += 1
+                end
+            end
+            section.Header.Visible = shown > 0
+            section.Count.Text = tostring(shown)
+            any = any or shown > 0
+        end
+        noResults.Visible = not any
+        scroller.CanvasPosition = Vector2.zero
+    end)
+    closeButton.MouseButton1Click:Connect(dialog.Close)
+    overlay.MouseButton1Click:Connect(dialog.Close)
+    stopEscape = self:_listen("Began", function(input)
+        if input.KeyCode == Enum.KeyCode.Escape then
+            dialog.Close()
+        end
+    end)
+
+    self._dialog = dialog
+    tween(overlay, { BackgroundTransparency = 0.45 }, 0.25)
+    tween(card_, { Position = UDim2.fromScale(0.5, 0.5), GroupTransparency = 0 }, 0.3, Enum.EasingStyle.Quint)
+    tween(cardScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
+    return dialog
+end
+
 function Window:_homeStats(list, opts, order, tab)
     local show = opts.Stats or { "Players", "Friends", "Execs", "Session", "FPS", "Ping" }
     local holder = create("Frame", {
@@ -10277,6 +10796,7 @@ function Window:_buildHome(opts)
     self:_homeGame(list, 3)
     self:_homeExecutor(list, opts, 4)
     self:_homeLinks(list, opts, 5)
+    local refreshFeatures = self:_homeFeatures(list, opts, 6)
 
     if type(pages) == "table" then
         for _, page in ipairs(pages) do
@@ -10292,6 +10812,7 @@ function Window:_buildHome(opts)
             if self.Open and self.CurrentTab == tab then
                 refreshStats()
                 refreshExpiry()
+                refreshFeatures()
             else
                 resetStats()
             end
@@ -10750,6 +11271,212 @@ function Window:_placeIndicator(tab)
             tween(pill, { Size = UDim2.fromOffset(3, 20) }, 0.35, Enum.EasingStyle.Back)
         end)
     end
+end
+
+-- While a tab list or sub tab strip runs past an end, that end gets a fade
+-- and a small chip with a chevron and how many tabs are out of sight there.
+-- Pressing the chip scrolls most of a view toward them.
+function Window:_overflowHint(host, scroller, items, vertical, fadeColor)
+    local overlay = create("Frame", {
+        AnchorPoint = scroller.AnchorPoint,
+        Position = scroller.Position,
+        Size = scroller.Size,
+        BackgroundTransparency = 1,
+        ZIndex = 3,
+        Parent = host,
+    })
+    local function mirror()
+        overlay.Position = scroller.Position
+        overlay.Size = scroller.Size
+        overlay.Visible = scroller.Visible
+    end
+    for _, property in ipairs({ "Position", "Size", "Visible" }) do
+        scroller:GetPropertyChangedSignal(property):Connect(mirror)
+    end
+
+    local function axis(vector)
+        return vertical and vector.Y or vector.X
+    end
+    local function scale()
+        return self.Scale and self.Scale.Scale or 1
+    end
+    local function scrollBy(direction)
+        local view = axis(scroller.AbsoluteWindowSize) / scale()
+        local limit = math.max(axis(scroller.AbsoluteCanvasSize) / scale() - view, 0)
+        local target = math.clamp(axis(scroller.CanvasPosition) + direction * view * 0.75, 0, limit)
+        tween(scroller, { CanvasPosition = vertical and Vector2.new(0, target) or Vector2.new(target, 0) }, 0.35, Enum.EasingStyle.Quint)
+    end
+
+    local hints = {}
+    for _, direction in ipairs({ -1, 1 }) do
+        local far = direction > 0
+        local fade = create("Frame", {
+            AnchorPoint = vertical and Vector2.new(0, far and 1 or 0) or Vector2.new(far and 1 or 0, 0),
+            Position = vertical and UDim2.fromScale(0, far and 1 or 0) or UDim2.fromScale(far and 1 or 0, 0),
+            Size = vertical and UDim2.new(1, 0, 0, 34) or UDim2.new(0, 48, 1, 0),
+            BackgroundColor3 = fadeColor,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Visible = false,
+            Parent = overlay,
+        })
+        create("UIGradient", {
+            Rotation = vertical and (far and 270 or 90) or (far and 180 or 0),
+            Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(0.4, 0.2),
+                NumberSequenceKeypoint.new(1, 1),
+            }),
+            Parent = fade,
+        })
+        local home = vertical and UDim2.new(0.5, 0, far and 1 or 0, far and -5 or 5) or UDim2.new(far and 1 or 0, far and -2 or 2, 0.5, 0)
+        local chip = create("TextButton", {
+            AnchorPoint = vertical and Vector2.new(0.5, far and 1 or 0) or Vector2.new(far and 1 or 0, 0.5),
+            Position = home,
+            Size = UDim2.fromOffset(0, 20),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundColor3 = Theme.Surface3,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            Visible = false,
+            ZIndex = 2,
+            Parent = overlay,
+        })
+        corner(chip, UDim.new(1, 0))
+        local chipStroke = stroke(chip, Theme.Stroke, 1)
+        padding(chip, 7, 7)
+        create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 3),
+            Parent = chip,
+        })
+        local arrow = create("ImageLabel", {
+            Size = UDim2.fromOffset(12, 12),
+            BackgroundTransparency = 1,
+            ImageColor3 = Theme.Accent,
+            ImageTransparency = 1,
+            ScaleType = Enum.ScaleType.Fit,
+            LayoutOrder = 1,
+            ZIndex = 2,
+            Parent = chip,
+        })
+        applyIcon(arrow, vertical and (far and "chevron-down" or "chevron-up") or (far and "chevron-right" or "chevron-left"))
+        local arrowFade = "ImageTransparency"
+        if arrow.Image == "" then
+            arrow:Destroy()
+            arrow = label({
+                Size = UDim2.fromOffset(10, 20),
+                Text = "›",
+                TextSize = 16,
+                TextColor3 = Theme.Accent,
+                TextTransparency = 1,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                TextTruncate = Enum.TextTruncate.None,
+                Rotation = vertical and (far and 90 or -90) or (far and 0 or 180),
+                LayoutOrder = 1,
+                ZIndex = 2,
+                Parent = chip,
+            })
+            arrowFade = "TextTransparency"
+        end
+        local count = label({
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Text = "",
+            TextSize = 11,
+            TextColor3 = Theme.Text,
+            TextTransparency = 1,
+            TextTruncate = Enum.TextTruncate.None,
+            Visible = false,
+            LayoutOrder = 2,
+            ZIndex = 2,
+            Parent = chip,
+        })
+        chip.MouseEnter:Connect(function()
+            if not usingTouch() then
+                tween(chipStroke, { Color = Theme.StrokeHover }, 0.12)
+            end
+        end)
+        chip.MouseLeave:Connect(function()
+            tween(chipStroke, { Color = Theme.Stroke }, 0.2)
+        end)
+        chip.MouseButton1Click:Connect(function()
+            scrollBy(direction)
+        end)
+        hints[direction] = {
+            Direction = direction,
+            Fade = fade,
+            Chip = chip,
+            Stroke = chipStroke,
+            Arrow = arrow,
+            ArrowFade = arrowFade,
+            Count = count,
+            Home = home,
+            Shown = false,
+            Generation = 0,
+        }
+    end
+
+    local function show(hint, on)
+        if hint.Shown == on then
+            return
+        end
+        hint.Shown = on
+        hint.Generation += 1
+        local away = hint.Home + (vertical and UDim2.fromOffset(0, hint.Direction * 6) or UDim2.fromOffset(hint.Direction * 6, 0))
+        local value = on and 0 or 1
+        if on then
+            hint.Fade.Visible = true
+            hint.Chip.Visible = true
+            hint.Chip.Position = away
+            tween(hint.Chip, { Position = hint.Home, BackgroundTransparency = 0.08 }, 0.3, Enum.EasingStyle.Quint)
+        else
+            tween(hint.Chip, { Position = away, BackgroundTransparency = 1 }, 0.2, Enum.EasingStyle.Quint)
+            local generation = hint.Generation
+            task.delay(0.21, function()
+                if hint.Generation == generation then
+                    hint.Fade.Visible = false
+                    hint.Chip.Visible = false
+                end
+            end)
+        end
+        tween(hint.Fade, { BackgroundTransparency = value }, 0.2)
+        tween(hint.Stroke, { Transparency = value }, 0.2)
+        tween(hint.Arrow, { [hint.ArrowFade] = value }, 0.2)
+        tween(hint.Count, { TextTransparency = value }, 0.2)
+    end
+
+    local function refresh()
+        local view = axis(scroller.AbsoluteWindowSize)
+        local overflow = (axis(scroller.AbsoluteCanvasSize) - view) / scale()
+        local position = axis(scroller.CanvasPosition)
+        local start = axis(scroller.AbsolutePosition)
+        local before, after = 0, 0
+        for _, item in ipairs(items:GetChildren()) do
+            if item:IsA("GuiObject") and item.Visible and axis(item.AbsoluteSize) > 0 then
+                local centre = axis(item.AbsolutePosition) + axis(item.AbsoluteSize) / 2 - start
+                if centre < 0 then
+                    before += 1
+                elseif centre > view then
+                    after += 1
+                end
+            end
+        end
+        for direction, hint in pairs(hints) do
+            local hidden = direction < 0 and before or after
+            hint.Count.Text = tostring(hidden)
+            hint.Count.Visible = hidden > 0
+            show(hint, overflow > 1 and (direction < 0 and position > 1 or direction > 0 and position < overflow - 1))
+        end
+    end
+    for _, property in ipairs({ "CanvasPosition", "AbsoluteCanvasSize", "AbsoluteWindowSize" }) do
+        scroller:GetPropertyChangedSignal(property):Connect(refresh)
+    end
+    task.defer(refresh)
 end
 
 function Window:_scrollTabIntoView(tab)
@@ -12323,6 +13050,8 @@ local Window = Airflow:CreateWindow({
         Discord = "dsc.gg/airflowscript",
         Website = "airflowscript.com",
         Stats = { "Players", "Friends", "Execs", "Session", "FPS", "Ping" },
+        -- Feature list card: automatic by default (every control, grouped by tab). Write your own with
+        -- Features = { List = { { Name = "Combat", Items = { "Auto Parry", { Name = "Kill Aura", Tag = "New" } } } } }
     },
 })
 

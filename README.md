@@ -161,6 +161,7 @@ Home = {
     },
     HideName = false,
     HideAvatar = false,
+    Features = true, -- automatic feature list; a table writes your own, false hides it
     Pages = {
         {
             Name = "Changelog",
@@ -177,6 +178,23 @@ Home = {
 ```
 
 Stats refresh once a second and pause while the window is hidden or another tab is open. When `Pages` is set, the home tab gets sub tabs: an overview page with the cards above, then one per page.
+
+The **Feature list** card opens a searchable list of the script's features over the window. By default it's automatic: every toggle, slider, dropdown, input, keybind, colour picker, stepper, button and order list, grouped by tab, with the sub tab and groupbox under each name. Hidden elements, hidden tabs and the config and theme managers are left out. Picking a feature closes the list and jumps to it, like search does. To write the list yourself, pass `Features` a table:
+
+```lua
+Features = {
+    Title = "What's inside",
+    List = {
+        { Name = "Combat", Icon = "swords", Items = {
+            "Auto Parry", -- names that match a control jump to it
+            { Name = "Kill Aura", Desc = "Hits everything in range", Tag = "New" },
+        } },
+        { Name = "Coming soon", Icon = "clock", Items = { { Name = "Auto Raid", Tag = "Soon" } } },
+    },
+}
+```
+
+Bare items (strings or tables without `Items`) gather into one group. `Features = false` removes the card. `Window:ShowFeatures()` opens the list from anywhere.
 
 The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest Server. The executor card names the executor, says whether it is supported, and shows the hide key. The **Name** and **Profile** switches hide the player's name and headshot on the home tab and in the sidebar.
 
@@ -198,6 +216,9 @@ The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest
 | `DiscordTitle` / `WebsiteTitle` | string | `"Join the community"` / `"Supported games"` | Card titles. |
 | `Links` | table | — | More link cards: `{ Icon, Title, Text, Button, Copy, Callback }`. |
 | `HideName` / `HideAvatar` | boolean | `false` | Start with the privacy switches on. |
+| `Features` | table \| false | automatic | The feature list card. A table takes `Title`, `Desc` (card text, instead of the count), `Icon`, `Button` and `List`. |
+| `Features.List[n]` | table \| string | — | A group `{ Name, Icon, Items }`, or a bare item. |
+| `Items[n]` | string \| table | — | `{ Name, Desc, Tag, Icon, Callback }`. `Callback` runs when it's picked. |
 | `OverviewName` / `TabIcon` | string | `"Overview"` / `"layout-grid"` | The first sub tab when `Pages` is set. |
 | `Pages` | table | — | Extra sub tabs. |
 | `Pages[n].Name` / `Icon` | string | — | The sub tab button. |
@@ -222,7 +243,7 @@ local Tab = Window:CreateTab({
 local Tab = Window:CreateTab("Main", "zap")
 ```
 
-The first tab created is selected automatically. An empty tab shows its icon with `EmptyText`. Elements added straight to a tab stack as full-width cards. Groupboxes go into two columns underneath them.
+The first tab created is selected automatically. When there are more tabs than fit in the sidebar, the hidden end fades out and a small chip shows a chevron and how many tabs are past that end. Pressing it scrolls toward them; it leaves once you reach the end. An empty tab shows its icon with `EmptyText`. Elements added straight to a tab stack as full-width cards. Groupboxes go into two columns underneath them.
 
 ### Properties
 
@@ -254,7 +275,7 @@ MobFarm:CreateToggle({ Name = "Auto Farm", Callback = function(v) end })
 Farm:SelectSubTab("Boss Farm")
 ```
 
-The first sub tab is selected automatically. Once a tab has sub tabs, add elements and groupboxes to the sub tabs, not the tab. The pill row scrolls sideways when it overflows.
+The first sub tab is selected automatically. Once a tab has sub tabs, add elements and groupboxes to the sub tabs, not the tab. The pill row scrolls sideways when it overflows, with the same fade and chip as the sidebar at whichever end has more pills.
 
 ### Properties
 
