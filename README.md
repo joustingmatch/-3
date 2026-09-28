@@ -1,6 +1,6 @@
 # Airflow UI
 
-> A UI library for Roblox. Windows, tabs, sub tabs, collapsible groupboxes and thirteen elements with lucide icons and eased motion.
+> A UI library for Roblox. Windows, tabs, sub tabs, collapsible groupboxes and fourteen elements with lucide icons and eased motion.
 
 ```lua
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
@@ -809,6 +809,52 @@ Clicking the chip unfolds a popup out of it, floating over the window under the 
 | `Refresh(options, keepSelection?, skipCallback?)` | Replace the rows. A pick only counts while its option is in the list, so if the refresh changes the value (a config's saved picks becoming real options, or picks dropped), the callback runs with the new value. Saving keeps picks whose option is missing right now. |
 | `SetOpen(open)` | Show or hide the popup. |
 | `Get()` | The current selection. |
+
+---
+
+## Order List
+
+> An always-open list the player puts in order.
+
+```lua
+local Order = Tab:CreateOrderList({
+    Name = "Boss Order",
+    Desc = "Top boss is farmed first",
+    Items = { "Rui", "Akaza", "Doma", "Kokushibo" },
+    MaxRows = 6,
+    Flag = "BossOrder",
+    Callback = function(Order)
+        print("First:", Order[1])
+    end,
+})
+
+Order:Set({ "Doma", "Rui" }) -- Doma, Rui, then the rest in their current order
+```
+
+There's nothing to click open: the rows sit in the element. Drag a row to move it, and the others slide out of its way. On PC the whole row drags; on touch only the grip on the left does, so a swipe across the rows still scrolls. The up and down arrows on each row move it one place. Past `MaxRows` the list scrolls inside itself, and holding a dragged row near its top or bottom edge scrolls it along. The page behind stays put while a row is held. The callback runs once per drop or arrow press, not while dragging.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | The label above the list. |
+| `Desc` | string | — | Hint text under the label. |
+| `Items` | table | `{}` | The rows, in their starting order. |
+| `MaxRows` | number | `6` | Rows visible before the list scrolls. |
+| `Numbered` | boolean | `true` | Show each row's position. |
+| `Arrows` | boolean | `true` | Show the up and down buttons. |
+| `EmptyText` | string | `"Nothing to order"` | Shown when there are no items. |
+| `Flag` | string | — | The save key. Saves the order. |
+| `Callback` | function | — | Runs with the new order on every change. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `.Value` | The current order. |
+| `Set(order, skipCallback?)` | Reorder the items to match `order`. Items it leaves out keep their order after the ones it names. Names not in the list are remembered and applied when `Refresh` brings them in, so a saved order survives a list that fills in later. |
+| `Refresh(items, keepOrder?, skipCallback?)` | Replace the items. Items that were already there keep the player's order and new ones go to the end. Pass `keepOrder` as `false` to take `items` as given. |
+| `Get()` | The current order, a list. |
 
 ---
 
