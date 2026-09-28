@@ -10380,6 +10380,9 @@ function Window:_buildMiniBar()
     if self.MiniBar then
         return self.MiniBar
     end
+    if TOUCH then
+        return self:_buildMiniPill()
+    end
     local gui = self.Gui
     local function fitWidth(width)
         local room = math.max(gui.AbsoluteSize.X - 16, Mini.MinWidth)
@@ -10888,6 +10891,165 @@ function Window:_buildMiniBar()
     return bar
 end
 
+-- On touch screens the box would sit over the game, so minimizing folds into
+-- a small pill instead: the logo and how many toggles are on. Tap restores,
+-- drag moves it. It starts at the top centre of the screen.
+function Window:_buildMiniPill()
+    local gui = self.Gui
+    local bar = create("CanvasGroup", {
+        Size = UDim2.fromOffset(0, 40),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = Theme.Background,
+        BackgroundTransparency = 0.08,
+        BorderSizePixel = 0,
+        GroupTransparency = 1,
+        Visible = false,
+        ZIndex = 30,
+        Parent = gui,
+    })
+    corner(bar, UDim.new(1, 0))
+    stroke(bar, Theme.Stroke)
+    padding(bar, 10, 12)
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+        Parent = bar,
+    })
+    local logo = create("ImageLabel", {
+        Size = UDim2.fromOffset(20, 20),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Accent,
+        ScaleType = Enum.ScaleType.Fit,
+        LayoutOrder = 1,
+        Parent = bar,
+    })
+    applyIcon(logo, self._logoIcon, true)
+    local active = create("Frame", {
+        Size = UDim2.fromOffset(0, 20),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+        LayoutOrder = 2,
+        Visible = false,
+        Parent = bar,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5),
+        Parent = active,
+    })
+    local activeDot = create("Frame", {
+        Size = UDim2.fromOffset(6, 6),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        LayoutOrder = 1,
+        Parent = active,
+    })
+    corner(activeDot, UDim.new(1, 0))
+    TweenService:Create(activeDot, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        BackgroundTransparency = 0.7,
+    }):Play()
+    local activeLabel = label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        TextSize = 12,
+        TextColor3 = Theme.Accent,
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 2,
+        Parent = active,
+    })
+
+    local hit = create("TextButton", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 5,
+        Parent = bar,
+    })
+    local barScale = create("UIScale", { Parent = bar })
+    self._miniScale = barScale
+    self._miniUnhover = function()
+        barScale.Scale = 1
+    end
+
+    local dragging, moved = false, false
+    local grab, pressedAt = Vector2.zero, Vector2.zero
+    hit.InputBegan:Connect(function(input)
+        if isPress(input) then
+            dragging = true
+            moved = false
+            pressedAt = pointerPosition()
+            grab = pressedAt - bar.AbsolutePosition
+            tween(barScale, { Scale = 0.94 }, 0.12, Enum.EasingStyle.Quad)
+        end
+    end)
+    table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
+        if not dragging or not isMove(input) then
+            return
+        end
+        if not self.Minimized then
+            dragging = false
+            return
+        end
+        -- Fingers wobble: only a real drag moves it, a tap still restores.
+        if not moved and (pointerPosition() - pressedAt).Magnitude > 10 then
+            moved = true
+            tween(barScale, { Scale = 1 }, 0.2, Enum.EasingStyle.Quint)
+        end
+        if moved then
+            local point = pointerPosition() - grab - gui.AbsolutePosition
+            bar.Position = UDim2.fromOffset(
+                math.clamp(point.X, 0, math.max(gui.AbsoluteSize.X - bar.AbsoluteSize.X, 0)),
+                math.clamp(point.Y, 0, math.max(gui.AbsoluteSize.Y - bar.AbsoluteSize.Y, 0))
+            )
+        end
+    end))
+    table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
+        if dragging and isPress(input) then
+            dragging = false
+            tween(barScale, { Scale = 1 }, 0.2, Enum.EasingStyle.Quint)
+            if moved then
+                self._miniPosition = bar.AbsolutePosition - gui.AbsolutePosition
+            elseif self.Minimized then
+                self:Restore()
+            end
+        end
+    end))
+
+    function self:_refreshMini()
+        local running = 0
+        for _, element in pairs(Library.Flags) do
+            if element._type == "Toggle" and element.Value == true then
+                running += 1
+            end
+        end
+        active.Visible = running > 0
+        activeLabel.Text = tostring(running)
+    end
+
+    table.insert(self._connections, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if not bar.Visible then
+            return
+        end
+        local position = bar.AbsolutePosition - gui.AbsolutePosition
+        local clamped = Vector2.new(
+            math.clamp(position.X, 8, math.max(gui.AbsoluteSize.X - bar.AbsoluteSize.X - 8, 8)),
+            math.clamp(position.Y, 8, math.max(gui.AbsoluteSize.Y - bar.AbsoluteSize.Y - 8, 8))
+        )
+        if clamped ~= position then
+            bar.Position = UDim2.fromOffset(clamped.X, clamped.Y)
+            self._miniPosition = clamped
+        end
+    end))
+
+    self.MiniBar = bar
+    return bar
+end
+
 function Window:Minimize()
     if self.Minimized or not self._introDone or not self.Open or self._destroyed then
         return
@@ -10936,13 +11098,15 @@ function Window:Minimize()
         self.Root.Visible = false
         self.Scale.Scale = self._fitScale or 1
         local size = bar.AbsoluteSize
-        local target = self._miniPosition or fromPosition
+        local target = self._miniPosition
+            or (TOUCH and Vector2.new((gui.AbsoluteSize.X - size.X) / 2, 8))
+            or fromPosition
         target = Vector2.new(
             math.clamp(target.X, 8, math.max(gui.AbsoluteSize.X - size.X - 8, 8)),
             math.clamp(target.Y, 8, math.max(gui.AbsoluteSize.Y - size.Y - 8, 8))
         )
         bar.Position = UDim2.fromOffset(target.X, target.Y)
-        morphGhost(ghost, ghostCorner, target, size, 12, 0.36)
+        morphGhost(ghost, ghostCorner, target, size, TOUCH and math.floor(size.Y / 2) or 12, 0.36)
         task.delay(0.3, function()
             if self._minimizeGeneration ~= generation or self._destroyed then
                 return
@@ -11003,7 +11167,7 @@ function Window:Restore()
         end)
     end
 
-    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, 12)
+    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, TOUCH and math.floor(fromSize.Y / 2) or 12)
     ghost.BackgroundTransparency = fromAlpha
     ghostStroke.Transparency = fromAlpha
     tween(ghost, { BackgroundTransparency = 0 }, 0.1, Enum.EasingStyle.Quad)
