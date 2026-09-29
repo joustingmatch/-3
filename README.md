@@ -111,6 +111,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Disclaimer.AcceptText` / `DeclineText` | string | `"I understand"` / `"Exit"` | Button labels. `DeclineText = false` drops Exit so the card can only be acknowledged. |
 | `Disclaimer.Remember` | boolean | `true` | Offers a **Don't show again** tick box (when the executor can write files). Ticked, the disclaimer's `Id` is saved to `disclaimers.txt` in the `ConfigurationSaving` folder and it is skipped next time. `false` shows it on every run. |
 | `Disclaimer.RememberText` | string | `"Don't show again"` | Tick box label. |
+| `Disclaimer.Block` | boolean | `false` | `true` leaves only **Exit** (no accept button, no tick box), for a hard stop such as a missing requirement. It is never remembered. |
 | `Disclaimer.Id` | string | hash of title and text | Key saved by the tick box. Without it, rewording the disclaimer shows it again; set an `Id` (and bump it) to control that yourself. |
 | `Disclaimer.Callback` | function | — | Called with `true` on accept or `false` on Exit. |
 | `ConfigurationSaving` | table | — | See [Configs](#configs). |

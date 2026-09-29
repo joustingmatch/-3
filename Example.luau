@@ -4574,7 +4574,8 @@ function Library.Window(_, opts)
             if type(entry) == "table" then
                 local key = UnsupportedSkip.DisclaimerKey(entry)
                 local folder = self.ConfigFolder
-                local rememberable = entry.Remember ~= false
+                local block = entry.Block == true
+                local rememberable = entry.Remember ~= false and not block
                 if not (rememberable and UnsupportedSkip.DisclaimerAccepted(folder, key)) then
                     local callback = entry.Callback
                     table.insert(prompts, {
@@ -4590,6 +4591,7 @@ function Library.Window(_, opts)
                             UnsupportedSkip.AcceptDisclaimer(folder, key)
                         end,
                         Callback = type(callback) == "function" and callback or nil,
+                        Block = block,
                     })
                 end
             end
