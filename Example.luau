@@ -5412,20 +5412,33 @@ function Window:_showLoader(opts)
             end)
         end
 
-        -- The card grows to fit the message, then it fades in.
-        task.delay(0.15, function()
-            if not loader.Parent then
-                return
-            end
+        -- The card grows to fit the message, then it fades in. The wrapped
+        -- height can land a few frames late (font loading, the scroller's
+        -- layout), so the card refits whenever it changes.
+        local laidOut = false
+        local function fit(duration)
             local textHeight = math.max(body.TextBounds.Y, 16)
             local bodyHeight = math.min(textHeight, MAX_BODY)
+            body.Size = UDim2.new(1, -8, 0, textHeight)
             scroller.Size = UDim2.new(1, -PAD * 2, 0, bodyHeight)
             scroller.CanvasSize = UDim2.fromOffset(0, textHeight)
             local height = PAD + 60 + bodyHeight + 18 + 34 + PAD - 4
             if rememberRow then
                 height += rememberRow.Size.Y.Offset + 10
             end
-            tween(loader, { Size = UDim2.fromOffset(WIDTH, height) }, 0.35, Enum.EasingStyle.Quint)
+            tween(loader, { Size = UDim2.fromOffset(WIDTH, height) }, duration, Enum.EasingStyle.Quint)
+        end
+        body:GetPropertyChangedSignal("TextBounds"):Connect(function()
+            if laidOut and loader.Parent and warnCard.Parent then
+                fit(0.2)
+            end
+        end)
+        task.delay(0.15, function()
+            if not loader.Parent then
+                return
+            end
+            laidOut = true
+            fit(0.35)
             task.delay(0.12, function()
                 tween(warnCard, { GroupTransparency = 0 }, 0.3)
                 badge.Size = UDim2.fromOffset(34, 34)
