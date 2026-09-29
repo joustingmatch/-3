@@ -7626,6 +7626,7 @@ function Tab:ThemeManager(opts)
     local window = self.Window
     local manager = {}
     local themes, status, defaultRow, presets
+    local weather, weatherMode, dim, transparent, dragSkeleton
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
@@ -7660,9 +7661,9 @@ function Tab:ThemeManager(opts)
             end
         end,
     })
+    local labels = { None = "None", Snow = "Snow", Rain = "Rain", Ember = "Hell Fire" }
     if window._backdrop and opts.Weather ~= false then
-        local labels = { None = "None", Snow = "Snow", Rain = "Rain", Ember = "Hell Fire" }
-        host:Dropdown({
+        weather = host:Dropdown({
             Name = "Weather",
             Options = { "Snow", "Rain", "Hell Fire", "None" },
             Default = labels[window.Weather] or "None",
@@ -7675,7 +7676,7 @@ function Tab:ThemeManager(opts)
         })
     end
     if window._backdrop and opts.Weather ~= false then
-        host:Dropdown({
+        weatherMode = host:Dropdown({
             Name = "Weather Mode",
             Options = { "Screen", "UI" },
             Default = window.WeatherMode,
@@ -7688,7 +7689,7 @@ function Tab:ThemeManager(opts)
         })
     end
     if window._backdrop and opts.Dim ~= false then
-        host:Toggle({
+        dim = host:Toggle({
             Name = "Dim",
             Default = window._backdropDim,
             Callback = function(value)
@@ -7697,7 +7698,7 @@ function Tab:ThemeManager(opts)
         })
     end
     if opts.Transparent ~= false then
-        host:Toggle({
+        transparent = host:Toggle({
             Name = "Transparent",
             Default = window.Transparent == true,
             Callback = function(value)
@@ -7706,7 +7707,7 @@ function Tab:ThemeManager(opts)
         })
     end
     if opts.DragSkeleton ~= false then
-        host:Toggle({
+        dragSkeleton = host:Toggle({
             Name = "Drag Skeleton",
             Default = window.DragSkeleton,
             Callback = function(value)
@@ -7853,6 +7854,75 @@ function Tab:ThemeManager(opts)
                 end
             end)
         end
+    end
+
+    -- One hidden flag carries the palette and the look settings above, so
+    -- configs save and load the theme. Not a flag per toggle: flagged toggles
+    -- would count as running features on the minimized orb.
+    if opts.Flag ~= false then
+        local flag = type(opts.Flag) == "string" and opts.Flag or "__Theme"
+        local look = { _type = "Theme", _searchName = "Theme", _searchKey = "theme", _listeners = {} }
+
+        function look:Get()
+            local colors = {}
+            for _, key in ipairs(THEME_KEYS) do
+                colors[key] = colorToHex(Theme[key])
+            end
+            return {
+                Name = presets:Get() or themes:Get(),
+                Colors = colors,
+                Weather = weather and window.Weather or nil,
+                WeatherMode = weatherMode and window.WeatherMode or nil,
+                Dim = dim and window._backdropDim or nil,
+                Transparent = transparent and window.Transparent == true or nil,
+                DragSkeleton = dragSkeleton and window.DragSkeleton or nil,
+            }
+        end
+
+        function look:Set(value)
+            if type(value) ~= "table" then
+                return
+            end
+            if type(value.Colors) == "table" then
+                Library:SetTheme(value.Colors)
+            end
+            local name = type(value.Name) == "string" and value.Name or nil
+            if name and Library.ThemePresets[name] then
+                Library.ThemeName = name
+                presets:Set(name, true)
+                themes:Set(nil, true)
+            else
+                if name then
+                    Library.ThemeName = name
+                end
+                presets:Set(nil, true)
+                themes:Set(name and table.find(window:ListThemes(), name) and name or nil, true)
+            end
+            if weather and type(value.Weather) == "string" then
+                window:SetWeather(value.Weather)
+                weather:Set(labels[window.Weather] or "None", true)
+            end
+            if weatherMode and type(value.WeatherMode) == "string" then
+                window:SetWeatherMode(value.WeatherMode)
+                weatherMode:Set(window.WeatherMode, true)
+            end
+            if dim and type(value.Dim) == "boolean" then
+                window:SetDim(value.Dim)
+                dim:Set(value.Dim, true)
+            end
+            if transparent and type(value.Transparent) == "boolean" then
+                window:SetTransparent(value.Transparent)
+                transparent:Set(value.Transparent, true)
+            end
+            if dragSkeleton and type(value.DragSkeleton) == "boolean" then
+                window:SetDragSkeleton(value.DragSkeleton)
+                dragSkeleton:Set(value.DragSkeleton, true)
+            end
+            refreshStatus()
+        end
+
+        Library.Flags[flag] = look
+        window:_flagCreated(flag, look)
     end
 
     -- A reset wipes the themes folder, so drop the stale list.
@@ -14282,6 +14352,8 @@ function Window:CloudConfigs(opts)
         elseif type(value) == "table" then
             if type(value.Hex) == "string" then
                 return "#" .. string.upper(value.Hex)
+            elseif type(value.Colors) == "table" then
+                return type(value.Name) == "string" and value.Name or "Custom"
             end
             local parts = {}
             for index, item in ipairs(value) do

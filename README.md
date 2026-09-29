@@ -1527,6 +1527,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
