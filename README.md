@@ -37,6 +37,11 @@ local Window = Airflow:CreateWindow({
         Steps = { "Preparing interface", "Loading icons", "Almost there" },
         Duration = 1.6,
     },
+    Disclaimer = {
+        Title = "Before you start",
+        Text = "Use at your own risk. We are not responsible for bans.",
+        Id = "risk-v1",
+    },
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "MyHub",
@@ -99,6 +104,15 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Loading.Text` | string | `LoadingSubtitle` | First status line. |
 | `Loading.Steps` | table | 3 built-in lines | Status lines cycled over the duration. |
 | `Loading.Duration` | number | `1.6` | Seconds before the window appears. |
+| `Disclaimer` | string \| table | — | Custom notice shown on the loading card after the executor warning, before the window opens; the player must press **I understand** to continue or **Exit** to close the script. Shown even with `Loading = false`. A string is just the text; a list of them shows one card after another. See the fields below. `Disclaimers` works too. |
+| `Disclaimer.Title` / `Text` | string | `"Disclaimer"` / — | Heading and body. Long text scrolls inside the card. |
+| `Disclaimer.Subtitle` | string | — | Small coloured line under the title. |
+| `Disclaimer.Icon` / `Color` | string / Color3 | `"info"` / accent | Badge icon (any Lucide name or asset id) and its tint, e.g. `Color3.fromRGB(240, 176, 108)` for a warning look. |
+| `Disclaimer.AcceptText` / `DeclineText` | string | `"I understand"` / `"Exit"` | Button labels. `DeclineText = false` drops Exit so the card can only be acknowledged. |
+| `Disclaimer.Remember` | boolean | `true` | Offers a **Don't show again** tick box (when the executor can write files). Ticked, the disclaimer's `Id` is saved to `disclaimers.txt` in the `ConfigurationSaving` folder and it is skipped next time. `false` shows it on every run. |
+| `Disclaimer.RememberText` | string | `"Don't show again"` | Tick box label. |
+| `Disclaimer.Id` | string | hash of title and text | Key saved by the tick box. Without it, rewording the disclaimer shows it again; set an `Id` (and bump it) to control that yourself. |
+| `Disclaimer.Callback` | function | — | Called with `true` on accept or `false` on Exit. |
 | `ConfigurationSaving` | table | — | See [Configs](#configs). |
 | `Home` | boolean \| table | `{}` | The built-in first tab. `false` removes it. See [Home](#home). |
 | `Theme` / `DefaultTheme` | string \| table | — | Starting theme, same as `Airflow:SetDefaultTheme`. A default the player saved in the theme manager wins. See [Theme](#theme). |

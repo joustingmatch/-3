@@ -3973,22 +3973,75 @@ function UnsupportedSkip.Saved(folder, executor)
     return ok and saved == executor
 end
 
-function UnsupportedSkip.Save(folder, executor)
+function UnsupportedSkip.Write(folder, path, content)
     if not UnsupportedSkip.Available() then
         return false
     end
     return pcall(function()
         if type(isfolder) == "function" and type(makefolder) == "function" then
-            local path = ""
+            local built = ""
             for segment in tostring(folder):gmatch("[^/\\]+") do
-                path = path == "" and segment or path .. "/" .. segment
-                if not isfolder(path) then
-                    makefolder(path)
+                built = built == "" and segment or built .. "/" .. segment
+                if not isfolder(built) then
+                    makefolder(built)
                 end
             end
         end
-        writefile(UnsupportedSkip.Path(folder), executor)
+        writefile(path, content)
     end)
+end
+
+function UnsupportedSkip.Save(folder, executor)
+    return UnsupportedSkip.Write(folder, UnsupportedSkip.Path(folder), executor)
+end
+
+-- Custom disclaimers ticked "Don't show again": one key per line in
+-- disclaimers.txt. The key is the disclaimer's Id, or a hash of its title
+-- and text, so rewording a disclaimer shows it again.
+function UnsupportedSkip.DisclaimerKey(entry)
+    if entry.Id ~= nil then
+        return (tostring(entry.Id):gsub("[\r\n]", " "))
+    end
+    local source = tostring(entry.Title) .. "\0" .. tostring(entry.Text)
+    local hash = 5381
+    for index = 1, #source do
+        hash = (hash * 33 + source:byte(index)) % 4294967296
+    end
+    return string.format("%08x", hash)
+end
+
+function UnsupportedSkip.DisclaimerAccepted(folder, key)
+    if not UnsupportedSkip.Available() then
+        return false
+    end
+    local path = tostring(folder) .. "/disclaimers.txt"
+    local ok, saved = pcall(function()
+        return isfile(path) and readfile(path) or ""
+    end)
+    if not ok or type(saved) ~= "string" then
+        return false
+    end
+    for line in saved:gmatch("[^\r\n]+") do
+        if line == key then
+            return true
+        end
+    end
+    return false
+end
+
+function UnsupportedSkip.AcceptDisclaimer(folder, key)
+    if UnsupportedSkip.DisclaimerAccepted(folder, key) then
+        return true
+    end
+    local path = tostring(folder) .. "/disclaimers.txt"
+    local ok, saved = pcall(function()
+        return isfile(path) and readfile(path) or ""
+    end)
+    saved = ok and type(saved) == "string" and saved or ""
+    if saved ~= "" and not saved:match("\n$") then
+        saved ..= "\n"
+    end
+    return UnsupportedSkip.Write(folder, path, saved .. key .. "\n")
 end
 
 local gameInfoCache = nil
@@ -4482,21 +4535,70 @@ function Library.Window(_, opts)
     end
     -- An executor off the supported list (or missing the file / asset API)
     -- stops at a warning card before the window opens.
+    local prompts = {}
     local gate = opts.UnsupportedExecutor
     if gate ~= false then
         gate = type(gate) == "table" and gate or {}
         local list = opts.SupportedExecutors or (type(opts.Home) == "table" and opts.Home.SupportedExecutors or nil)
         local executor, supported, message = executorReport({ SupportedExecutors = list })
         if not supported and not UnsupportedSkip.Saved(self.ConfigFolder, executor) then
-            opts._unsupported = {
-                Executor = executor,
+            local block = gate.Block == true
+            local folder = self.ConfigFolder
+            table.insert(prompts, {
                 Title = gate.Title or "Unsupported executor",
-                Text = gate.Text or message,
-                Block = gate.Block == true,
-            }
+                Subtitle = executor,
+                Text = block and ((gate.Text or message) .. " This script can't run here.") or (gate.Text or message),
+                Icon = "shield-alert",
+                Color = Theme.Warning,
+                ContinueText = "Continue anyway",
+                ExitText = "Exit",
+                Block = block,
+                RememberText = "Don't ask again on this executor",
+                Remember = function()
+                    UnsupportedSkip.Save(folder, executor)
+                end,
+            })
         end
     end
-    if loading == false and opts._unsupported then
+    -- Custom disclaimers queue up after the executor warning, in order. Each
+    -- one must be accepted (or skipped by an earlier "Don't show again").
+    local disclaimers = opts.Disclaimer or opts.Disclaimers
+    if type(disclaimers) == "string" or (type(disclaimers) == "table" and (disclaimers.Title ~= nil or disclaimers.Text ~= nil)) then
+        disclaimers = { disclaimers }
+    end
+    if type(disclaimers) == "table" then
+        for _, entry in ipairs(disclaimers) do
+            if type(entry) == "string" then
+                entry = { Text = entry }
+            end
+            if type(entry) == "table" then
+                local key = UnsupportedSkip.DisclaimerKey(entry)
+                local folder = self.ConfigFolder
+                local rememberable = entry.Remember ~= false
+                if not (rememberable and UnsupportedSkip.DisclaimerAccepted(folder, key)) then
+                    local callback = entry.Callback
+                    table.insert(prompts, {
+                        Title = entry.Title or "Disclaimer",
+                        Subtitle = entry.Subtitle,
+                        Text = entry.Text or "",
+                        Icon = entry.Icon or "info",
+                        Color = entry.Color or Theme.Accent,
+                        ContinueText = entry.AcceptText or "I understand",
+                        ExitText = entry.DeclineText == nil and "Exit" or entry.DeclineText,
+                        RememberText = rememberable and (entry.RememberText or "Don't show again") or nil,
+                        Remember = function()
+                            UnsupportedSkip.AcceptDisclaimer(folder, key)
+                        end,
+                        Callback = type(callback) == "function" and callback or nil,
+                    })
+                end
+            end
+        end
+    end
+    if #prompts > 0 then
+        opts._prompts = prompts
+    end
+    if loading == false and opts._prompts then
         opts.LoadingDuration = opts.LoadingDuration or 0.5
         loading = true
     end
@@ -5064,9 +5166,10 @@ function Window:_showLoader(opts)
         end)
     end
 
-    -- Unsupported executor: the bar gives way to a warning card with
-    -- Continue (unless blocked) and Exit.
-    local function warnUnsupported(info)
+    -- Prompt cards (unsupported executor, custom disclaimers): the bar gives
+    -- way to one card at a time, each with Exit and Continue, before the
+    -- window opens.
+    local function hideBar()
         sweep:Cancel()
         float:Cancel()
         tween(titleLabel, { TextTransparency = 1 }, 0.15)
@@ -5076,10 +5179,17 @@ function Window:_showLoader(opts)
         tween(track, { BackgroundTransparency = 1 }, 0.15)
         tween(fill, { BackgroundTransparency = 1 }, 0.15)
         tween(sheen, { BackgroundTransparency = 1 }, 0.1)
+    end
 
-        local WIDTH, PAD = 360, 24
+    local function showCard(info, onContinue)
+        local WIDTH, PAD, MAX_BODY = 360, 24, 220
+        local tone = info.Color or Theme.Accent
+        -- Fixed width from the start, so the body wraps at its final width
+        -- while the loader is still resizing.
         local warnCard = create("CanvasGroup", {
-            Size = UDim2.fromScale(1, 1),
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.fromScale(0.5, 0),
+            Size = UDim2.new(0, WIDTH, 1, 0),
             BackgroundTransparency = 1,
             GroupTransparency = 1,
             ZIndex = 5,
@@ -5088,50 +5198,64 @@ function Window:_showLoader(opts)
         local badge = create("Frame", {
             Position = UDim2.fromOffset(PAD, PAD),
             Size = UDim2.fromOffset(44, 44),
-            BackgroundColor3 = Theme.Warning,
+            BackgroundColor3 = tone,
             BackgroundTransparency = 0.86,
             BorderSizePixel = 0,
             Parent = warnCard,
         })
         corner(badge, UDim.new(0, 12))
-        stroke(badge, Theme.Warning, 1).Transparency = 0.6
+        stroke(badge, tone, 1).Transparency = 0.6
         local badgeIcon = create("ImageLabel", {
             AnchorPoint = Vector2.new(0.5, 0.5),
             Position = UDim2.fromScale(0.5, 0.5),
             Size = UDim2.fromOffset(22, 22),
             BackgroundTransparency = 1,
-            ImageColor3 = Theme.Warning,
+            ImageColor3 = tone,
             ScaleType = Enum.ScaleType.Fit,
             Parent = badge,
         })
-        applyIcon(badgeIcon, "shield-alert")
+        applyIcon(badgeIcon, info.Icon or "info")
         label({
-            Position = UDim2.fromOffset(PAD + 58, PAD + 3),
+            Position = UDim2.fromOffset(PAD + 58, info.Subtitle and PAD + 3 or PAD + 12),
             Size = UDim2.new(1, -(PAD * 2 + 58), 0, 20),
             Text = info.Title,
             TextSize = 17,
             Parent = warnCard,
         })
-        label({
-            Position = UDim2.fromOffset(PAD + 58, PAD + 25),
-            Size = UDim2.new(1, -(PAD * 2 + 58), 0, 16),
-            Text = info.Executor,
-            TextSize = 13,
-            TextColor3 = Theme.Warning,
+        if info.Subtitle then
+            label({
+                Position = UDim2.fromOffset(PAD + 58, PAD + 25),
+                Size = UDim2.new(1, -(PAD * 2 + 58), 0, 16),
+                Text = tostring(info.Subtitle),
+                TextSize = 13,
+                TextColor3 = tone,
+                Parent = warnCard,
+            })
+        end
+        -- Long text scrolls past MAX_BODY instead of pushing the card off screen.
+        local scroller = create("ScrollingFrame", {
+            Position = UDim2.fromOffset(PAD, PAD + 60),
+            Size = UDim2.new(1, -PAD * 2, 0, 16),
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            ScrollBarThickness = TOUCH and 4 or 3,
+            ScrollBarImageColor3 = Theme.Accent,
+            ScrollBarImageTransparency = 0.4,
+            ScrollingDirection = Enum.ScrollingDirection.Y,
+            CanvasSize = UDim2.new(),
             Parent = warnCard,
         })
         local body = label({
-            Position = UDim2.fromOffset(PAD, PAD + 60),
-            Size = UDim2.new(1, -PAD * 2, 0, 0),
+            Size = UDim2.new(1, -8, 0, 0),
             AutomaticSize = Enum.AutomaticSize.Y,
-            Text = info.Block and (info.Text .. " This script can't run here.") or info.Text,
+            Text = tostring(info.Text),
             TextSize = 13,
             FontFace = Fonts.Regular,
             TextColor3 = Theme.Muted,
             TextWrapped = true,
             TextTruncate = Enum.TextTruncate.None,
             TextYAlignment = Enum.TextYAlignment.Top,
-            Parent = warnCard,
+            Parent = scroller,
         })
         local row = create("Frame", {
             AnchorPoint = Vector2.new(0, 1),
@@ -5152,7 +5276,7 @@ function Window:_showLoader(opts)
         -- can write the file that remembers it.
         local remember = false
         local rememberRow = nil
-        if not info.Block and UnsupportedSkip.Available() then
+        if not info.Block and info.RememberText and UnsupportedSkip.Available() then
             local boxSize = TOUCH and 20 or 16
             rememberRow = create("TextButton", {
                 AnchorPoint = Vector2.new(0, 1),
@@ -5187,7 +5311,7 @@ function Window:_showLoader(opts)
             local rememberLabel = label({
                 Position = UDim2.fromOffset(boxSize + 8, 0),
                 Size = UDim2.new(1, -(boxSize + 8), 1, 0),
-                Text = "Don't ask again on this executor",
+                Text = info.RememberText,
                 TextSize = 12,
                 FontFace = Fonts.Regular,
                 TextColor3 = Theme.Muted,
@@ -5260,29 +5384,44 @@ function Window:_showLoader(opts)
                 callback()
             end)
         end
-        button("Exit", info.Block, 1, function()
-            tween(loader, { GroupTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, 12) }, 0.25, Enum.EasingStyle.Quint)
-            tween(loaderShadow, { ImageTransparency = 1 }, 0.2)
-            task.delay(0.25, function()
-                self:Destroy()
+        if info.ExitText ~= false then
+            button(info.ExitText or "Exit", info.Block, 1, function()
+                if info.Callback then
+                    task.spawn(info.Callback, false)
+                end
+                tween(loader, { GroupTransparency = 1, Position = UDim2.new(0.5, 0, 0.5, 12) }, 0.25, Enum.EasingStyle.Quint)
+                tween(loaderShadow, { ImageTransparency = 1 }, 0.2)
+                task.delay(0.25, function()
+                    self:Destroy()
+                end)
             end)
-        end)
+        end
         if not info.Block then
-            button("Continue anyway", true, 2, function()
-                if remember then
-                    UnsupportedSkip.Save(self.ConfigFolder, info.Executor)
+            button(info.ContinueText or "Continue", true, 2, function()
+                if remember and info.Remember then
+                    info.Remember()
+                end
+                if info.Callback then
+                    task.spawn(info.Callback, true)
                 end
                 tween(warnCard, { GroupTransparency = 1 }, 0.15)
-                task.delay(0.15, finish)
+                task.delay(0.15, function()
+                    warnCard:Destroy()
+                    onContinue()
+                end)
             end)
         end
 
-        -- The card grows to fit the message, then the warning fades in.
+        -- The card grows to fit the message, then it fades in.
         task.delay(0.15, function()
             if not loader.Parent then
                 return
             end
-            local height = PAD + 60 + math.max(body.TextBounds.Y, 16) + 18 + 34 + PAD - 4
+            local textHeight = math.max(body.TextBounds.Y, 16)
+            local bodyHeight = math.min(textHeight, MAX_BODY)
+            scroller.Size = UDim2.new(1, -PAD * 2, 0, bodyHeight)
+            scroller.CanvasSize = UDim2.fromOffset(0, textHeight)
+            local height = PAD + 60 + bodyHeight + 18 + 34 + PAD - 4
             if rememberRow then
                 height += rememberRow.Size.Y.Offset + 10
             end
@@ -5296,14 +5435,29 @@ function Window:_showLoader(opts)
         end)
     end
 
+    local function runPrompts(queue, index)
+        if not loader.Parent then
+            return
+        end
+        local info = queue[index]
+        if not info then
+            finish()
+            return
+        end
+        showCard(info, function()
+            runPrompts(queue, index + 1)
+        end)
+    end
+
     task.delay(duration, function()
         tween(fill, { Size = UDim2.fromScale(1, 1) }, 0.25, Enum.EasingStyle.Quint)
         task.delay(0.25, function()
             if not loader.Parent then
                 return
             end
-            if opts._unsupported then
-                warnUnsupported(opts._unsupported)
+            if opts._prompts then
+                hideBar()
+                runPrompts(opts._prompts, 1)
             else
                 finish()
             end
@@ -15631,6 +15785,7 @@ local Window = Airflow:CreateWindow({
     ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample", FileName = "default" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
     Backdrop = { Weather = "Snow", Tint = 0.45 }, -- black tint + weather behind the open window: "Rain", "Snow", "Hell Fire" or "None". false turns it off
+    -- Disclaimer = { Title = "Before you start", Text = "Use at your own risk.", Id = "risk-v1" }, -- card the player accepts before the window opens. A list shows several in a row
     Home = {
         Tier = "Free",
         Expiry = os.time() + 12 * 3600, -- countdown under the tier badge. A string or a function also works
