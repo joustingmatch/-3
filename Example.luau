@@ -4166,6 +4166,20 @@ function Library.Window(_, opts)
     corner(body, UDim.new(0, 10))
     self.BodyStroke = stroke(body, Theme.Stroke)
     edgeHighlight(body)
+    -- Background image: made first so everything else in the body draws over it.
+    self._backgroundImage = create("ImageLabel", {
+        Name = "BackgroundImage",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        ScaleType = Enum.ScaleType.Crop,
+        ImageTransparency = 1,
+        Visible = false,
+        ZIndex = 0,
+        Parent = body,
+    })
+    corner(self._backgroundImage, UDim.new(0, 10))
+    self.BackgroundTransparency = math.clamp(tonumber(opts.BackgroundTransparency) or 0.35, 0, 1)
+    self._backgroundGeneration = 0
 
     glow(body, UDim2.fromOffset(500, 180), UDim2.new(0.5, 0, 1, 8), 0.86, 270)
     glow(body, UDim2.fromOffset(130, 60), UDim2.new(0, 60, 1, -16), 0.75, 90)
@@ -4391,6 +4405,9 @@ function Library.Window(_, opts)
     self.DragSkeleton = opts.DragSkeleton ~= false
     if opts.Transparent then
         self:SetTransparent(true)
+    end
+    if opts.Background then
+        task.spawn(self.SetBackground, self, opts.Background)
     end
     self:_enableDrag()
     self.MaxSize = opts.MaxSize
@@ -4719,7 +4736,7 @@ function Window:SetTransparent(enabled)
     local on = self.Transparent
     self._shadowRest = on and 0.85 or 0.6
     tween(self.Body, { BackgroundTransparency = on and 0.35 or 0 }, 0.25)
-    tween(self.Sidebar, { BackgroundTransparency = on and 0.3 or 0 }, 0.25)
+    tween(self.Sidebar, { BackgroundTransparency = (on or self.Background) and 0.3 or 0 }, 0.25)
     if self.Open and not self.Minimized and self.Root.Visible then
         tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.25)
     end
@@ -6516,6 +6533,170 @@ function Window:_applyDefaultTheme()
     end
 end
 
+-- Background images
+
+-- Image assets anyone can use, from Fluent-modded's themes.
+Library.BackgroundPresets = {
+    ["Deep Violet"] = "rbxassetid://136310484943077",
+    ["Blood Red"] = "rbxassetid://121343473918667",
+    ["Cyanic"] = "rbxassetid://95656189244173",
+    ["Amber Glow"] = "rbxassetid://107795771598485",
+    ["Bloomings"] = "rbxassetid://133541508207801",
+    ["Lavender Pink"] = "rbxassetid://126107479485287",
+}
+Library.BackgroundPresetOrder = { "Deep Violet", "Blood Red", "Cyanic", "Amber Glow", "Bloomings", "Lavender Pink" }
+
+-- Table fields, not locals: the library chunk is at Luau's 200 local limit.
+Library._imageExtensions = { png = true, jpg = true, jpeg = true, webp = true, gif = true, bmp = true }
+
+function Window:_backgroundFolder()
+    return self.ConfigFolder .. "/backgrounds"
+end
+
+function Window:_trimBackground(source)
+    return (tostring(source or ""):match("^%s*(.-)%s*$"))
+end
+
+-- Turns a background source into something ImageLabel.Image takes. Web images
+-- are downloaded once into backgrounds/cache and loaded with getcustomasset,
+-- so this yields the first time a URL is used.
+function Window:_resolveBackground(source)
+    source = self:_trimBackground(source)
+    local preset = Library.BackgroundPresets[source]
+    if preset then
+        return preset
+    end
+    if source:match("^%d+$") then
+        return "rbxassetid://" .. source
+    end
+    if source:match("^rbxassetid://%d+") or source:match("^rbxasset://") or source:match("^rbxthumb://")
+        or source:match("^https?://www%.roblox%.com/asset") then
+        return source
+    end
+    local canLoad = fileApiAvailable() and typeof(getcustomasset) == "function"
+    if source:match("^https?://") then
+        if not canLoad then
+            return nil, "web images need writefile and getcustomasset"
+        end
+        local clean = source:match("^[^?#]+") or source
+        local ext = (clean:match("%.(%w+)$") or "png"):lower()
+        if not Library._imageExtensions[ext] then
+            ext = "png"
+        end
+        local key = (clean:gsub("^https?://", ""):gsub("[^%w]", "_")):sub(-60)
+        local folder = self:_backgroundFolder() .. "/cache"
+        local path = folder .. "/" .. key .. "_" .. #source .. "." .. ext
+        if not isfile(path) then
+            local ok, body = pcall(function()
+                local request = (syn and syn.request) or http_request or request
+                if request then
+                    local response = request({ Url = source, Method = "GET" })
+                    return response and response.Body
+                end
+                return game:HttpGet(source, true)
+            end)
+            if not ok or type(body) ~= "string" or #body < 128 then
+                return nil, "could not download the image"
+            end
+            local head = body:sub(1, 64):lower()
+            if head:find("<!doctype") or head:find("<html") then
+                return nil, "that link is a web page, not an image"
+            end
+            ensureFolder(folder)
+            if not pcall(writefile, path, body) then
+                return nil, "could not save the image"
+            end
+        end
+        local ok, asset = pcall(getcustomasset, path)
+        if ok and type(asset) == "string" and asset ~= "" then
+            return asset
+        end
+        pcall(delfile, path)
+        return nil, "the downloaded file is not an image"
+    end
+    -- A file in the backgrounds folder, or any path in the workspace.
+    if canLoad then
+        for _, path in ipairs({ self:_backgroundFolder() .. "/" .. source, source }) do
+            if isfile(path) then
+                local ok, asset = pcall(getcustomasset, path)
+                if ok and type(asset) == "string" and asset ~= "" then
+                    return asset
+                end
+                return nil, "could not load " .. source
+            end
+        end
+    end
+    return nil, "no image called " .. source
+end
+
+-- source: a preset name, an image asset id, an rbxassetid:// link, an http(s)
+-- image URL, or an image file in <ConfigFolder>/backgrounds. nil or "None"
+-- removes it. May yield while a web image downloads.
+function Window:SetBackground(source)
+    self._backgroundGeneration += 1
+    local generation = self._backgroundGeneration
+    local image = self._backgroundImage
+    source = source ~= false and self:_trimBackground(source) or ""
+    if source == "" or source == "None" then
+        self.Background = nil
+        tween(image, { ImageTransparency = 1 }, 0.25)
+        task.delay(0.25, function()
+            if self._backgroundGeneration == generation then
+                image.Visible = false
+                image.Image = ""
+            end
+        end)
+        self:SetTransparent(self.Transparent)
+        return true
+    end
+    local asset, err = self:_resolveBackground(source)
+    if self._backgroundGeneration ~= generation or self._destroyed then
+        return false, "replaced by a newer background"
+    end
+    if not asset then
+        return false, err
+    end
+    self.Background = source
+    image.Image = asset
+    image.Visible = true
+    tween(image, { ImageTransparency = self.BackgroundTransparency }, 0.3)
+    self:SetTransparent(self.Transparent)
+    return true
+end
+
+function Window:GetBackground()
+    return self.Background
+end
+
+-- 0 shows the image fully, 1 hides it behind the theme background colour.
+function Window:SetBackgroundTransparency(value)
+    self.BackgroundTransparency = math.clamp(tonumber(value) or 0.35, 0, 1)
+    if self.Background then
+        tween(self._backgroundImage, { ImageTransparency = self.BackgroundTransparency }, 0.15)
+    end
+end
+
+-- Preset names, then the image files in <ConfigFolder>/backgrounds.
+function Window:ListBackgrounds()
+    local names = table.clone(Library.BackgroundPresetOrder)
+    local folder = self:_backgroundFolder()
+    if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(folder) then
+        local files = {}
+        for _, path in ipairs(listfiles(folder)) do
+            local name = path:match("([^/\]+)$")
+            local ext = name and name:match("%.(%w+)$")
+            if ext and Library._imageExtensions[ext:lower()] then
+                table.insert(files, name)
+            end
+        end
+        table.sort(files)
+        for _, name in ipairs(files) do
+            table.insert(names, name)
+        end
+    end
+    return names
+end
+
 local function emptyState(parent, icon, text)
     local holder = create("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -7581,7 +7762,7 @@ function Tab:ConfigManager(opts)
     end
 
     local disconnect = window:OnConfigChanged(function()
-        -- Configs can arrive from elsewhere (an import from chat), so the list is reread.
+        -- Configs can arrive from elsewhere (a cloud install), so the list is reread.
         manager:Refresh()
         if window.LoadedConfig and list:Get() == nil then
             list:Set(window.LoadedConfig, true)
@@ -7627,6 +7808,7 @@ function Tab:ThemeManager(opts)
     local manager = {}
     local themes, status, defaultRow, presets
     local weather, weatherMode, dim, transparent, dragSkeleton
+    local background, backgroundInput, backgroundOpacity
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
@@ -7715,6 +7897,57 @@ function Tab:ThemeManager(opts)
             end,
         })
     end
+    if opts.Background ~= false then
+        -- The dropdown shows listed images by name, "custom" for ids and links.
+        local function backgroundLabel(source)
+            if source == nil or source == "" then
+                return "None"
+            end
+            return table.find(window:ListBackgrounds(), source) and source or nil
+        end
+        local function applyBackground(source, fromList)
+            task.spawn(function()
+                local ok, err = window:SetBackground(source)
+                if ok and not fromList then
+                    background:Set(backgroundLabel(window.Background), true)
+                elseif not ok and err ~= "replaced by a newer background" then
+                    notify(false, "Background failed", tostring(err))
+                end
+            end)
+        end
+        local options = window:ListBackgrounds()
+        table.insert(options, 1, "None")
+        background = host:Dropdown({
+            Name = "Background",
+            Options = options,
+            Default = backgroundLabel(window.Background),
+            NoneText = "custom",
+            AllowNone = false,
+            Callback = function(name)
+                if name then
+                    applyBackground(name, true)
+                end
+            end,
+        })
+        backgroundInput = actionInput(host, "image id or url", "Set", function(text)
+            text = trim(text)
+            if text == "" then
+                notify(false, "No image", "Paste an image id or link first")
+                return
+            end
+            applyBackground(text)
+        end)
+        backgroundOpacity = host:Slider({
+            Name = "Background Opacity",
+            Min = 0,
+            Max = 100,
+            Default = math.floor((1 - window.BackgroundTransparency) * 100 + 0.5),
+            Suffix = "%",
+            Callback = function(value)
+                window:SetBackgroundTransparency(1 - value / 100)
+            end,
+        })
+    end
     local nameInput = actionInput(host, opts.Placeholder or "theme name", "Create", function(text)
         manager:Create(text)
     end)
@@ -7743,6 +7976,11 @@ function Tab:ThemeManager(opts)
 
     function manager:Refresh()
         themes:Refresh(window:ListThemes(), true)
+        if background then
+            local options = window:ListBackgrounds()
+            table.insert(options, 1, "None")
+            background:Refresh(options, true, true)
+        end
         refreshStatus()
     end
 
@@ -7876,6 +8114,9 @@ function Tab:ThemeManager(opts)
                 Dim = dim and window._backdropDim or nil,
                 Transparent = transparent and window.Transparent == true or nil,
                 DragSkeleton = dragSkeleton and window.DragSkeleton or nil,
+                -- "" is no background; a missing field leaves it alone on load.
+                Background = background and (window.Background or "") or nil,
+                BackgroundTransparency = background and window.BackgroundTransparency or nil,
             }
         end
 
@@ -7917,6 +8158,16 @@ function Tab:ThemeManager(opts)
             if dragSkeleton and type(value.DragSkeleton) == "boolean" then
                 window:SetDragSkeleton(value.DragSkeleton)
                 dragSkeleton:Set(value.DragSkeleton, true)
+            end
+            if background and tonumber(value.BackgroundTransparency) then
+                window:SetBackgroundTransparency(tonumber(value.BackgroundTransparency))
+                backgroundOpacity:Set(math.floor((1 - window.BackgroundTransparency) * 100 + 0.5), true)
+            end
+            if background and type(value.Background) == "string" and value.Background ~= (window.Background or "") then
+                local source = value.Background
+                background:Set(backgroundLabel(source), true)
+                -- A web image may download first; don't hold up the rest of the config.
+                task.spawn(window.SetBackground, window, source)
             end
             refreshStatus()
         end
@@ -11041,1748 +11292,6 @@ end
 
 Window.CreateTab = Window.Tab
 
--- Chat: a tab of its own with channels, a message feed and a composer that can
--- attach configs. The library only draws it: OnSend hands the script what the
--- player sent, and the script shows what it receives with AddMessage.
-function Window:Chat(opts)
-    opts = normalize(opts, { Title = "Name", Description = "Desc" })
-    local window = self
-    local tab = self:Tab({
-        Name = opts.Name or "Chat",
-        Desc = opts.Desc,
-        Icon = opts.Icon or "messages-square",
-        PageTitle = opts.PageTitle,
-    })
-    tab._noSearch = true
-    tab.List.Visible = false
-    if tab._empty then
-        tab._empty:Destroy()
-        tab._empty = nil
-    end
-
-    local BAR = 40
-    local COMPOSER = TOUCH and 42 or 36
-    local GROUP_SECONDS = 180
-    local maxMessages = math.max(math.floor(tonumber(opts.MaxMessages) or 200), 20)
-    local maxLength = math.max(math.floor(tonumber(opts.MaxLength) or 200), 1)
-    local cooldown = math.max(tonumber(opts.Cooldown) or 1, 0)
-    local echo = opts.Echo ~= false
-    local sharing = opts.Configs ~= false
-    local myName = tostring(opts.Username or LocalPlayer.DisplayName)
-    -- Streamer mode shows and sends the player as a stand-in name, with no
-    -- headshot. It is remembered in the script's settings file.
-    local anonName = tostring(opts.StreamerName or "Ouroboros User")
-    local streamer = window:_readConfigSettings().StreamerMode
-    if type(streamer) ~= "boolean" then
-        streamer = opts.StreamerMode == true or window._hideName == true
-    end
-    local function shownName()
-        return streamer and anonName or myName
-    end
-    local mentionKeys = {
-        [string.lower(LocalPlayer.Name)] = true,
-        [string.lower(LocalPlayer.DisplayName)] = true,
-        [string.lower(myName)] = true,
-    }
-
-    local chat = { Tab = tab }
-    local channels, channelOrder, current = {}, {}, nil
-    local byId = {}
-    local order = 0
-    local unread = 0
-    local enabled, disabledReason = true, nil
-    local loadingHistory = false
-    local attachment = nil
-    local openActions = nil
-
-    local function notify(ok, title, detail)
-        window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
-    end
-
-    local function onScreen()
-        return not window._destroyed and window.Open and not window.Minimized and window.CurrentTab == tab
-    end
-
-    local function escape(text)
-        return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&apos;"))
-    end
-
-    -- Escaped text with every @name in the accent, and whether one of them is us.
-    local function richText(text)
-        local mentioned = false
-        local hex = colorToHex(Theme.Accent)
-        local out = escape(text):gsub("@([%w_]+)", function(word)
-            if mentionKeys[string.lower(word)] then
-                mentioned = true
-            end
-            return ('<font color="#%s"><b>@%s</b></font>'):format(hex, word)
-        end)
-        return out, mentioned
-    end
-
-    local function iconButton(parent, icon, glyph, size)
-        local button = create("TextButton", {
-            Size = UDim2.fromOffset(size, size),
-            BackgroundColor3 = Theme.Surface3,
-            BackgroundTransparency = 1,
-            Text = "",
-            AutoButtonColor = false,
-            Parent = parent,
-        })
-        corner(button, UDim.new(0, 7))
-        local image = create("ImageLabel", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.fromScale(0.5, 0.5),
-            Size = UDim2.fromOffset(15, 15),
-            BackgroundTransparency = 1,
-            ImageColor3 = Theme.Muted,
-            ScaleType = Enum.ScaleType.Fit,
-            Parent = button,
-        })
-        applyIcon(image, icon)
-        if image.Image == "" then
-            image:Destroy()
-            image = label({
-                Size = UDim2.fromScale(1, 1),
-                Text = glyph,
-                TextSize = 15,
-                TextColor3 = Theme.Muted,
-                TextXAlignment = Enum.TextXAlignment.Center,
-                TextTruncate = Enum.TextTruncate.None,
-                Parent = button,
-            })
-        end
-        return button, image
-    end
-    local function paint(image, color, duration)
-        tween(image, { [image:IsA("ImageLabel") and "ImageColor3" or "TextColor3"] = color }, duration)
-    end
-
-    local top = tab._headerBottom
-    local panel = create("Frame", {
-        Position = UDim2.fromOffset(24, top),
-        Size = UDim2.new(1, -48, 1, -(top + 20)),
-        BackgroundColor3 = Theme.Surface2,
-        BorderSizePixel = 0,
-        ClipsDescendants = true,
-        Parent = tab._page,
-    })
-    panel:SetAttribute("NoDrag", true)
-    corner(panel, UDim.new(0, 10))
-    stroke(panel)
-
-    -- Top bar: channels on the left, connection status on the right.
-    local bar = create("Frame", {
-        Size = UDim2.new(1, 0, 0, BAR),
-        BackgroundTransparency = 1,
-        Parent = panel,
-    })
-    create("Frame", {
-        Position = UDim2.new(0, 0, 1, -1),
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Theme.Stroke,
-        BorderSizePixel = 0,
-        Parent = bar,
-    })
-    local statusHolder = create("Frame", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -12, 0.5, 0),
-        Size = UDim2.fromOffset(0, 20),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1,
-        Parent = bar,
-    })
-    create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 6),
-        Parent = statusHolder,
-    })
-    local streamerButton, streamerIcon = iconButton(statusHolder, "eye-off", "S", 24)
-    streamerButton.LayoutOrder = 0
-    local onlineLabel = label({
-        Size = UDim2.fromOffset(0, 20),
-        AutomaticSize = Enum.AutomaticSize.X,
-        Text = "",
-        TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        TextTruncate = Enum.TextTruncate.None,
-        Visible = false,
-        LayoutOrder = 1,
-        Parent = statusHolder,
-    })
-    local statusDot = create("Frame", {
-        Size = UDim2.fromOffset(7, 7),
-        BackgroundColor3 = Theme.Muted,
-        BorderSizePixel = 0,
-        LayoutOrder = 2,
-        Parent = statusHolder,
-    })
-    corner(statusDot, UDim.new(1, 0))
-    local statusLabel = label({
-        Size = UDim2.fromOffset(0, 20),
-        AutomaticSize = Enum.AutomaticSize.X,
-        Text = tostring(opts.Status or "Offline"),
-        TextSize = 12,
-        TextColor3 = Theme.Muted,
-        TextTruncate = Enum.TextTruncate.None,
-        LayoutOrder = 3,
-        Parent = statusHolder,
-    })
-    local channelStrip = create("ScrollingFrame", {
-        Position = UDim2.fromOffset(8, 0),
-        Size = UDim2.new(1, -120, 1, 0),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 0,
-        ScrollingDirection = Enum.ScrollingDirection.X,
-        AutomaticCanvasSize = Enum.AutomaticSize.X,
-        CanvasSize = UDim2.new(),
-        Parent = bar,
-    })
-    create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
-        Parent = channelStrip,
-    })
-    local function fitStrip()
-        local width = statusHolder.AbsoluteSize.X / window.Scale.Scale
-        channelStrip.Size = UDim2.new(1, -(width + 28), 1, 0)
-    end
-    statusHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitStrip)
-    task.defer(fitStrip)
-
-    -- Feed area between the bar and the footer; each channel has its own feed.
-    local feedArea = create("Frame", {
-        Position = UDim2.fromOffset(0, BAR),
-        Size = UDim2.new(1, 0, 1, -(BAR + COMPOSER + 14)),
-        BackgroundTransparency = 1,
-        ClipsDescendants = true,
-        Parent = panel,
-    })
-    local empty = emptyState(feedArea, "message-circle", tostring(opts.EmptyText or "No messages yet. Say hi!"))
-    local jump = create("TextButton", {
-        AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, -8),
-        Size = UDim2.fromOffset(0, 26),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundColor3 = Theme.Accent,
-        Text = "",
-        AutoButtonColor = false,
-        Visible = false,
-        ZIndex = 4,
-        Parent = feedArea,
-    })
-    corner(jump, UDim.new(1, 0))
-    padding(jump, 12, 12)
-    local jumpLabel = label({
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        Text = "Jump to latest",
-        TextSize = 12,
-        FontFace = Fonts.Bold,
-        TextColor3 = Theme.AccentDark,
-        TextTruncate = Enum.TextTruncate.None,
-        ZIndex = 4,
-        Parent = jump,
-    })
-
-    -- Footer: typing line, config picker, attachment and the composer.
-    local footer = create("Frame", {
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.fromScale(0, 1),
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1,
-        Parent = panel,
-    })
-    padding(footer, 10, 10, 4, 10)
-    create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 6),
-        Parent = footer,
-    })
-    local typingLabel = label({
-        Size = UDim2.new(1, 0, 0, 14),
-        Text = "",
-        TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        Visible = false,
-        LayoutOrder = 1,
-        Parent = footer,
-    })
-    local picker = create("Frame", {
-        Size = UDim2.new(1, 0, 0, CHIP_HEIGHT),
-        BackgroundTransparency = 1,
-        Visible = false,
-        LayoutOrder = 2,
-        Parent = footer,
-    })
-    label({
-        Size = UDim2.new(0, 44, 1, 0),
-        Text = "Share",
-        TextSize = 12,
-        TextColor3 = Theme.Muted,
-        Parent = picker,
-    })
-    local pickerList = create("ScrollingFrame", {
-        Position = UDim2.fromOffset(46, 0),
-        Size = UDim2.new(1, -46, 1, 0),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 0,
-        ScrollingDirection = Enum.ScrollingDirection.X,
-        AutomaticCanvasSize = Enum.AutomaticSize.X,
-        CanvasSize = UDim2.new(),
-        Parent = picker,
-    })
-    padding(pickerList, 1, 1)
-    create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 6),
-        Parent = pickerList,
-    })
-    local attachRow = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 30),
-        BackgroundColor3 = Theme.Surface,
-        BorderSizePixel = 0,
-        Visible = false,
-        LayoutOrder = 3,
-        Parent = footer,
-    })
-    corner(attachRow, UDim.new(0, 8))
-    stroke(attachRow)
-    local attachIcon = glowIcon(attachRow, "file-cog", Theme.Accent, UDim2.new(0, 10, 0.5, 0))
-    attachIcon.Size = UDim2.fromOffset(14, 14)
-    local attachName = label({
-        Position = UDim2.fromOffset(32, 0),
-        Size = UDim2.new(1, -64, 1, 0),
-        Text = "",
-        TextSize = 12,
-        Parent = attachRow,
-    })
-    local attachRemove = iconButton(attachRow, "x", "×", 24)
-    attachRemove.AnchorPoint = Vector2.new(1, 0.5)
-    attachRemove.Position = UDim2.new(1, -3, 0.5, 0)
-
-    local composer = create("Frame", {
-        Size = UDim2.new(1, 0, 0, COMPOSER),
-        BackgroundTransparency = 1,
-        LayoutOrder = 4,
-        Parent = footer,
-    })
-    local attachButton, attachButtonIcon = iconButton(composer, "paperclip", "+", COMPOSER)
-    tween(attachButton, { BackgroundTransparency = 0.45 }, 0)
-    local attachStroke = stroke(attachButton)
-    attachButton.Visible = sharing
-    local sendButton, sendIcon = iconButton(composer, "send", ">", COMPOSER)
-    sendButton.AnchorPoint = Vector2.new(1, 0)
-    sendButton.Position = UDim2.fromScale(1, 0)
-    tween(sendButton, { BackgroundTransparency = 0.45 }, 0)
-    local left = sharing and COMPOSER + 6 or 0
-    local boxHolder = create("Frame", {
-        Position = UDim2.fromOffset(left, 0),
-        Size = UDim2.new(1, -(left + COMPOSER + 6), 1, 0),
-        BackgroundColor3 = Theme.Surface,
-        BorderSizePixel = 0,
-        ClipsDescendants = true,
-        Parent = composer,
-    })
-    corner(boxHolder, UDim.new(0, 8))
-    local boxStroke = stroke(boxHolder)
-    local box = create("TextBox", {
-        Position = UDim2.fromOffset(10, 0),
-        Size = UDim2.new(1, -20, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "",
-        PlaceholderText = "",
-        PlaceholderColor3 = Theme.Muted,
-        TextColor3 = Theme.Text,
-        TextSize = 13,
-        FontFace = Fonts.Regular,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ClearTextOnFocus = false,
-        Parent = boxHolder,
-    })
-    local counter = label({
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -10, 0.5, 0),
-        Size = UDim2.fromOffset(0, 16),
-        AutomaticSize = Enum.AutomaticSize.X,
-        Text = "",
-        TextSize = 11,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        TextTruncate = Enum.TextTruncate.None,
-        Visible = false,
-        Parent = boxHolder,
-    })
-
-    local function fitFeed()
-        local height = footer.AbsoluteSize.Y / window.Scale.Scale
-        feedArea.Size = UDim2.new(1, 0, 1, -(BAR + height))
-    end
-    footer:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitFeed)
-    task.defer(fitFeed)
-
-    local function placeholder()
-        if not enabled then
-            return disabledReason or "Chat is unavailable"
-        end
-        return opts.Placeholder or ("Message #" .. (current and current.Name or "chat"))
-    end
-
-    -- Feed scrolling: stays pinned to the newest message unless the player
-    -- scrolled up, in which case a pill counts what came in below.
-    local function maxScroll(feed)
-        return math.max(feed.CanvasSize.Y.Offset - feed.AbsoluteWindowSize.Y / window.Scale.Scale, 0)
-    end
-
-    local function refreshJump()
-        local show = current ~= nil and not current.Stick and #current.Entries > 0
-        jump.Visible = show
-        if show then
-            jumpLabel.Text = current.Unseen > 0
-                and ("%d new message%s"):format(current.Unseen, current.Unseen == 1 and "" or "s")
-                or "Jump to latest"
-        end
-    end
-
-    local function toBottom(channel, animate)
-        local feed = channel.Feed
-        local target = Vector2.new(0, maxScroll(feed))
-        channel.Stick = true
-        channel.Unseen = 0
-        if animate then
-            tween(feed, { CanvasPosition = target }, 0.3, Enum.EasingStyle.Quint)
-        else
-            feed.CanvasPosition = target
-        end
-        refreshJump()
-    end
-
-    local function fitCanvas(channel)
-        local stick = channel.Stick
-        channel.Feed.CanvasSize = UDim2.fromOffset(0, channel.Layout.AbsoluteContentSize.Y / window.Scale.Scale + 16)
-        if stick then
-            toBottom(channel, false)
-        end
-    end
-
-    feedArea:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        if current and current.Stick then
-            toBottom(current, false)
-        end
-    end)
-
-    local function refreshTyping()
-        local names = current and current.Typing or {}
-        local count = #names
-        typingLabel.Visible = count > 0
-        if count == 1 then
-            typingLabel.Text = names[1] .. " is typing..."
-        elseif count == 2 then
-            typingLabel.Text = names[1] .. " and " .. names[2] .. " are typing..."
-        elseif count > 2 then
-            typingLabel.Text = count .. " people are typing..."
-        end
-    end
-
-    local function refreshChip(channel)
-        local selected = channel == current
-        tween(channel.Chip, { BackgroundTransparency = selected and 0 or 1 }, 0.18)
-        tween(channel.Label, { TextColor3 = selected and Theme.Text or Theme.Muted }, 0.18)
-        channel.Dot.Visible = not selected and channel.Unread > 0
-    end
-
-    local function clearUnread()
-        if unread > 0 then
-            unread = 0
-            tab:SetBadge(nil)
-        end
-    end
-    tab._page:GetPropertyChangedSignal("Visible"):Connect(function()
-        if tab._page.Visible then
-            clearUnread()
-            if current and current.Stick then
-                task.defer(toBottom, current, false)
-            end
-        end
-    end)
-
-    local function channelOf(name)
-        name = tostring(name or (current and current.Name) or "Global")
-        local channel = channels[name]
-        if channel then
-            return channel
-        end
-        channel = { Name = name, Entries = {}, Unread = 0, Unseen = 0, Stick = true, Typing = {} }
-        local chip = create("TextButton", {
-            Size = UDim2.fromOffset(0, 26),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = Theme.Surface3,
-            BackgroundTransparency = 1,
-            Text = "",
-            AutoButtonColor = false,
-            LayoutOrder = #channelOrder + 1,
-            Parent = channelStrip,
-        })
-        corner(chip, UDim.new(0, 7))
-        padding(chip, 10, 12)
-        channel.Chip = chip
-        channel.Label = label({
-            Size = UDim2.new(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            Text = "# " .. name,
-            TextSize = 13,
-            TextColor3 = Theme.Muted,
-            TextTruncate = Enum.TextTruncate.None,
-            Parent = chip,
-        })
-        channel.Dot = create("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.new(1, 7, 0, 7),
-            Size = UDim2.fromOffset(6, 6),
-            BackgroundColor3 = Theme.Accent,
-            BorderSizePixel = 0,
-            Visible = false,
-            Parent = chip,
-        })
-        corner(channel.Dot, UDim.new(1, 0))
-        chip.MouseButton1Click:Connect(function()
-            chat:SelectChannel(name)
-        end)
-
-        local feed = create("ScrollingFrame", {
-            Size = UDim2.fromScale(1, 1),
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-            ScrollBarThickness = 3,
-            ScrollBarImageColor3 = Theme.Accent,
-            ScrollBarImageTransparency = 0.4,
-            ScrollingDirection = Enum.ScrollingDirection.Y,
-            -- Sized by hand so it scrolls right under UIScale.
-            CanvasSize = UDim2.new(),
-            Visible = false,
-            Parent = feedArea,
-        })
-        feed:SetAttribute("NoDrag", true)
-        padding(feed, 0, 0, 8, 8)
-        channel.Feed = feed
-        channel.Layout = create("UIListLayout", {
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Parent = feed,
-        })
-        channel.Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            fitCanvas(channel)
-        end)
-        feed:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-            local stick = feed.CanvasPosition.Y >= maxScroll(feed) - 30
-            if stick ~= channel.Stick then
-                channel.Stick = stick
-                if stick then
-                    channel.Unseen = 0
-                end
-                if channel == current then
-                    refreshJump()
-                end
-            elseif stick and channel.Unseen > 0 then
-                channel.Unseen = 0
-                refreshJump()
-            end
-        end)
-
-        channels[name] = channel
-        table.insert(channelOrder, name)
-        if not current then
-            chat:SelectChannel(name, true)
-        else
-            refreshChip(channel)
-        end
-        return channel
-    end
-
-    jump.MouseButton1Click:Connect(function()
-        if current then
-            toBottom(current, true)
-        end
-    end)
-
-    -- Messages
-
-    local function authorKey(entry)
-        return entry.UserId and ("#" .. entry.UserId) or ("@" .. entry.Author)
-    end
-
-    local function groups(previous, entry)
-        return previous ~= nil and not previous.System and not entry.System
-            and authorKey(previous) == authorKey(entry)
-            and math.abs(entry.Time - previous.Time) <= GROUP_SECONDS
-    end
-
-    local function setGrouped(entry, grouped)
-        if entry.System then
-            return
-        end
-        entry.Avatar.Visible = not grouped
-        entry.Header.Visible = not grouped
-        entry.Padding.PaddingTop = UDim.new(0, grouped and 1 or 8)
-    end
-
-    local function timeText(stamp)
-        if os.time() - stamp > 86400 then
-            return os.date("%d %b, %H:%M", stamp)
-        end
-        return os.date("%H:%M", stamp)
-    end
-
-    local function publicMessage(entry)
-        return {
-            Id = entry.Id,
-            Channel = entry.Channel.Name,
-            Author = entry.Author,
-            UserId = entry.UserId,
-            Text = entry.Text,
-            Config = entry.Config,
-            ConfigName = entry.ConfigName,
-            Time = entry.Time,
-            Self = entry.Self,
-            System = entry.System,
-        }
-    end
-
-    local function mention(author)
-        local handle = "@" .. tostring(author):gsub("%s", "") .. " "
-        if box.Text:sub(1, #handle) ~= handle then
-            box.Text = handle .. box.Text
-        end
-        if enabled then
-            box:CaptureFocus()
-            box.CursorPosition = #box.Text + 1
-        end
-    end
-
-    local function uniqueName(base)
-        base = trim((tostring(base or ""):gsub('[\\/:%*%?"<>|]', "")))
-        if base == "" then
-            base = "Shared config"
-        end
-        local name, index = base, 2
-        while window:ConfigExists(name) do
-            name = ("%s (%d)"):format(base, index)
-            index += 1
-        end
-        return name
-    end
-
-    local function markInstalled(entry)
-        if entry.InstallLabel then
-            entry.InstallLabel.Text = "Installed"
-        end
-    end
-
-    local function installConfig(entry)
-        local data, info = window:DecodeConfig(entry.Config)
-        if not data then
-            notify(false, "Install failed", "This config code is invalid")
-            return
-        end
-        local name = entry.ConfigName or info.Name or "Shared config"
-        local saveAs = fileApiAvailable() and uniqueName(name) or nil
-        local other = info.Folder and info.Folder ~= window.ConfigFolder
-        local function run()
-            local ok, err = window:ImportConfig(entry.Config, saveAs, true)
-            if ok then
-                entry.Installed = true
-                markInstalled(entry)
-                if opts.OnInstall then
-                    task.spawn(safeCall, opts.OnInstall, publicMessage(entry), saveAs)
-                end
-            end
-            notify(ok, ok and "Config installed" or "Install failed",
-                ok and (saveAs and ("Saved as " .. saveAs) or "Applied to current settings") or tostring(err))
-        end
-        if opts.ConfirmInstall == false and not other then
-            run()
-            return
-        end
-        local content = ("Apply %s from %s%s?"):format(name, entry.Author, saveAs and (" and save it as " .. saveAs) or "")
-        if other then
-            content ..= (" It was made for %s, so only matching settings apply."):format(info.Folder)
-        end
-        window:Confirm({
-            Title = "Install config",
-            Content = content,
-            Icon = other and "triangle-alert" or "download",
-            ConfirmText = "Install",
-            Callback = run,
-        })
-    end
-
-    local function configCard(entry, parent)
-        local data, info = window:DecodeConfig(entry.Config)
-        local count = 0
-        if data then
-            for _ in pairs(data) do
-                count += 1
-            end
-        end
-        local cardFrame = create("Frame", {
-            Size = UDim2.new(1, 0, 0, 52),
-            BackgroundColor3 = Theme.Surface,
-            BorderSizePixel = 0,
-            LayoutOrder = 3,
-            Parent = parent,
-        })
-        create("UISizeConstraint", { MaxSize = Vector2.new(400, 52), Parent = cardFrame })
-        corner(cardFrame, UDim.new(0, 8))
-        hoverStroke(cardFrame, stroke(cardFrame))
-        local badge = create("Frame", {
-            AnchorPoint = Vector2.new(0, 0.5),
-            Position = UDim2.new(0, 10, 0.5, 0),
-            Size = UDim2.fromOffset(32, 32),
-            BackgroundColor3 = Theme.Accent,
-            BackgroundTransparency = 0.85,
-            BorderSizePixel = 0,
-            Parent = cardFrame,
-        })
-        corner(badge, UDim.new(0, 7))
-        local icon = glowIcon(badge, "file-cog", Theme.Accent, UDim2.new(0.5, -8, 0.5, 0))
-        icon.Size = UDim2.fromOffset(16, 16)
-        local reserve = data and 146 or 12
-        label({
-            Position = UDim2.fromOffset(52, 8),
-            Size = UDim2.new(1, -(52 + reserve), 0, 18),
-            Text = entry.ConfigName or (info and info.Name) or "Config",
-            TextSize = 13,
-            FontFace = Fonts.Bold,
-            Parent = cardFrame,
-        })
-        local other = data and info.Folder and info.Folder ~= window.ConfigFolder
-        local sub = label({
-            Position = UDim2.fromOffset(52, 27),
-            Size = UDim2.new(1, -(52 + reserve), 0, 16),
-            Text = "Invalid config",
-            TextSize = 12,
-            FontFace = Fonts.Regular,
-            TextColor3 = data and (other and Theme.Warning or Theme.Muted) or Theme.Error,
-            Parent = cardFrame,
-        })
-        if not data then
-            return
-        end
-        sub.Text = ("%d setting%s%s"):format(count, count == 1 and "" or "s", other and (" · for " .. info.Folder) or "")
-        local install, installText = softButton(cardFrame, entry.Installed and "Installed" or "Install", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -10, 0.5, 0),
-            Size = UDim2.fromOffset(70, 28),
-        }, function()
-            installConfig(entry)
-        end)
-        tween(install, { BackgroundColor3 = Theme.Accent, BackgroundTransparency = 0.12 }, 0)
-        tween(installText, { TextColor3 = Theme.AccentDark }, 0)
-        installText.FontFace = Fonts.Bold
-        entry.InstallLabel = installText
-        softButton(cardFrame, "Copy", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -86, 0.5, 0),
-            Size = UDim2.fromOffset(52, 28),
-        }, function()
-            window:CopyToClipboard(entry.Config, "Config code")
-        end)
-    end
-
-    local retry
-
-    local function renderState(entry)
-        if entry.System then
-            return
-        end
-        local state = entry.State
-        entry.Body.TextTransparency = state == "sending" and 0.45 or 0
-        local status = entry.StatusButton
-        if state == "failed" then
-            status.Visible = true
-            status.Text = (entry.Reason and ("Not sent: " .. entry.Reason) or "Not sent") .. (entry.Self and "  ·  Retry" or "")
-            status.TextColor3 = Theme.Error
-        elseif state == "sending" then
-            status.Visible = true
-            status.Text = "Sending..."
-            status.TextColor3 = Theme.Muted
-        else
-            status.Visible = false
-        end
-    end
-
-    local function paintRow(entry, hovered)
-        local frame = entry.Frame
-        if entry.Mentioned then
-            tween(frame, { BackgroundColor3 = Theme.Accent, BackgroundTransparency = hovered and 0.86 or 0.92 }, 0.15)
-        else
-            tween(frame, { BackgroundColor3 = Theme.Surface3, BackgroundTransparency = hovered and 0.6 or 1 }, 0.15)
-        end
-    end
-
-    local function showActions(entry, show)
-        if not entry.Actions then
-            return
-        end
-        if show and openActions and openActions ~= entry then
-            showActions(openActions, false)
-        end
-        entry.Actions.Visible = show
-        paintRow(entry, show)
-        openActions = show and entry or (openActions ~= entry and openActions or nil)
-    end
-
-    -- The player's own messages follow streamer mode, including ones already
-    -- shown, and a message sent while hidden stays hidden. Everyone else's
-    -- show as the backend sent them.
-    local function renderIdentity(entry)
-        local hidden = entry.Self and (streamer or entry.Streamer)
-        local name = hidden and anonName or entry.Author
-        entry.NameButton.Text = name
-        entry.Initial.Text = string.upper(name:sub(1, 1))
-        if entry.Headshot then
-            entry.Headshot.Visible = not hidden
-        end
-    end
-
-    local function buildRow(channel, entry)
-        order += 1
-        local row = create("TextButton", {
-            Size = UDim2.new(1, 0, 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundColor3 = Theme.Surface3,
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-            Text = "",
-            AutoButtonColor = false,
-            LayoutOrder = order,
-            Parent = channel.Feed,
-        })
-        entry.Frame = row
-        if entry.System then
-            padding(row, 16, 16, 6, 6)
-            entry.Body = label({
-                Size = UDim2.new(1, 0, 0, 0),
-                AutomaticSize = Enum.AutomaticSize.Y,
-                Text = escape(entry.Text),
-                RichText = true,
-                TextSize = 12,
-                FontFace = Fonts.Regular,
-                TextColor3 = Theme.Muted,
-                TextWrapped = true,
-                TextTruncate = Enum.TextTruncate.None,
-                TextXAlignment = Enum.TextXAlignment.Center,
-                Parent = row,
-            })
-            return
-        end
-        entry.Padding = padding(row, 12, 12, 8, 2)
-
-        local avatar = create("Frame", {
-            Size = UDim2.fromOffset(30, 30),
-            BackgroundColor3 = Theme.Surface3,
-            BorderSizePixel = 0,
-            Parent = row,
-        })
-        corner(avatar, UDim.new(1, 0))
-        entry.Avatar = avatar
-        entry.Initial = label({
-            Size = UDim2.fromScale(1, 1),
-            Text = "",
-            TextSize = 14,
-            FontFace = Fonts.Bold,
-            TextColor3 = Theme.Accent,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            Parent = avatar,
-        })
-        if entry.UserId and entry.UserId > 0 then
-            entry.Headshot = create("ImageLabel", {
-                Size = UDim2.fromScale(1, 1),
-                BackgroundTransparency = 1,
-                Image = ("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48"):format(entry.UserId),
-                Parent = avatar,
-            })
-            corner(entry.Headshot, UDim.new(1, 0))
-        end
-
-        local body = create("Frame", {
-            Position = UDim2.fromOffset(42, 0),
-            Size = UDim2.new(1, -42, 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            BackgroundTransparency = 1,
-            Parent = row,
-        })
-        create("UIListLayout", {
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 3),
-            Parent = body,
-        })
-        local header = create("Frame", {
-            Size = UDim2.new(1, 0, 0, 18),
-            BackgroundTransparency = 1,
-            LayoutOrder = 1,
-            Parent = body,
-        })
-        entry.Header = header
-        create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Horizontal,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 6),
-            Parent = header,
-        })
-        local nameColor = entry.Color or (entry.Self and Theme.Accent or Theme.Text)
-        local nameButton = create("TextButton", {
-            Size = UDim2.fromOffset(0, 18),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1,
-            Text = "",
-            TextSize = 13,
-            FontFace = Fonts.Bold,
-            TextColor3 = nameColor,
-            AutoButtonColor = false,
-            LayoutOrder = 1,
-            Parent = header,
-        })
-        nameButton.MouseButton1Click:Connect(function()
-            if not entry.Self then
-                mention(entry.Author)
-            end
-        end)
-        entry.NameButton = nameButton
-        renderIdentity(entry)
-        if entry.Tag then
-            local tag = label({
-                Size = UDim2.fromOffset(0, 15),
-                AutomaticSize = Enum.AutomaticSize.X,
-                BackgroundColor3 = entry.TagColor or Theme.Accent,
-                BackgroundTransparency = 0.8,
-                Text = entry.Tag,
-                TextSize = 10,
-                FontFace = Fonts.Bold,
-                TextColor3 = entry.TagColor or Theme.Accent,
-                TextXAlignment = Enum.TextXAlignment.Center,
-                TextTruncate = Enum.TextTruncate.None,
-                LayoutOrder = 2,
-                Parent = header,
-            })
-            corner(tag, UDim.new(0, 4))
-            padding(tag, 5, 5)
-        end
-        label({
-            Size = UDim2.fromOffset(0, 18),
-            AutomaticSize = Enum.AutomaticSize.X,
-            Text = timeText(entry.Time),
-            TextSize = 11,
-            FontFace = Fonts.Regular,
-            TextColor3 = Theme.Muted,
-            TextTruncate = Enum.TextTruncate.None,
-            LayoutOrder = 3,
-            Parent = header,
-        })
-
-        local text, mentioned = richText(entry.Text)
-        entry.Mentioned = mentioned and not entry.Self
-        entry.Body = label({
-            Size = UDim2.new(1, 0, 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
-            Text = text,
-            RichText = true,
-            TextSize = 13,
-            FontFace = Fonts.Regular,
-            TextWrapped = true,
-            TextTruncate = Enum.TextTruncate.None,
-            TextYAlignment = Enum.TextYAlignment.Top,
-            Visible = entry.Text ~= "",
-            LayoutOrder = 2,
-            Parent = body,
-        })
-        if entry.Config then
-            configCard(entry, body)
-        end
-        local status = create("TextButton", {
-            Size = UDim2.fromOffset(0, 14),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1,
-            Text = "",
-            TextSize = 11,
-            FontFace = Fonts.Regular,
-            TextColor3 = Theme.Muted,
-            AutoButtonColor = false,
-            Visible = false,
-            LayoutOrder = 4,
-            Parent = body,
-        })
-        status.MouseButton1Click:Connect(function()
-            if entry.State == "failed" and entry.Self then
-                retry(entry)
-            end
-        end)
-        entry.StatusButton = status
-        if entry.Mentioned then
-            create("Frame", {
-                Position = UDim2.fromOffset(-12, -8),
-                Size = UDim2.new(0, 2, 1, 10),
-                BackgroundColor3 = Theme.Accent,
-                BorderSizePixel = 0,
-                Parent = row,
-            })
-            paintRow(entry, false)
-        end
-
-        -- Hover actions: reply, copy, and whatever the script adds.
-        local actions = create("Frame", {
-            AnchorPoint = Vector2.new(1, 0),
-            Position = UDim2.new(1, 0, 0, -4),
-            Size = UDim2.fromOffset(0, 26),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = Theme.Surface,
-            BorderSizePixel = 0,
-            Visible = false,
-            ZIndex = 3,
-            Parent = row,
-        })
-        corner(actions, UDim.new(0, 7))
-        stroke(actions)
-        padding(actions, 2, 2)
-        create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Horizontal,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Parent = actions,
-        })
-        entry.Actions = actions
-        local specs = {}
-        if not entry.Self then
-            table.insert(specs, { Icon = "reply", Glyph = "@", Callback = function()
-                mention(entry.Author)
-            end })
-        end
-        table.insert(specs, { Icon = "copy", Glyph = "C", Callback = function()
-            window:CopyToClipboard(entry.Text ~= "" and entry.Text or entry.Config, "Message")
-        end })
-        if type(opts.MessageActions) == "table" then
-            for _, spec in ipairs(opts.MessageActions) do
-                if type(spec) == "table" and (spec.Self == nil or spec.Self == entry.Self) then
-                    table.insert(specs, { Icon = spec.Icon or "circle", Glyph = tostring(spec.Name or "?"):sub(1, 1), Callback = function()
-                        task.spawn(safeCall, spec.Callback, publicMessage(entry))
-                    end })
-                end
-            end
-        end
-        for index, spec in ipairs(specs) do
-            local button, image = iconButton(actions, spec.Icon, spec.Glyph, 22)
-            button.LayoutOrder = index
-            button.ZIndex = 3
-            image.ZIndex = 3
-            button.MouseEnter:Connect(function()
-                paint(image, Theme.Accent, 0.12)
-            end)
-            button.MouseLeave:Connect(function()
-                paint(image, Theme.Muted, 0.2)
-            end)
-            button.MouseButton1Click:Connect(function()
-                showActions(entry, false)
-                spec.Callback()
-            end)
-        end
-        row.MouseEnter:Connect(function()
-            if not usingTouch() then
-                showActions(entry, true)
-            end
-        end)
-        row.MouseLeave:Connect(function()
-            if not usingTouch() then
-                showActions(entry, false)
-            end
-        end)
-        local isTap = tapGuard(row, function()
-            return channel.Feed
-        end)
-        row.MouseButton1Click:Connect(function()
-            if usingTouch() and isTap() then
-                showActions(entry, not actions.Visible)
-            end
-        end)
-        renderState(entry)
-    end
-
-    local function removeEntry(entry)
-        local channel = entry.Channel
-        local index = table.find(channel.Entries, entry)
-        if not index then
-            return
-        end
-        table.remove(channel.Entries, index)
-        byId[entry.Id] = nil
-        if openActions == entry then
-            openActions = nil
-        end
-        entry.Frame:Destroy()
-        local following = channel.Entries[index]
-        if following then
-            setGrouped(following, groups(channel.Entries[index - 1], following))
-        end
-        if channel == current then
-            empty.Visible = #channel.Entries == 0
-            refreshJump()
-        end
-    end
-
-    onTheme(panel, function()
-        for _, channel in pairs(channels) do
-            for _, entry in ipairs(channel.Entries) do
-                if not entry.System then
-                    entry.Body.Text = (richText(entry.Text))
-                end
-            end
-        end
-    end)
-
-    local function colorOf(value)
-        if typeof(value) == "Color3" then
-            return value
-        elseif type(value) == "string" and typeof(Theme[value]) == "Color3" then
-            return Theme[value]
-        end
-        return nil
-    end
-
-    -- Shows a message. A message whose Id is already shown updates it instead,
-    -- so the server's copy of a message the player sent settles the echo.
-    function chat:AddMessage(message)
-        if type(message) == "string" then
-            message = { Text = message }
-        end
-        if type(message) ~= "table" then
-            return nil
-        end
-        local id = message.Id ~= nil and tostring(message.Id) or HttpService:GenerateGUID(false)
-        local existing = byId[id]
-        if existing then
-            existing.State = message.State
-            existing.Reason = message.Reason
-            if message.Text ~= nil and tostring(message.Text) ~= existing.Text and not existing.System then
-                existing.Text = tostring(message.Text)
-                existing.Body.Text = (richText(existing.Text))
-                existing.Body.Visible = existing.Text ~= ""
-            end
-            renderState(existing)
-            return id
-        end
-        local channel = channelOf(message.Channel)
-        local config = message.Config
-        local configName = message.ConfigName
-        if type(config) == "table" then
-            configName = configName or config.Name
-            config = config.Code
-        end
-        local userId = tonumber(message.UserId)
-        local entry = {
-            Id = id,
-            Channel = channel,
-            Text = tostring(message.Text or message.Content or ""),
-            Author = tostring(message.Author or message.Name or "Unknown"),
-            UserId = userId,
-            Time = tonumber(message.Time) or os.time(),
-            System = message.System == true,
-            Self = message.Self == true or (message.Self == nil and userId ~= nil and userId == LocalPlayer.UserId),
-            Tag = message.Tag and tostring(message.Tag) or nil,
-            TagColor = colorOf(message.TagColor),
-            Color = colorOf(message.Color),
-            State = message.State,
-            Reason = message.Reason,
-            Streamer = message.Streamer == true,
-            Config = type(config) == "string" and config ~= "" and config or nil,
-            ConfigName = configName and tostring(configName) or nil,
-        }
-        if entry.Config and not sharing then
-            entry.Config = nil
-        end
-        if entry.Self then
-            channel.Stick = true
-        end
-        buildRow(channel, entry)
-        local previous = channel.Entries[#channel.Entries]
-        table.insert(channel.Entries, entry)
-        byId[id] = entry
-        setGrouped(entry, groups(previous, entry))
-        while #channel.Entries > maxMessages do
-            removeEntry(channel.Entries[1])
-        end
-
-        local seen = onScreen() and channel == current
-        if not entry.Self and not entry.System and not loadingHistory then
-            if not seen then
-                if channel ~= current then
-                    channel.Unread += 1
-                    refreshChip(channel)
-                end
-                if not onScreen() then
-                    unread += 1
-                    tab:SetBadge(unread)
-                end
-                if entry.Mentioned and opts.MentionNotify ~= false then
-                    window:Notify({
-                        Title = entry.Author .. " mentioned you",
-                        Content = entry.Text,
-                        Icon = "at-sign",
-                        Duration = 4,
-                    })
-                end
-            end
-            if not channel.Stick then
-                channel.Unseen += 1
-            end
-        end
-        if channel == current then
-            empty.Visible = false
-            refreshJump()
-        end
-        return id
-    end
-
-    function chat:AddSystem(text, channel)
-        return chat:AddMessage({ System = true, Text = text, Channel = channel })
-    end
-
-    -- Replaces a channel's messages, for history the script loaded.
-    function chat:SetMessages(list, channel)
-        chat:Clear(channel or (current and current.Name))
-        -- History is old news: no unread counts or mention toasts for it.
-        loadingHistory = true
-        for _, message in ipairs(type(list) == "table" and list or {}) do
-            if type(message) == "table" and message.Channel == nil then
-                message = table.clone(message)
-                message.Channel = channel
-            end
-            pcall(chat.AddMessage, chat, message)
-        end
-        loadingHistory = false
-    end
-
-    function chat:RemoveMessage(id)
-        local entry = byId[tostring(id)]
-        if entry then
-            removeEntry(entry)
-        end
-    end
-
-    function chat:Clear(name)
-        for _, channel in pairs(channels) do
-            if name == nil or channel.Name == tostring(name) then
-                for index = #channel.Entries, 1, -1 do
-                    removeEntry(channel.Entries[index])
-                end
-                channel.Unread = 0
-                channel.Unseen = 0
-                refreshChip(channel)
-            end
-        end
-    end
-
-    function chat:GetMessages(name)
-        local channel = channels[tostring(name or (current and current.Name))]
-        local list = {}
-        for index, entry in ipairs(channel and channel.Entries or {}) do
-            list[index] = publicMessage(entry)
-        end
-        return list
-    end
-
-    -- Channels
-
-    function chat:AddChannel(name)
-        channelOf(name)
-    end
-
-    function chat:RemoveChannel(name)
-        local channel = channels[tostring(name)]
-        if not channel or #channelOrder <= 1 then
-            return
-        end
-        for _, entry in ipairs(channel.Entries) do
-            byId[entry.Id] = nil
-        end
-        channel.Chip:Destroy()
-        channel.Feed:Destroy()
-        channels[channel.Name] = nil
-        table.remove(channelOrder, table.find(channelOrder, channel.Name))
-        if current == channel then
-            current = nil
-            chat:SelectChannel(channelOrder[1])
-        end
-    end
-
-    function chat:SelectChannel(name, silent)
-        local channel = channels[tostring(name)]
-        if not channel or channel == current then
-            return
-        end
-        local previous = current
-        if previous then
-            previous.Feed.Visible = false
-        end
-        current = channel
-        channel.Unread = 0
-        channel.Feed.Visible = true
-        for _, other in pairs(channels) do
-            refreshChip(other)
-        end
-        empty.Visible = #channel.Entries == 0
-        box.PlaceholderText = placeholder()
-        refreshTyping()
-        refreshJump()
-        if channel.Stick then
-            task.defer(toBottom, channel, false)
-        end
-        if previous and not silent then
-            task.spawn(safeCall, opts.OnChannelChanged, channel.Name)
-        end
-    end
-
-    function chat:GetChannel()
-        return current and current.Name
-    end
-
-    -- Presence
-
-    function chat:SetStatus(text, tone)
-        statusLabel.Text = tostring(text or "")
-        tween(statusDot, { BackgroundColor3 = colorOf(tone) or Theme.Muted }, 0.2)
-    end
-
-    function chat:SetOnline(count)
-        onlineLabel.Visible = count ~= nil
-        if count ~= nil then
-            onlineLabel.Text = tostring(count) .. " online  ·"
-        end
-    end
-
-    function chat:SetTyping(names, channel)
-        local target = channelOf(channel)
-        local list = {}
-        for _, name in ipairs(type(names) == "table" and names or { names }) do
-            if name ~= nil and tostring(name) ~= "" then
-                table.insert(list, tostring(name))
-            end
-        end
-        target.Typing = list
-        if target == current then
-            refreshTyping()
-        end
-    end
-
-    -- Composer
-
-    local lastSend = -math.huge
-    local history, historyIndex = {}, nil
-    local hintToken = 0
-    local typingOut, typingToken = false, 0
-
-    local function canSend()
-        return enabled and (trim(box.Text) ~= "" or attachment ~= nil)
-    end
-
-    local function refreshSend()
-        local ready = canSend()
-        tween(sendButton, {
-            BackgroundColor3 = ready and Theme.Accent or Theme.Surface3,
-            BackgroundTransparency = ready and 0 or 0.45,
-        }, 0.15)
-        paint(sendIcon, ready and Theme.AccentDark or Theme.Muted, 0.15)
-    end
-
-    local function refreshCounter()
-        local length = utf8.len(box.Text) or #box.Text
-        local show = length >= maxLength * 0.75
-        counter.Visible = show
-        counter.Text = length .. "/" .. maxLength
-        counter.TextColor3 = length >= maxLength and Theme.Warning or Theme.Muted
-        box.Size = UDim2.new(1, show and -62 or -20, 1, 0)
-    end
-
-    local function hint(text)
-        hintToken += 1
-        local token = hintToken
-        counter.Visible = true
-        counter.Text = text
-        counter.TextColor3 = Theme.Warning
-        box.Size = UDim2.new(1, -90, 1, 0)
-        flashStroke(boxStroke)
-        task.delay(1.2, function()
-            if hintToken == token then
-                refreshCounter()
-            end
-        end)
-    end
-
-    local function setTyping(active)
-        if type(opts.OnTyping) ~= "function" or not current then
-            return
-        end
-        typingToken += 1
-        local token = typingToken
-        local channelName = current.Name
-        if active then
-            if not typingOut then
-                typingOut = true
-                task.spawn(safeCall, opts.OnTyping, true, channelName)
-            end
-            task.delay(4, function()
-                if typingToken == token and typingOut then
-                    typingOut = false
-                    task.spawn(safeCall, opts.OnTyping, false, channelName)
-                end
-            end)
-        elseif typingOut then
-            typingOut = false
-            task.spawn(safeCall, opts.OnTyping, false, channelName)
-        end
-    end
-
-    local function renderAttachment()
-        attachRow.Visible = attachment ~= nil
-        if attachment then
-            attachName.Text = ("%s  ·  %d setting%s"):format(attachment.Name, attachment.Count, attachment.Count == 1 and "" or "s")
-        end
-        refreshSend()
-    end
-
-    local function setPicker(open)
-        picker.Visible = open
-        tween(attachStroke, { Color = open and Theme.Accent or Theme.Stroke }, 0.15)
-        paint(attachButtonIcon, open and Theme.Accent or Theme.Muted, 0.15)
-        if not open then
-            return
-        end
-        for _, child in ipairs(pickerList:GetChildren()) do
-            if child:IsA("GuiObject") then
-                child:Destroy()
-            end
-        end
-        local names = { false }
-        for _, name in ipairs(window:ListConfigs()) do
-            table.insert(names, name)
-        end
-        for index, name in ipairs(names) do
-            local button = softButton(pickerList, name or "Current settings", {
-                Size = UDim2.new(0, 0, 1, -4),
-                AutomaticSize = Enum.AutomaticSize.X,
-                LayoutOrder = index,
-            }, function()
-                chat:Attach(name or nil)
-            end)
-            button:SetAttribute("NoDrag", true)
-        end
-    end
-
-    -- Attaches a saved config by name, or the current settings with no name.
-    function chat:Attach(name)
-        if not sharing then
-            return false
-        end
-        local code, err
-        local title = name
-        if name then
-            code, err = window:ExportConfig(name)
-        else
-            title = window.LoadedConfig or (shownName() .. "'s config")
-            local ok, encoded = pcall(encodeConfig, window, title, collectFlags(window))
-            code, err = ok and encoded or nil, "could not encode config"
-        end
-        if not code then
-            notify(false, "Attach failed", tostring(err))
-            return false
-        end
-        local data = window:DecodeConfig(code)
-        local count = 0
-        for _ in pairs(data or {}) do
-            count += 1
-        end
-        attachment = { Code = code, Name = title, Count = count }
-        setPicker(false)
-        renderAttachment()
-        return true
-    end
-
-    function chat:Detach()
-        attachment = nil
-        renderAttachment()
-    end
-
-    local function dispatch(entry, message)
-        if type(opts.OnSend) ~= "function" then
-            if entry then
-                entry.State = "failed"
-                entry.Reason = "no chat backend"
-                renderState(entry)
-            end
-            return
-        end
-        task.spawn(function()
-            local ok, result, reason = isolatedCall(function()
-                return opts.OnSend(message)
-            end)
-            if not ok then
-                warn("[AirFlow] chat OnSend error: " .. tostring(result))
-            end
-            if entry and byId[entry.Id] == entry then
-                -- An echo the server already settled through AddMessage stays as it is.
-                if entry.State == "sending" then
-                    local failed = not ok or result == false
-                    entry.State = failed and "failed" or nil
-                    entry.Reason = failed and (ok and reason and tostring(reason) or (not ok and "error") or nil) or nil
-                    renderState(entry)
-                end
-            elseif ok and result == false then
-                notify(false, "Message not sent", reason and tostring(reason) or "The chat refused it")
-            end
-        end)
-    end
-
-    function retry(entry)
-        entry.State = "sending"
-        entry.Reason = nil
-        renderState(entry)
-        dispatch(entry, {
-            Id = entry.Id,
-            Channel = entry.Channel.Name,
-            Author = entry.Streamer and anonName or myName,
-            UserId = not entry.Streamer and LocalPlayer.UserId or nil,
-            Streamer = entry.Streamer,
-            Text = entry.Text,
-            Config = entry.Config,
-            ConfigName = entry.ConfigName,
-        })
-    end
-
-    function chat:Send(text)
-        if not enabled or not current then
-            return false
-        end
-        text = trim(text or box.Text)
-        if text == "" and not attachment then
-            return false
-        end
-        local length = utf8.len(text) or #text
-        if length > maxLength then
-            hint("Too long")
-            return false
-        end
-        local wait_ = lastSend + cooldown - os.clock()
-        if wait_ > 0 then
-            hint(("Wait %.1fs"):format(wait_))
-            return false
-        end
-        lastSend = os.clock()
-        local message = {
-            Id = HttpService:GenerateGUID(false),
-            Channel = current.Name,
-            Author = shownName(),
-            UserId = not streamer and LocalPlayer.UserId or nil,
-            Streamer = streamer,
-            Text = text,
-            Config = attachment and attachment.Code or nil,
-            ConfigName = attachment and attachment.Name or nil,
-        }
-        if text ~= "" and history[#history] ~= text then
-            table.insert(history, text)
-            if #history > 30 then
-                table.remove(history, 1)
-            end
-        end
-        historyIndex = nil
-        box.Text = ""
-        attachment = nil
-        renderAttachment()
-        setTyping(false)
-        local entry = nil
-        if echo then
-            chat:AddMessage({
-                Id = message.Id,
-                Channel = message.Channel,
-                Text = text,
-                Author = myName,
-                UserId = LocalPlayer.UserId,
-                Streamer = streamer,
-                Self = true,
-                State = "sending",
-                Config = message.Config,
-                ConfigName = message.ConfigName,
-            })
-            entry = byId[message.Id]
-        end
-        dispatch(entry, message)
-        return message.Id
-    end
-
-    function chat:SetEnabled(value, reason)
-        enabled = value ~= false
-        disabledReason = reason and tostring(reason) or nil
-        box.TextEditable = enabled
-        if not enabled then
-            box:ReleaseFocus()
-            setPicker(false)
-        end
-        box.PlaceholderText = placeholder()
-        tween(boxHolder, { BackgroundTransparency = enabled and 0 or 0.5 }, 0.2)
-        refreshSend()
-    end
-
-    function chat:SetInput(text)
-        box.Text = tostring(text or "")
-    end
-
-    function chat:Focus()
-        if enabled then
-            window:SelectTab(tab)
-            box:CaptureFocus()
-        end
-    end
-
-    box:GetPropertyChangedSignal("Text"):Connect(function()
-        local text = box.Text
-        local length = utf8.len(text) or #text
-        if length > maxLength then
-            local cut = utf8.offset(text, maxLength + 1)
-            box.Text = cut and text:sub(1, cut - 1) or text:sub(1, maxLength)
-            return
-        end
-        refreshCounter()
-        refreshSend()
-        if box:IsFocused() and text ~= "" then
-            setTyping(true)
-        end
-    end)
-    box.Focused:Connect(function()
-        tween(boxStroke, { Color = Theme.StrokeHover }, 0.15)
-    end)
-    box.FocusLost:Connect(function(enterPressed)
-        tween(boxStroke, { Color = Theme.Stroke }, 0.2)
-        if enterPressed then
-            if chat:Send() and not usingTouch() then
-                task.defer(function()
-                    box:CaptureFocus()
-                end)
-            end
-        else
-            setTyping(false)
-        end
-    end)
-    -- Up and down walk back through what the player sent.
-    window:_listen("Began", function(input)
-        if not box:IsFocused() or #history == 0 then
-            return
-        end
-        if input.KeyCode == Enum.KeyCode.Up then
-            historyIndex = math.max((historyIndex or #history + 1) - 1, 1)
-        elseif input.KeyCode == Enum.KeyCode.Down and historyIndex then
-            historyIndex += 1
-            if historyIndex > #history then
-                historyIndex = nil
-                box.Text = ""
-                return
-            end
-        else
-            return
-        end
-        box.Text = history[historyIndex]
-        task.defer(function()
-            box.CursorPosition = #box.Text + 1
-        end)
-    end, chat)
-
-    sendButton.MouseButton1Click:Connect(function()
-        ripple(sendButton)
-        chat:Send()
-    end)
-    attachButton.MouseButton1Click:Connect(function()
-        if enabled then
-            setPicker(not picker.Visible)
-        end
-    end)
-    attachRemove.MouseButton1Click:Connect(function()
-        chat:Detach()
-    end)
-
-    local function renderStreamer(duration)
-        tween(streamerButton, {
-            BackgroundColor3 = streamer and Theme.Accent or Theme.Surface3,
-            BackgroundTransparency = streamer and 0.8 or 1,
-        }, duration)
-        paint(streamerIcon, streamer and Theme.Accent or Theme.Muted, duration)
-    end
-
-    function chat:SetStreamerMode(on, silent)
-        on = on == true
-        if on == streamer then
-            return
-        end
-        streamer = on
-        window:_writeConfigSettings({ StreamerMode = on })
-        for _, channel in pairs(channels) do
-            for _, entry in ipairs(channel.Entries) do
-                if entry.Self and not entry.System then
-                    renderIdentity(entry)
-                end
-            end
-        end
-        renderStreamer(0.2)
-        if not silent then
-            window:Notify({
-                Title = on and "Streamer mode on" or "Streamer mode off",
-                Content = "You show as " .. shownName(),
-                Icon = on and "eye-off" or "eye",
-                Duration = 2.5,
-            })
-        end
-        if opts.OnStreamerMode then
-            task.spawn(safeCall, opts.OnStreamerMode, on)
-        end
-    end
-
-    function chat:GetStreamerMode()
-        return streamer
-    end
-
-    streamerButton.MouseEnter:Connect(function()
-        if not streamer and not usingTouch() then
-            paint(streamerIcon, Theme.Text, 0.12)
-        end
-    end)
-    streamerButton.MouseLeave:Connect(function()
-        renderStreamer(0.2)
-    end)
-    streamerButton.MouseButton1Click:Connect(function()
-        chat:SetStreamerMode(not streamer)
-    end)
-    renderStreamer(0)
-
-    local channelList = type(opts.Channels) == "table" and #opts.Channels > 0 and opts.Channels or { "Global" }
-    for _, name in ipairs(channelList) do
-        channelOf(name)
-    end
-    if opts.Status then
-        chat:SetStatus(opts.Status, opts.StatusTone)
-    end
-    box.PlaceholderText = placeholder()
-    refreshSend()
-    return chat
-end
-
-Window.CreateChat = Window.Chat
-
 -- Cloud configs: a tab for browsing, previewing, installing and publishing
 -- configs other players shared. The library draws it; OnFetch, OnPublish and
 -- the other callbacks are the script's backend. Favorites, installs and the
@@ -12841,8 +11350,9 @@ function Window:CloudConfigs(opts)
         window:Notify({ Title = title, Content = detail_, Type = ok and "Success" or "Error", Duration = 3 })
     end
 
+    -- The Home tab's hide-name switch doubles as streamer mode.
     local function streamerOn()
-        return window:_readConfigSettings().StreamerMode == true
+        return window._hideName == true
     end
 
     -- Records
@@ -14353,7 +12863,11 @@ function Window:CloudConfigs(opts)
             if type(value.Hex) == "string" then
                 return "#" .. string.upper(value.Hex)
             elseif type(value.Colors) == "table" then
-                return type(value.Name) == "string" and value.Name or "Custom"
+                local text = type(value.Name) == "string" and value.Name or "Custom"
+                if type(value.Background) == "string" and value.Background ~= "" then
+                    text ..= ", image"
+                end
+                return text
             end
             local parts = {}
             for index, item in ipairs(value) do
@@ -14781,7 +13295,7 @@ function Window:CloudConfigs(opts)
         submitText.Text = editing and "Save changes" or "Publish"
         formError.Visible = false
         local streamer = streamerOn()
-        identityNote.Text = streamer and ("Streamer mode is on, so you publish as " .. anonName)
+        identityNote.Text = streamer and ("Your name is hidden, so you publish as " .. anonName)
             or ("You publish as " .. LocalPlayer.DisplayName)
         renderFormTags()
         buildSources()
@@ -17516,36 +16030,8 @@ Dialogs:CreateButton({
     end,
 })
 
--- Chat: the library draws it, your script moves the messages. This demo has no
--- server, so a bot answers locally. With a real backend, OnSend posts the
--- message and everything you receive goes to Chat:AddMessage.
-local Chat = Window:CreateChat({
-    Name = "Chat",
-    Channels = { "Global", "Configs" },
-    Status = "Demo", -- SetStatus("Connected", "Success") once your backend is up
-    StatusTone = "Warning",
-    MessageActions = { -- extra buttons on each message, next to reply and copy
-        { Icon = "flag", Name = "Report", Self = false, Callback = function(Message) print("report", Message.Author, Message.Text) end },
-    },
-    OnSend = function(Message) -- { Id, Channel, Text, Config, ConfigName }. Return false, "reason" to mark it not sent
-        task.delay(1.2, function()
-            Chat:AddMessage({
-                Author = "Airflow Bot",
-                Tag = "BOT",
-                Channel = Message.Channel,
-                Text = Message.Config and "Nice config! Anyone here can install it from the card."
-                    or ("@%s you said: %s"):format(game:GetService("Players").LocalPlayer.DisplayName, Message.Text),
-            })
-        end)
-    end,
-})
-Chat:SetOnline(1)
-Chat:AddSystem("Welcome to the chat. Be nice!")
-Chat:AddMessage({ Author = "Airflow Bot", Tag = "BOT", Text = "Hi! Press the paperclip to share your settings as a config." })
-Chat:AddMessage({ Author = "Airflow Bot", Tag = "BOT", Channel = "Configs", Text = "A starter config:", Config = Window:ExportConfig(), ConfigName = "Starter" })
-
--- Cloud configs: browse, preview, install and publish shared configs. Like the
--- chat, the library draws it and your script is the backend. This demo keeps
+-- Cloud configs: browse, preview, install and publish shared configs. The
+-- library draws it and your script is the backend. This demo keeps
 -- the "cloud" in a table; a real one would call your API in each callback.
 do
     local Starter = Window:ExportConfig() -- the current settings, as a code

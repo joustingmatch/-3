@@ -75,6 +75,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
 | `Transparent` | boolean | `false` | See-through window body and sidebar. |
+| `Background` | string | — | Background image behind the window content. Same sources as `SetBackground`. |
+| `BackgroundTransparency` | number | `0.35` | How much of the theme background colour shows through the image, 0 to 1. |
 | `DragSkeleton` | boolean | `true` | While dragging, an accent outline follows the pointer and the window glides into it on release. `false` drags the window itself. |
 | `OpenButton` | boolean \| table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
@@ -127,6 +129,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetDragSkeleton(enabled)` | Turn the drag outline on or off. |
 | `SetTransparent(enabled)` / `.Transparent` | See-through window on or off. |
+| `SetBackground(source)` / `.Background` | Background image. `source` is a preset name (`Library.BackgroundPresets`: Deep Violet, Blood Red, Cyanic, Amber Glow, Bloomings, Lavender Pink), an image asset id or `rbxassetid://` link (an Image id, not a Decal id), an http(s) image link (downloaded once to `<FolderName>/backgrounds/cache`, needs `writefile` and `getcustomasset`), or an image file dropped into `<FolderName>/backgrounds`. `nil` or `"None"` removes it. Yields while a link downloads; returns `ok, err`. |
+| `SetBackgroundTransparency(value)` / `ListBackgrounds()` | Image transparency, 0 to 1; presets plus the files in the backgrounds folder. |
 | `SetWeatherMode(mode)` / `.WeatherMode` | `"Screen"` or `"UI"`. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
 | `SelectTab(tab)` | Switch tabs from code. |
@@ -1189,127 +1193,6 @@ Requires `writefile` / `readfile`.
 
 ---
 
-## Chat
-
-> A chat tab with channels, mentions and one-click config sharing. The library draws it; your script is the backend.
-
-```lua
-local Chat = Window:CreateChat({
-    Name = "Chat",
-    Channels = { "Global", "Configs" },
-    OnSend = function(Message)
-        -- Message = { Id, Channel, Author, UserId, Streamer, Text, Config, ConfigName }
-        local ok = pcall(request, {
-            Url = "https://my.api/chat",
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = game:GetService("HttpService"):JSONEncode(Message),
-        })
-        if not ok then
-            return false, "offline" -- the message shows "Not sent: offline · Retry"
-        end
-    end,
-})
-
-Chat:SetStatus("Connected", "Success")
-
--- whatever your socket or poll loop receives:
-Chat:AddMessage({
-    Id = Data.Id, -- the Id OnSend got, when it's the player's own message coming back
-    Author = Data.Name,
-    UserId = Data.UserId, -- shows their headshot
-    Text = Data.Text,
-    Config = Data.Config, -- a config code, shown as an installable card
-    ConfigName = Data.ConfigName,
-    Channel = Data.Channel,
-    Time = Data.Time,
-})
-```
-
-`CreateChat` adds its own tab to the sidebar, like Home, and the whole page is the chat: a bar of channels with the connection status, the feed, and a composer at the bottom.
-
-- **Sending.** Enter or the send button sends. The message shows straight away, dimmed as *Sending...*, until `OnSend` returns. If it returns `false` (or errors) it's marked *Not sent* with a **Retry** link. `OnSend` may yield, so an HTTP call inside it is fine.
-- **Echoes.** Each sent message gets an `Id`. When your backend hands the same `Id` back to `AddMessage`, the shown message is updated in place instead of appearing twice. Pass `Echo = false` to show nothing until the backend sends it back.
-- **Configs.** The paperclip opens a strip with *Current settings* and every saved config. The pick sits above the box until sent, with an × to drop it. Sent configs appear as a card with the name, how many settings it holds, **Copy** (the code) and **Install**. Install asks first, then applies it and saves it under its own name (with ` (2)`... rather than overwriting). A config made for another `FolderName` is marked in the warning colour and says so in the confirm; only matching settings apply. The config manager's list picks the new config up by itself.
-- **Mentions.** `@name` is highlighted in every message. One that names the player (username or display name) gets an accent bar, and a notification when the chat isn't on screen. Clicking a name or the reply button puts `@name` in the box.
-- **Grouping and time.** Messages from the same author within three minutes stack under one header. Each header shows the time.
-- **Scrolling.** The feed follows new messages while it's at the bottom. Scroll up and it stays put, with a *3 new messages* pill that jumps back down.
-- **Unread.** Messages that arrive while the chat tab isn't showing count up on its sidebar badge; other channels get a dot on their chip.
-- **Typing.** `OnTyping(isTyping, channel)` fires when the player starts typing and again 4 seconds after they stop (or send). Show other people with `SetTyping`.
-- **Composer.** A counter appears near `MaxLength`, sends inside `Cooldown` show *Wait 0.6s*, and up / down walk back through what the player sent.
-- **Streamer mode.** The eye button in the top bar hides the player's name: their messages show and are sent as *Ouroboros User* with no headshot, and `OnSend` gets `Author = "Ouroboros User"`, `UserId = nil` and `Streamer = true`, so post `Message.Author` rather than the player's real name. Messages already shown switch too. The choice is remembered in the script's settings file, and starts on when the Home tab's hide-name switch is on.
-- **Message actions.** Hovering a message (tapping it on touch) shows reply and copy, plus any `MessageActions` you add, such as report or delete.
-
-### Properties
-
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `Name` | string | `"Chat"` | The tab's name. |
-| `Desc` | string | — | Line under the page title. |
-| `Icon` | string | `"messages-square"` | The tab icon. |
-| `Channels` | table | `{ "Global" }` | Channel names, the first one selected. |
-| `OnSend` | function | — | `(message)` for every send. Return `false, reason` to mark it not sent. |
-| `OnTyping` | function | — | `(isTyping, channel)` for the player's typing state. |
-| `OnChannelChanged` | function | — | `(channel)` when the player switches channel. |
-| `OnInstall` | function | — | `(message, savedName)` after a config from chat is installed. |
-| `MessageActions` | table | — | Extra hover buttons: `{ Icon, Name, Self?, Callback(message) }`. `Self = false` shows it only on other people's messages, `true` only on the player's. |
-| `Echo` | boolean | `true` | Show the player's message before the backend confirms it. |
-| `Configs` | boolean | `true` | Allow attaching and installing configs. |
-| `ConfirmInstall` | boolean | `true` | Ask before installing. A config for another script always asks. |
-| `MentionNotify` | boolean | `true` | Notify on mentions while the chat isn't showing. |
-| `Username` | string | display name | The name used for the player's own messages. |
-| `StreamerMode` | boolean | `false` | Start in streamer mode, until the player picks. |
-| `StreamerName` | string | `"Ouroboros User"` | The name shown and sent in streamer mode. |
-| `OnStreamerMode` | function | — | `(on)` when streamer mode changes. |
-| `MaxLength` | number | `200` | Characters per message. |
-| `Cooldown` | number | `1` | Seconds between sends. |
-| `MaxMessages` | number | `200` | Messages kept per channel; the oldest go first. |
-| `Placeholder` | string | `"Message #<channel>"` | Text in the empty box. |
-| `EmptyText` | string | `"No messages yet. Say hi!"` | Shown in an empty channel. |
-| `Status` / `StatusTone` | string | `"Offline"` | Starting status text and dot colour (a theme key: `"Success"`, `"Warning"`, `"Error"`...). |
-
-### Messages
-
-`AddMessage` takes a table (or just a string):
-
-| Field | Description |
-| --- | --- |
-| `Id` | Any string or number. A message with an `Id` already shown updates it. Defaults to a new GUID. |
-| `Author` / `UserId` | Who sent it. `UserId` shows their headshot, and a message with the player's `UserId` counts as their own. |
-| `Text` | The message. Shown as plain text; only mentions are styled. |
-| `Channel` | Channel name. Missing channels are created. Defaults to the selected one. |
-| `Time` | Unix time. Defaults to now. |
-| `Config` / `ConfigName` | A config code (from `ExportConfig` or `OnSend`) and the name to show. `Config` may also be `{ Code, Name }`. |
-| `Tag` / `TagColor` | A small badge after the name, like `"DEV"` or `"BOT"`. |
-| `Color` | Name colour: a `Color3` or a theme key. |
-| `System` | A centred grey line with no author. |
-| `Self` | Force the player's own styling on or off. |
-| `Streamer` | Sent in streamer mode: shown as the streamer name. |
-| `State` / `Reason` | `"sending"`, `"failed"` or `nil` (sent), and why it failed. |
-
-### Handle
-
-| Member | Description |
-| --- | --- |
-| `AddMessage(message)` | Show or update a message. Returns its `Id`. |
-| `AddSystem(text, channel?)` | A system line. |
-| `SetMessages(list, channel?)` | Replace a channel's messages, for history loaded on join. |
-| `RemoveMessage(id)` | Remove one message. |
-| `Clear(channel?)` | Empty one channel, or all of them. |
-| `GetMessages(channel?)` | The shown messages, oldest first. |
-| `Send(text?)` | Send `text`, or what's in the box, as if the player pressed send. Returns the `Id`, or `false`. |
-| `Attach(configName?)` / `Detach()` | Attach a saved config, or the current settings with no name. |
-| `SetStatus(text, tone?)` | The status in the corner. |
-| `SetOnline(count?)` | `"12 online"` beside the status. `nil` hides it. |
-| `SetTyping(names, channel?)` | Who else is typing: a list of names, empty to clear. |
-| `SetEnabled(enabled, reason?)` | Lock the composer, with `reason` as its placeholder (`"Connecting..."`, `"You are muted"`). |
-| `AddChannel(name)` / `RemoveChannel(name)` / `SelectChannel(name)` / `GetChannel()` | Channels. |
-| `SetStreamerMode(on, silent?)` / `GetStreamerMode()` | Streamer mode. `silent` skips the notification. |
-| `SetInput(text)` / `Focus()` | Fill the box, or open the tab and focus it. |
-| `.Tab` | The chat's tab, for `SetBadge` and the like. |
-
----
-
 ## Cloud Configs
 
 > A tab for browsing, previewing, installing and publishing configs other players shared. The library draws it; your script is the backend.
@@ -1337,7 +1220,7 @@ local Cloud = Window:CreateCloudConfigs({
 })
 ```
 
-`CreateCloudConfigs` adds its own sidebar tab, like Home and Chat. The page slides between three views: **browse**, a config's **details**, and the **publish** form. The first fetch waits until the tab is opened.
+`CreateCloudConfigs` adds its own sidebar tab, like Home. The page slides between three views: **browse**, a config's **details**, and the **publish** form. The first fetch waits until the tab is opened.
 
 **Browsing**
 
@@ -1355,7 +1238,7 @@ local Cloud = Window:CreateCloudConfigs({
 
 **Installing** asks first, with three buttons: **Install** applies it and saves it as a config (under its own name, with ` (2)`... rather than overwriting), **Apply only** changes the current settings without saving, or **Cancel**. Installing an update overwrites the config the last install saved. A config for another `FolderName` warns that only matching settings apply. Likes show at once and roll back if `OnLike` fails.
 
-**Publishing** takes a name (40 characters), a description with a counter, up to `MaxTags` tags, and which settings to share: *Current settings* or any saved config, with a count of what's in it. It says who you publish as, and follows the chat's streamer mode: then `Author` is *Ouroboros User* and `AuthorId` is `nil`. `OwnerId` is always the player's UserId, so the backend can tell who owns what; keep it private. A draft stays in the form if you back out. **Edit** opens the same form filled in, with *Keep published settings* as the default, and calls `OnUpdate`.
+**Publishing** takes a name (40 characters), a description with a counter, up to `MaxTags` tags, and which settings to share: *Current settings* or any saved config, with a count of what's in it. It says who you publish as, and follows the Home tab's hide-name switch: with it on, `Author` is *Ouroboros User* and `AuthorId` is `nil`. `OwnerId` is always the player's UserId, so the backend can tell who owns what; keep it private. A draft stays in the form if you back out. **Edit** opens the same form filled in, with *Keep published settings* as the default, and calls `OnUpdate`.
 
 ### Properties
 
@@ -1377,7 +1260,7 @@ local Cloud = Window:CreateCloudConfigs({
 | `OnReport` | function | — | `(config, reason)`. Hides **Report** when missing. |
 | `ReportReasons` | table | `{ "Broken", "Spam", "Inappropriate" }` | Choices in the report dialog. |
 | `MineFilter` | boolean | `true` | Show the **Mine** chip. |
-| `StreamerName` | string | `"Ouroboros User"` | The author name in streamer mode. |
+| `StreamerName` | string | `"Ouroboros User"` | The author name while the player's name is hidden. |
 | `SearchPlaceholder` / `EmptyText` | string | — | Text in the search box and when there are no configs. |
 
 ### Configs
@@ -1527,6 +1410,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
