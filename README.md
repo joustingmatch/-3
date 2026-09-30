@@ -342,6 +342,7 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | `Side` | `"Left"` \| `"Right"` \| 1 \| 2 | balanced | Column. |
 | `Collapsed` | boolean | `false` | Start collapsed. |
 | `Visible` | boolean | `true` | Start hidden. |
+| `Glass` | boolean | `true` | Liquid glass header: a solid slab lit from above, with a bright rim, an accent tint on the left and a sheen that sweeps across on hover. `false` gives a flat header with a divider. `Airflow.GlassHeaders = false` turns it off for every groupbox. |
 
 ### Handle
 
