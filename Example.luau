@@ -7638,48 +7638,32 @@ function Tab:Groupbox(opts, icon)
         LayoutOrder = 1,
         Parent = box,
     })
-    -- Liquid glass: a solid slab behind the header, lit from above like thick
-    -- glass. A bright rim and specular line along the top, a darker lower
-    -- edge, an accent tint caught on the left, and a sheen that sweeps across
-    -- on hover. Groupbox Glass = false or Library.GlassHeaders = false turns
-    -- it off.
-    local glassStroke, sheenGradient
-    if opts.Glass ~= false and Library.GlassHeaders ~= false then
-        local white = Color3.new(1, 1, 1)
-        -- Plain white and black stay out of the theme bindings (a theme whose
-        -- text is pure white would otherwise repaint them).
-        local function raw(object, color, property)
-            tween(object, { [property or "BackgroundColor3"] = color }, 0, nil, nil, true)
-            return object
-        end
-        local glass = create("Frame", {
-            Name = "Glass",
-            Position = UDim2.fromOffset(4, 4),
-            Size = UDim2.new(1, -8, 1, -8),
-            BackgroundTransparency = 0.04,
-            BorderSizePixel = 0,
-            ZIndex = 0,
-            Parent = header,
+    -- Liquid glass: every header sits on a solid slab lit from above like
+    -- thick glass. A bright rim and specular line along the top, a shade along
+    -- the bottom, a gloss over the upper half, accent light caught at the left
+    -- edge, and a sheen that sweeps across on hover.
+    local edgeFade = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.25, 0),
+        NumberSequenceKeypoint.new(0.75, 0),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    local glassTone = create("UIGradient", { Rotation = 90 })
+    onTheme(glassTone, function()
+        local base = Theme.Surface3
+        glassTone.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, base:Lerp(Color3.new(1, 1, 1), 0.1)),
+            ColorSequenceKeypoint.new(0.48, base:Lerp(Color3.new(1, 1, 1), 0.02)),
+            ColorSequenceKeypoint.new(0.52, base),
+            ColorSequenceKeypoint.new(1, base:Lerp(Theme.Background, 0.5)),
         })
-        raw(glass, white)
-        corner(glass, UDim.new(0, 7))
-        local tone = create("UIGradient", { Rotation = 90, Parent = glass })
-        onTheme(tone, function()
-            local base = Theme.Surface3
-            tone.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, base:Lerp(white, 0.1)),
-                ColorSequenceKeypoint.new(0.48, base:Lerp(white, 0.02)),
-                ColorSequenceKeypoint.new(0.52, base),
-                ColorSequenceKeypoint.new(1, base:Lerp(Theme.Background, 0.5)),
-            })
-        end)
-        glassStroke = create("UIStroke", {
-            Transparency = 0.2,
-            Thickness = 1,
-            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-            Parent = glass,
-        })
-        raw(glassStroke, white, "Color")
+    end)
+    local glassStroke = create("UIStroke", {
+        Color = Color3.new(1, 1, 1),
+        Transparency = 0.2,
+        Thickness = 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    }, {
         create("UIGradient", {
             Rotation = 90,
             Transparency = NumberSequence.new({
@@ -7687,101 +7671,104 @@ function Tab:Groupbox(opts, icon)
                 NumberSequenceKeypoint.new(0.45, 0.88),
                 NumberSequenceKeypoint.new(1, 0.95),
             }),
-            Parent = glassStroke,
-        })
-        -- Accent light caught in the glass, strongest at the left edge.
-        local tint = create("Frame", {
+        }),
+    })
+    -- A thin diagonal band parked off the left edge; moving its gradient
+    -- sweeps it across while the slab's corners clip it.
+    local sheenGradient = create("UIGradient", {
+        Rotation = 20,
+        Offset = Vector2.new(-1, 0),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.4, 1),
+            NumberSequenceKeypoint.new(0.5, 0.78),
+            NumberSequenceKeypoint.new(0.6, 1),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+    })
+    create("Frame", {
+        Name = "Glass",
+        Position = UDim2.fromOffset(4, 4),
+        Size = UDim2.new(1, -8, 1, -8),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BackgroundTransparency = 0.04,
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Parent = header,
+    }, {
+        create("UICorner", { CornerRadius = UDim.new(0, 7) }),
+        glassTone,
+        glassStroke,
+        -- Accent tint
+        create("Frame", {
             Size = UDim2.fromScale(1, 1),
             BackgroundColor3 = Theme.Accent,
             BackgroundTransparency = 0.8,
             BorderSizePixel = 0,
             ZIndex = 0,
-            Parent = glass,
-        })
-        corner(tint, UDim.new(0, 7))
-        create("UIGradient", {
-            Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.1),
-                NumberSequenceKeypoint.new(0.55, 1),
-                NumberSequenceKeypoint.new(1, 1),
+        }, {
+            create("UICorner", { CornerRadius = UDim.new(0, 7) }),
+            create("UIGradient", {
+                Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0.1),
+                    NumberSequenceKeypoint.new(0.55, 1),
+                    NumberSequenceKeypoint.new(1, 1),
+                }),
             }),
-            Parent = tint,
-        })
-        -- Gloss over the upper half.
-        local gloss = create("Frame", {
+        }),
+        -- Gloss
+        create("Frame", {
             Size = UDim2.fromScale(1, 0.55),
+            BackgroundColor3 = Color3.new(1, 1, 1),
             BackgroundTransparency = 0.9,
             BorderSizePixel = 0,
             ZIndex = 0,
-            Parent = glass,
-        })
-        raw(gloss, white)
-        corner(gloss, UDim.new(0, 7))
-        create("UIGradient", {
-            Rotation = 90,
-            Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.2),
-                NumberSequenceKeypoint.new(1, 1),
-            }),
-            Parent = gloss,
-        })
-        -- Specular line along the top edge and a shade along the bottom, both
-        -- fading out before the rounded corners.
-        local function edgeLine(y, color, transparency)
-            local line = create("Frame", {
-                AnchorPoint = Vector2.new(0, y),
-                Position = UDim2.new(0, 8, y, y == 0 and 1 or -1),
-                Size = UDim2.new(1, -16, 0, 1),
-                BackgroundTransparency = transparency,
-                BorderSizePixel = 0,
-                ZIndex = 0,
-                Parent = glass,
-            })
-            raw(line, color)
-            create("UIGradient", {
-                Transparency = NumberSequence.new({
-                    NumberSequenceKeypoint.new(0, 1),
-                    NumberSequenceKeypoint.new(0.25, 0),
-                    NumberSequenceKeypoint.new(0.75, 0),
-                    NumberSequenceKeypoint.new(1, 1),
-                }),
-                Parent = line,
-            })
-        end
-        edgeLine(0, white, 0.45)
-        edgeLine(1, Color3.new(0, 0, 0), 0.6)
-        -- The sheen: a thin diagonal band parked off the left edge, swept to
-        -- the right by moving its gradient, so it stays inside the corners.
-        local sheen = create("Frame", {
-            Size = UDim2.fromScale(1, 1),
-            BackgroundTransparency = 0,
+        }, {
+            create("UICorner", { CornerRadius = UDim.new(0, 7) }),
+            create("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0.2, 1) }),
+        }),
+        -- Specular line
+        create("Frame", {
+            Position = UDim2.fromOffset(8, 1),
+            Size = UDim2.new(1, -16, 0, 1),
+            BackgroundColor3 = Color3.new(1, 1, 1),
+            BackgroundTransparency = 0.45,
             BorderSizePixel = 0,
             ZIndex = 0,
-            Parent = glass,
-        })
-        raw(sheen, white)
-        corner(sheen, UDim.new(0, 7))
-        sheenGradient = create("UIGradient", {
-            Rotation = 20,
-            Offset = Vector2.new(-1, 0),
-            Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(0.4, 1),
-                NumberSequenceKeypoint.new(0.5, 0.78),
-                NumberSequenceKeypoint.new(0.6, 1),
-                NumberSequenceKeypoint.new(1, 1),
-            }),
-            Parent = sheen,
-        })
-        header.MouseEnter:Connect(function()
-            sheenGradient.Offset = Vector2.new(-1, 0)
-            tween(sheenGradient, { Offset = Vector2.new(1, 0) }, 0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, true)
-            tween(glassStroke, { Transparency = 0 }, 0.15, nil, nil, true)
-        end)
-        header.MouseLeave:Connect(function()
-            tween(glassStroke, { Transparency = 0.2 }, 0.3, nil, nil, true)
-        end)
-    end
+        }, {
+            create("UIGradient", { Transparency = edgeFade }),
+        }),
+        -- Lower shade
+        create("Frame", {
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, 8, 1, -1),
+            Size = UDim2.new(1, -16, 0, 1),
+            BackgroundColor3 = Color3.new(0, 0, 0),
+            BackgroundTransparency = 0.6,
+            BorderSizePixel = 0,
+            ZIndex = 0,
+        }, {
+            create("UIGradient", { Transparency = edgeFade }),
+        }),
+        -- Sheen
+        create("Frame", {
+            Size = UDim2.fromScale(1, 1),
+            BackgroundColor3 = Color3.new(1, 1, 1),
+            BorderSizePixel = 0,
+            ZIndex = 0,
+        }, {
+            create("UICorner", { CornerRadius = UDim.new(0, 7) }),
+            sheenGradient,
+        }),
+    })
+    header.MouseEnter:Connect(function()
+        sheenGradient.Offset = Vector2.new(-1, 0)
+        tween(sheenGradient, { Offset = Vector2.new(1, 0) }, 0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, true)
+        tween(glassStroke, { Transparency = 0 }, 0.15, nil, nil, true)
+    end)
+    header.MouseLeave:Connect(function()
+        tween(glassStroke, { Transparency = 0.2 }, 0.3, nil, nil, true)
+    end)
     if opts.Icon then
         local image = create("ImageLabel", {
             AnchorPoint = Vector2.new(1, 0.5),
@@ -7834,15 +7821,6 @@ function Tab:Groupbox(opts, icon)
         Parent = header,
     })
 
-    local ruleShown = not glassStroke
-    local rule = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Theme.Stroke,
-        BackgroundTransparency = ruleShown and 0 or 1,
-        BorderSizePixel = 0,
-        LayoutOrder = 2,
-        Parent = box,
-    })
     local body = create("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
@@ -7909,9 +7887,6 @@ function Tab:Groupbox(opts, icon)
             end
         end
         local motion = instant and 0 or 0.3
-        if ruleShown then
-            tween(rule, { BackgroundTransparency = value and 1 or 0 }, instant and 0 or 0.2)
-        end
         tween(vertical, { Size = UDim2.fromOffset(2, value and 10 or 0) }, motion, Enum.EasingStyle.Back)
         tween(glyph, { Rotation = value and 90 or 0 }, motion, Enum.EasingStyle.Quint)
     end
