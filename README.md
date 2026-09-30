@@ -6,7 +6,7 @@
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
 ```
 
-Every constructor also works without the `Create` prefix. `Tab:Toggle` is the same as `Tab:CreateToggle`. Every element handle also has `Destroy()`, which removes the card, its listeners and its flag, and `SetVisible(bool)` / `IsVisible()`. Every constructor takes `Visible = false` to start hidden. See [Visibility](#visibility).
+Every constructor also works without the `Create` prefix. `Tab:Toggle` is the same as `Tab:CreateToggle`. Every element handle also has `Destroy()`, which removes the card, its listeners and its flag, and `SetVisible(bool)` / `IsVisible()`. Every constructor takes `Visible = false` to start hidden (see [Visibility](#visibility)) and `Tooltip` to explain itself on hover (see [Tooltips](#tooltips)).
 
 ---
 
@@ -90,12 +90,14 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `ToggleButton.Enabled` | boolean | `true` | `false` builds it hidden, to show later with `SetToggleButton(true)`. |
 | `ToggleButton.Position` / `Size` | UDim2 / number | left edge / `56` touch, `50` PC | Starting position and side length. |
 | `Backdrop` | boolean \| table | `{ Weather = "Snow" }` | Black tint over the game while the window is up, with weather drifting through it. It fades out when the window is minimized or hidden and sweeps back in with a gust on restore. `false` removes it. |
-| `Backdrop.Weather` | string | `"Snow"` | `"Snow"`, `"Rain"`, `"Hell Fire"` (embers rising from a red glow) or `"None"` for the tint alone. |
+| `Backdrop.Weather` | string | `"Snow"` | `"Snow"`, `"Rain"`, `"Hell Fire"` (embers rising from a red glow), `"Sakura"` (pink petals that flip as they drift down), `"Fireflies"` (glowing specks that wander, pulse and fade), `"Matrix"` (falling columns of shifting green glyphs) or `"None"` for the tint alone. |
 | `Backdrop.Tint` | number | `0.45` | Tint strength, `0` to `1`. |
 | `Backdrop.Dim` | boolean | `true` | `false` starts with the tint off and only the weather showing. |
 | `Backdrop.Mode` | string | `"Screen"` | `"Screen"` drifts the weather across the whole screen, `"UI"` keeps it inside the window behind its content. |
 | `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
 | `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
+| `UIScale` | number | `1` | Size of the whole window, `0.6` to `1.5`. The window still shrinks further when it wouldn't fit the screen. Players can change it in the [theme manager](#theme). |
+| `Density` | string | `"Default"` | `"Compact"`, `"Default"` or `"Comfortable"`: the spacing between cards, groupboxes and groupbox rows. Shared by every window, like the theme. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
 | `Search` | boolean | `true` | Search box in the top-right of the content area. See [Search](#search). |
 | `Loading` | boolean \| table | `true` | Loading card before the window morphs in. `false` skips it. |
@@ -136,7 +138,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetToggleButtonIcon(icon)` | Swap its icon. |
 | `.ToggleButton` | The toggle button, when it was built. |
 | `SetBackdrop(enabled)` | Turn the tint and weather on or off. |
-| `SetWeather(name)` / `.Weather` | `"Rain"`, `"Snow"`, `"Hell Fire"` or `"None"`. |
+| `SetWeather(name)` / `.Weather` | `"Snow"`, `"Rain"`, `"Hell Fire"`, `"Sakura"`, `"Fireflies"`, `"Matrix"` or `"None"`. `.Weather` reads `"Ember"` for hell fire. |
 | `SetBackdropTint(amount)` | Tint strength, `0` to `1`. |
 | `SetDim(bool)` | Turn the tint on or off. The weather keeps running. |
 | `SetWeatherDensity(n)` / `SetWeatherSpeed(n)` | Particle count and speed multipliers. |
@@ -148,6 +150,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetBackgroundTransparency(value)` / `ListBackgrounds()` | Image transparency, 0 to 1; presets plus the files in the backgrounds folder. |
 | `SetWeatherMode(mode)` / `.WeatherMode` | `"Screen"` or `"UI"`. |
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
+| `SetUIScale(n)` / `GetUIScale()` / `.UIScale` | Window size, `0.6` to `1.5`. Eases to the new size and nudges the window back on screen. |
+| `SetDensity(mode)` / `GetDensity()` | `"Compact"`, `"Default"` or `"Comfortable"`. Respaces every window live; same as `Airflow:SetDensity(mode)`. Returns the mode it applied. |
 | `SelectTab(tab)` | Switch tabs from code. |
 | `CreateTab(opts)` | See [Tab](#tab). |
 | `Rejoin()` / `ServerHop()` / `JoinLowestServer()` | Teleport to this server, a random open one, or the emptiest one. |
@@ -366,6 +370,25 @@ Charge = Box:CreateSlider({ Name = "Charge Distance", Range = { 5, 60 }, Visible
 - Hidden elements keep their flag. They still save, load and run callbacks, so loading a config with `HoldSkills` on shows `Charge`. Visibility itself is not saved.
 - Hiding an open dropdown or colour picker closes it, and hiding a keybind stops a capture.
 - A hidden pinned status leaves the orb's hover card until it is shown again.
+
+---
+
+## Tooltips
+
+Every element takes `Tooltip`: a string, or `{ Title, Text, Icon }` for a card with a heading and an icon.
+
+```lua
+Box:CreateToggle({ Name = "Kill Aura", Flag = "KillAura", Tooltip = "Hits every mob in range" })
+Box:CreateSlider({
+    Name = "Range",
+    Range = { 5, 50 },
+    Tooltip = { Title = "Range", Text = "Studs from your character. Higher can get you flagged.", Icon = "triangle-alert" },
+})
+
+Toggle:SetTooltip("New text") -- nil or false removes it
+```
+
+The card fades in after a short hover and follows the pointer, flipping to the other side near the screen edge. Moving straight from one element to another swaps the card without the wait. Any click or key press hides it, as does switching tabs or hiding the window. On touch screens a half-second press shows it above the finger and lifting hides it; a finger that starts scrolling doesn't. `GetTooltip()` returns the current value.
 
 ---
 
@@ -698,12 +721,14 @@ Click the value chip to type an exact number.
 | `CurrentValue` | number | min | The initial value. |
 | `Flag` | string | — | The save key. |
 | `Callback` | function | — | Runs with the new value on every change, including while dragging. |
+| `OnRelease` | function | — | Runs with the value when a drag ends. Use it for work too heavy to repeat every frame. |
 
 ### Handle
 
 | Member | Description |
 | --- | --- |
 | `.Value` | The current value. |
+| `.Dragging` | Whether the knob is being dragged. |
 | `Set(value, skipCallback?)` | Set the value. Slides with a small overshoot. |
 | `Get()` | The current value. |
 
@@ -1025,6 +1050,158 @@ The panel has a saturation/value square, a hue bar, a hex box and an RGB readout
 | `Set(color, skipCallback?)` | Set the colour. Animates the cursors. |
 | `SetOpen(open)` | Expand or collapse. |
 | `Get()` | The current colour. |
+
+---
+
+## Image
+
+> A picture card: an optional title, the image with rounded corners, and an optional caption.
+
+```lua
+local Banner = Tab:CreateImage({
+    Name = "Map",
+    Image = 1234567890, -- asset id, rbxassetid:// or rbxthumb:// link, web link, file, background preset or "Avatar"
+    Height = 160,
+    Caption = "Spawn island",
+})
+
+Banner:SetImage("https://example.com/map.png")
+```
+
+A placeholder icon shows until the image has loaded, then the picture fades in. Sources are the same as `SetBackground` on the [window](#handle): an image asset id (an Image id, not a Decal id), an `rbxassetid://` / `rbxthumb://` link, an http(s) link (downloaded once, needs `writefile` and `getcustomasset`), a file in `<FolderName>/backgrounds`, or a background preset name. `"Avatar"` shows the player's headshot.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | Title above the image. Leave out for just the image. |
+| `Desc` | string | — | Hint text under the title. |
+| `Image` | string \| number | — | The picture. |
+| `Height` | number | `160` | Height of the picture, 40 to 600. |
+| `Caption` | string | — | Line over the bottom of the picture, on a dark fade. |
+| `ScaleType` | string | `"Crop"` | `"Crop"`, `"Fit"`, `"Stretch"`. |
+| `Color` | Color3 | white | Tint. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `.Value` | The current source. |
+| `SetImage(source)` / `Set(source)` | Swap the picture. `nil` clears it. Yields while a link downloads; returns `ok, err`. |
+| `Get()` | The current source. |
+| `SetCaption(text)` / `SetTitle(text)` | Change the caption (`nil` hides it) or the title. |
+| `SetScaleType(name)` / `SetColor(color)` | Change how it fills the card, or its tint. |
+
+---
+
+## Viewport
+
+> A 3D preview: a model, a part or the player's avatar, turning slowly.
+
+```lua
+local Preview = Tab:CreateViewport({
+    Name = "Your character",
+    Model = "Avatar", -- or any Model / BasePart (it is copied), a Player, or a function returning one
+    Height = 200,
+    SpinSpeed = 25,
+})
+
+Preview:SetModel(workspace.Sword)
+```
+
+The model is copied into the card with its scripts and sounds stripped and every part anchored, so the original is never touched. The camera frames the whole model and faces its front. Drag the card sideways to turn it by hand; the spin picks up again a moment after you let go. It only spins while the window is open. `"Avatar"` waits for the character to spawn if it hasn't yet; call `Refresh()` after a respawn or an outfit change to copy it again.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | Title above the preview. |
+| `Desc` | string | — | Hint text under the title. |
+| `Model` | Instance \| string \| function | — | What to show. |
+| `Height` | number | `180` | Height of the preview, 40 to 600. |
+| `Spin` | boolean | `true` | Turn slowly on its own. |
+| `SpinSpeed` | number | `25` | Degrees per second. |
+| `Angle` / `Pitch` | number | `0` / `10` | Starting turn, and how far above the model the camera sits, in degrees. |
+| `Distance` | number | `1` | Camera distance multiplier. Below 1 zooms in. |
+| `FieldOfView` | number | `35` | Camera field of view. |
+| `Clone` | boolean | `true` | `false` moves the instance itself into the card instead of a copy. |
+| `Caption` | string | — | Line over the bottom of the preview. |
+| `Ambient` / `LightColor` | Color3 | soft grey / warm white | Lighting. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `.Model` | The copy on show. |
+| `SetModel(value)` / `Set(value)` | Show something else. `nil` clears it. Yields while waiting for a character; returns `ok, err`. |
+| `Refresh()` | Copy the current source again. |
+| `SetSpin(enabled)` / `SetSpinSpeed(degrees)` / `SetAngle(degrees)` | Control the turn. |
+| `SetCaption(text)` / `SetTitle(text)` | Change the caption or the title. |
+
+---
+
+## Table
+
+> Rows under a header, sortable by column. With `Rank` it is a leaderboard.
+
+```lua
+local Board = Tab:CreateTable({
+    Name = "Leaderboard",
+    Rank = true,
+    Columns = {
+        "Player",
+        { Name = "Kills", Align = "Right", Width = 0.2 },
+        { Name = "Cash", Align = "Right", Width = 0.25, Format = function(v) return "$" .. v end },
+    },
+    Rows = {
+        { "Builderman", 42, 12500 },
+        { "Roblox", 57, 9800, Highlight = true },
+    },
+    SortBy = "Kills",
+    MaxRows = 8,
+    Callback = function(row, index)
+        print(row[1], index)
+    end,
+})
+
+Board:AddRow({ "Guest", 12, 300 })
+Board:UpdateRow(2, { "Roblox", 60, 10200, Highlight = true })
+```
+
+Click a header to sort by it: numbers go high to low first and text A to Z, a second click flips it, and a third goes back to the order you gave. An arrow marks the sorted column. `Rank = true` adds a `#` column numbered by the order on screen, with gold, silver and bronze badges for the top three. Rows alternate shading and light up on hover. A highlighted row gets an accent tint, accent text and a bar on its left, for marking the player. `UpdateRow` flashes the row it changed. Past `MaxRows` the body scrolls; with fewer rows the card shrinks to fit.
+
+A row is a list of values in column order, or a table keyed by each column's `Key` (its name by default). Numbers get thousands separators unless the column has a `Format`.
+
+### Properties
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Name` | string | — | Title above the table. |
+| `Desc` | string | — | Hint text under the title. |
+| `Columns` | table | — | Column names, or `{ Name, Key, Width, Align, Format, Color, Sortable }`. `Width` above 1 is pixels, up to 1 a share of the width; columns without one split what's left. `Align` is `"Left"`, `"Center"` or `"Right"`. `Format(value, row)` returns the text to show. `Color` is a Color3 or `function(value, row)` returning one. `Sortable = false` locks a column. |
+| `Rows` | table | `{}` | The rows. Put `Highlight = true` in a row to mark it. |
+| `Rank` | boolean | `false` | Add the `#` column with medals. |
+| `Highlight` | function | — | `function(row, index)` returning `true` to mark a row, for example the player's own. |
+| `SortBy` / `SortDescending` | string \| number / boolean | — / `true` | Starting sort: a column name, key or number. |
+| `Sortable` | boolean | `true` | `false` turns header sorting off for every column. |
+| `MaxRows` | number | `8` | Rows shown before the body scrolls. |
+| `RowHeight` | number | `26` (`32` touch) | Height of a row. |
+| `EmptyText` | string | `"Nothing here yet"` | Shown with no rows. |
+| `Callback` | function | — | `function(row, index)` when a row is clicked. `OnRowClick` works too. |
+
+### Handle
+
+| Member | Description |
+| --- | --- |
+| `.Rows` | The rows, in the order you gave. Indexes below refer to this list, not the sorted view. |
+| `SetRows(rows)` / `Set(rows)` | Replace every row. Cheap enough to call every second for a live board. |
+| `GetRows()` / `Get()` | The rows. |
+| `AddRow(row, index?)` | Add a row at the end or at `index`. Returns its index. |
+| `UpdateRow(index, row)` | Replace a row and flash it. |
+| `RemoveRow(index)` / `Clear()` | Remove one row or all of them. |
+| `Sort(column?, descending?)` | Sort from code. `Sort()` goes back to the given order. |
+| `SetColumns(columns)` | Rebuild the header and clear the sort. |
+| `SetMaxRows(n)` / `SetTitle(text)` | Change the visible row count or the title. |
 
 ---
 
@@ -1396,7 +1573,7 @@ Airflow.Assets.Shadow = "rbxassetid://6014261993"
 
 Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
-The theme manager is a groupbox with a **Preset** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
+The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 
 ### Properties
 
@@ -1425,6 +1602,6 @@ The theme manager is a groupbox with a **Preset** picker, a name box and **Creat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
