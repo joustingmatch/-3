@@ -1247,7 +1247,7 @@ Board:AddRow({ "Guest", 12, 300 })
 Board:UpdateRow(2, { "Roblox", 60, 10200, Highlight = true })
 ```
 
-Click a header to sort by it: numbers go high to low first and text A to Z, a second click flips it, and a third goes back to the order you gave. An arrow marks the sorted column. `Rank = true` adds a `#` column numbered by the order on screen, with gold, silver and bronze badges for the top three. Rows alternate shading and light up on hover. A highlighted row gets an accent tint, accent text and a bar on its left, for marking the player. `UpdateRow` flashes the row it changed. Past `MaxRows` the body scrolls; with fewer rows the card shrinks to fit.
+A search box sits above every table and filters the rows as you type, matching any cell's text; while it filters, a count of the matching rows shows on its right. Ranks and medals keep their place in the full board, so a filtered leaderboard still shows each player's real rank. `Search = false` removes the box. Click a header to sort by it: numbers go high to low first and text A to Z, a second click flips it, and a third goes back to the order you gave. An arrow marks the sorted column. `Rank = true` adds a `#` column numbered by the order on screen, with gold, silver and bronze badges for the top three. Rows alternate shading and light up on hover. A highlighted row gets an accent tint, accent text and a bar on its left, for marking the player. `UpdateRow` flashes the row it changed. Past `MaxRows` the body scrolls; with fewer rows the card shrinks to fit.
 
 A row is a list of values in column order, or a table keyed by each column's `Key` (its name by default). Numbers get thousands separators unless the column has a `Format`.
 
@@ -1266,6 +1266,8 @@ A row is a list of values in column order, or a table keyed by each column's `Ke
 | `MaxRows` | number | `8` | Rows shown before the body scrolls. |
 | `RowHeight` | number | `26` (`32` touch) | Height of a row. |
 | `EmptyText` | string | `"Nothing here yet"` | Shown with no rows. |
+| `Search` | boolean | `true` | The search box above the table. |
+| `SearchPlaceholder` / `NoMatchText` | string | `"Search"` / `"No rows match"` | Text in the empty box, and shown when the search matches nothing. |
 | `Callback` | function | — | `function(row, index)` when a row is clicked. `OnRowClick` works too. |
 
 ### Handle
@@ -1281,6 +1283,7 @@ A row is a list of values in column order, or a table keyed by each column's `Ke
 | `Sort(column?, descending?)` | Sort from code. `Sort()` goes back to the given order. |
 | `SetColumns(columns)` | Rebuild the header and clear the sort. |
 | `SetMaxRows(n)` / `SetTitle(text)` | Change the visible row count or the title. |
+| `SetSearch(text)` | Fill the search box from code; `""` clears it. |
 
 ---
 

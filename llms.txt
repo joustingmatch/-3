@@ -96,7 +96,7 @@ Every element takes `Name`, `Desc` (a muted hint under the name), `Tooltip` (a s
 | `Statuses` | `(entries, shared)`: names or option tables | table of status handles by name |
 | `StatusList` | `Rows`, `MaxRows`, `EmptyText`, `Update` returning rows | `Set(rows)`, `Get`, `Clear`, `SetName` |
 | `Progress` | `CurrentValue` 0..1, `Color`, `TextColor`, `Format(fraction)` | `Set`, `Get`, `SetColor`, `SetTextColor` |
-| `Table` | `Columns` (names or `{ Name, Key, Width, Align, Format, Color, Sortable }`), `Rows`, `Rank`, `SortBy`, `MaxRows`, `Highlight(row)`, `Callback(row, i)` | `SetRows`, `AddRow`, `UpdateRow`, `RemoveRow`, `Clear`, `Sort`, `SetColumns` |
+| `Table` | `Columns` (names or `{ Name, Key, Width, Align, Format, Color, Sortable }`), `Rows`, `Rank`, `SortBy`, `MaxRows`, `Search` (built-in search box, default on), `Highlight(row)`, `Callback(row, i)` | `SetRows`, `AddRow`, `UpdateRow`, `RemoveRow`, `Clear`, `Sort`, `SetColumns`, `SetSearch(text)` |
 | `Image` | `Image` (asset id, link, file, preset or `"Avatar"`), `Height`, `Caption`, `ScaleType` | `SetImage`, `SetCaption`, `SetTitle` |
 | `Viewport` | `Model` (Instance, `"Avatar"`, Player or function), `Height`, `SpinSpeed` | `SetModel`, `Refresh`, `SetSpin` |
 

@@ -10206,7 +10206,10 @@ function Tab:Table(opts)
     local inset = compact and 14 or 8
     local hasHead = type(opts.Name) == "string" and opts.Name ~= ""
     local titleTop = compact and 4 or 10
-    local gridTop = hasHead and (titleTop + (opts.Desc and 38 or 22)) or (compact and 4 or inset)
+    local searchable = opts.Search ~= false
+    local searchHeight = TOUCH and 30 or 26
+    local searchTop = hasHead and (titleTop + (opts.Desc and 38 or 22)) or (compact and 4 or inset)
+    local gridTop = searchTop + (searchable and searchHeight + 6 or 0)
     local bottom = compact and 6 or inset
 
     local frame, frameStroke = card(self, "Frame", gridTop + headerHeight + rowHeight + bottom, opts)
@@ -10232,6 +10235,61 @@ function Tab:Table(opts)
             })
         end
     end
+    -- Search: filters rows by any cell's text as you type. A count of what
+    -- matches shows on the right while it filters.
+    local query = ""
+    local searchBox, searchCount
+    if searchable then
+        local holder = create("Frame", {
+            Position = UDim2.fromOffset(inset, searchTop),
+            Size = UDim2.new(1, -inset * 2, 0, searchHeight),
+            BackgroundColor3 = Theme.Surface,
+            BorderSizePixel = 0,
+            Parent = frame,
+        })
+        holder:SetAttribute("NoDrag", true)
+        corner(holder, UDim.new(0, 6))
+        local searchStroke = stroke(holder)
+        local iconHolder, searchIcon = glowIcon(holder, "search", Theme.Muted, UDim2.new(0, 9, 0.5, 0))
+        iconHolder.Size = UDim2.fromOffset(13, 13)
+        searchCount = label({
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -9, 0, 0),
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Text = "",
+            TextSize = 11,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextTruncate = Enum.TextTruncate.None,
+            Visible = false,
+            Parent = holder,
+        })
+        searchBox = create("TextBox", {
+            Position = UDim2.fromOffset(29, 0),
+            Size = UDim2.new(1, -90, 1, 0),
+            BackgroundTransparency = 1,
+            Text = "",
+            PlaceholderText = opts.SearchPlaceholder or "Search",
+            PlaceholderColor3 = Theme.Muted,
+            TextColor3 = Theme.Text,
+            TextSize = 12,
+            FontFace = Fonts.Regular,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            ClearTextOnFocus = false,
+            Parent = holder,
+        })
+        searchBox.Focused:Connect(function()
+            tween(searchStroke, { Color = Theme.StrokeHover }, 0.15)
+            tween(searchIcon, { ImageColor3 = Theme.Accent }, 0.15)
+        end)
+        searchBox.FocusLost:Connect(function()
+            tween(searchStroke, { Color = Theme.Stroke }, 0.2)
+            tween(searchIcon, { ImageColor3 = Theme.Muted }, 0.2)
+        end)
+    end
+
     local grid = create("Frame", {
         Position = UDim2.fromOffset(inset, gridTop),
         Size = UDim2.new(1, -inset * 2, 0, headerHeight + rowHeight),
@@ -10287,6 +10345,7 @@ function Tab:Table(opts)
     })
 
     local handle = { Rows = {} }
+    local shownCount = nil
     local columns, headerCells = {}, {}
     local pool = {}
     local sortKey, sortDescending = nil, false
@@ -10412,7 +10471,27 @@ function Tab:Table(opts)
                 return a.Index < b.Index
             end)
         end
-        return list
+        -- Ranks come from the full order, so filtering never renumbers them.
+        for position, item in ipairs(list) do
+            item.Rank = position
+        end
+        if query == "" then
+            return list
+        end
+        local shown = {}
+        for _, item in ipairs(list) do
+            for _, column in ipairs(columns) do
+                if not column.Rank then
+                    local text = display(columnValue(item.Row, column), column, item.Row)
+                    text = string.lower((string.gsub(text, "<[^>]->", "")))
+                    if string.find(text, query, 1, true) then
+                        table.insert(shown, item)
+                        break
+                    end
+                end
+            end
+        end
+        return shown
     end
 
     local function newRow()
@@ -10499,7 +10578,6 @@ function Tab:Table(opts)
         end)
         rowFrame.MouseButton1Click:Connect(function()
             if entry.Data and canTap() then
-                ripple(rowFrame)
                 safeCall(opts.Callback, entry.Data, entry.Index)
             end
         end)
@@ -10507,7 +10585,7 @@ function Tab:Table(opts)
     end
 
     local function fitHeight(instant)
-        local count = #handle.Rows
+        local count = shownCount or #handle.Rows
         local visible = math.clamp(count, 1, maxRows)
         local gridHeight = headerHeight + visible * rowHeight
         local total = gridTop + gridHeight + bottom
@@ -10549,8 +10627,8 @@ function Tab:Table(opts)
             for order, column in ipairs(columns) do
                 local cell = entry.Cells[order]
                 if column.Rank then
-                    local medal = MEDALS[position]
-                    cell.Label.Text = tostring(position)
+                    local medal = MEDALS[item.Rank]
+                    cell.Label.Text = tostring(item.Rank)
                     cell.Label.TextColor3 = medal and Color3.fromRGB(28, 22, 18) or Theme.Muted
                     bindColors(cell.Label, { TextColor3 = cell.Label.TextColor3 })
                     cell.Badge.BackgroundColor3 = medal or Theme.Surface3
@@ -10584,7 +10662,14 @@ function Tab:Table(opts)
             pool[position].Frame.Visible = false
             pool[position].Data = nil
         end
+        shownCount = #list
         empty.Visible = #list == 0
+        empty.Text = (#list == 0 and query ~= "" and #handle.Rows > 0) and (opts.NoMatchText or "No rows match")
+            or (opts.EmptyText or "Nothing here yet")
+        if searchCount then
+            searchCount.Visible = query ~= ""
+            searchCount.Text = #list .. " / " .. #handle.Rows
+        end
         fitHeight()
     end
 
@@ -10827,6 +10912,21 @@ function Tab:Table(opts)
         handle:Sort(opts.SortBy, opts.SortDescending ~= false)
     end
     fitHeight(true)
+    if searchBox then
+        searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local text = string.lower(trim(searchBox.Text))
+            if text ~= query then
+                query = text
+                body.CanvasPosition = Vector2.zero
+                render()
+            end
+        end)
+    end
+    function handle:SetSearch(text)
+        if searchBox then
+            searchBox.Text = tostring(text or "")
+        end
+    end
     -- Theme tags in cells are baked to colours; repaint them on theme change.
     onTheme(grid, render)
     return finishElement(self, opts, handle, frame, "Table")
@@ -11305,30 +11405,46 @@ function Window:_flash(frame, radius)
         Parent = ring,
     })
 
-    -- A small pop, unless something else is scaling the control already.
+    -- Groupboxes clip their rows, so anything drawn outside a control is cut
+    -- off at its corners. The strokes go on the inside of the control where
+    -- the engine supports it; otherwise everything is inset by its width.
+    local inside = pcall(function()
+        haloStroke.BorderStrokePosition = Enum.BorderStrokePosition.Inner
+        ring.BorderStrokePosition = Enum.BorderStrokePosition.Inner
+    end)
+    local glowWidth = inside and 6 or 3
+    if not inside then
+        halo.Position = UDim2.fromOffset(glowWidth + 1, glowWidth + 1)
+        halo.Size = UDim2.new(1, -(glowWidth + 1) * 2, 1, -(glowWidth + 1) * 2)
+        wash.Position = UDim2.fromOffset(2, 2)
+        wash.Size = UDim2.new(1, -4, 1, -4)
+    end
+
+    -- A small pop, unless something else is scaling the control already. It
+    -- never grows past full size, which would be clipped as well.
     local pop
     if not frame:FindFirstChildOfClass("UIScale") then
         pop = create("UIScale", { Scale = 0.975, Parent = frame })
-        tween(pop, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
+        tween(pop, { Scale = 1 }, 0.4, Enum.EasingStyle.Quint)
     end
 
     tween(wash, { BackgroundTransparency = 0.8 }, 0.2, Enum.EasingStyle.Quad)
     tween(ring, { Transparency = 0 }, 0.2, Enum.EasingStyle.Quad)
-    tween(haloStroke, { Thickness = 6, Transparency = 0.72 }, 0.35, Enum.EasingStyle.Quint)
+    tween(haloStroke, { Thickness = glowWidth, Transparency = 0.72 }, 0.35, Enum.EasingStyle.Quint)
     tween(sheen, { Offset = Vector2.new(1, 0) }, 0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
     tween(runner, { Rotation = 540 }, 2.2, Enum.EasingStyle.Quad)
     task.spawn(function()
         task.wait(0.75)
         -- One softer breath, then fade out.
         tween(wash, { BackgroundTransparency = 0.9 }, 0.35, Enum.EasingStyle.Sine)
-        tween(haloStroke, { Thickness = 3, Transparency = 0.85 }, 0.35, Enum.EasingStyle.Sine)
+        tween(haloStroke, { Thickness = glowWidth / 2, Transparency = 0.85 }, 0.35, Enum.EasingStyle.Sine)
         task.wait(0.35)
         tween(wash, { BackgroundTransparency = 0.84 }, 0.3, Enum.EasingStyle.Sine)
-        tween(haloStroke, { Thickness = 5, Transparency = 0.76 }, 0.3, Enum.EasingStyle.Sine)
+        tween(haloStroke, { Thickness = glowWidth * 0.85, Transparency = 0.76 }, 0.3, Enum.EasingStyle.Sine)
         task.wait(0.4)
         tween(wash, { BackgroundTransparency = 1 }, 0.55, Enum.EasingStyle.Quad)
         tween(ring, { Transparency = 1 }, 0.65, Enum.EasingStyle.Quad)
-        tween(haloStroke, { Thickness = 10, Transparency = 1 }, 0.65, Enum.EasingStyle.Quad)
+        tween(haloStroke, { Thickness = glowWidth, Transparency = 1 }, 0.65, Enum.EasingStyle.Quad)
         task.wait(0.7)
         wash:Destroy()
         halo:Destroy()
