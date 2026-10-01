@@ -16797,6 +16797,7 @@ function Window:_buildMiniBar()
     local layers = { Compact = compact, Expanded = expanded, Activity = activity }
     local mode = "Compact"
     local modeToken = 0
+    local sizeTween, cornerTween
     local hovered, pressed = false, false
     local activityToken = 0
     local activityLive = false
@@ -16819,8 +16820,16 @@ function Window:_buildMiniBar()
         local current = Vector2.new(island.Size.X.Offset, island.Size.Y.Offset)
         local growing = size.X > current.X + 1 or size.Y > current.Y + 1
         local duration = instant and 0 or (growing and 0.5 or 0.38)
-        tween(island, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, growing and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
-        tween(islandCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
+        -- A snap must stop a morph still in flight, or it keeps writing the
+        -- old shape over the new one.
+        if sizeTween then
+            sizeTween:Cancel()
+        end
+        if cornerTween then
+            cornerTween:Cancel()
+        end
+        sizeTween = tween(island, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, growing and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
+        cornerTween = tween(islandCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
         if not changed and not instant then
             return
         end
@@ -16905,6 +16914,13 @@ function Window:_buildMiniBar()
         hovered, pressed, activityLive = false, false, false
         activityToken += 1
         islandScale.Scale = 1
+        -- Clicked open while expanded: once the island has faded out, fold it
+        -- back to the pill so the next minimize starts from it.
+        task.delay(0.15, function()
+            if not self.Minimized then
+                setMode("Compact", true)
+            end
+        end)
     end
 
     -- A notification while minimized: the island opens to show it for a few
@@ -17036,9 +17052,9 @@ function Window:_buildMiniBar()
             end
         end
         -- Rows coming and going change the expanded height.
-        if mode == "Expanded" then
+        if mode == "Expanded" and hovered then
             task.defer(function()
-                if mode == "Expanded" then
+                if mode == "Expanded" and hovered and self.Minimized then
                     local size = shapeFor("Expanded")
                     if math.abs(size.Y - island.Size.Y.Offset) > 1 then
                         setMode("Expanded")
