@@ -1257,10 +1257,11 @@ function Tab:Label(opts)
     opts = normalize(opts, { Name = "Text", Title = "Text" })
     local text_ = label({
         Size = UDim2.new(1, 0, 0, 18),
-        Text = opts.Text or "",
+        Text = Library._rich(opts.Text or ""),
         TextSize = 13,
         FontFace = Fonts.Regular,
-        TextColor3 = opts.Color or Theme.Muted,
+        TextColor3 = Library._color(opts.Color) or Theme.Muted,
+        RichText = true,
         LayoutOrder = self:_nextOrder(),
         Parent = self.List,
     })
@@ -1272,10 +1273,13 @@ function Tab:Label(opts)
     end
     local handle = {
         Set = function(_, value)
-            text_.Text = tostring(value)
+            text_.Text = Library._rich(value)
         end,
         Get = function()
             return text_.Text
+        end,
+        SetColor = function(_, color)
+            tween(text_, { TextColor3 = Library._color(color) or Theme.Muted }, 0.25)
         end,
     }
     if type(opts.Update) == "function" then
@@ -1289,7 +1293,7 @@ function Tab:Label(opts)
             while running and text_.Parent do
                 local ok, value = isolatedCall(opts.Update)
                 if ok and value ~= nil then
-                    text_.Text = tostring(value)
+                    text_.Text = Library._rich(value)
                 elseif not ok then
                     warn("[AirFlow] label update error: " .. tostring(value))
                 end
@@ -1326,19 +1330,20 @@ function Tab:Paragraph(opts)
     local content = label({
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        Text = opts.Content or "",
+        Text = Library._rich(opts.Content or ""),
         TextSize = 13,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
         TextWrapped = true,
         TextTruncate = Enum.TextTruncate.None,
         TextYAlignment = Enum.TextYAlignment.Top,
+        RichText = true,
         LayoutOrder = 2,
         Parent = frame,
     })
     return finishElement(self, opts, {
         Set = function(_, value)
-            content.Text = value
+            content.Text = Library._rich(value)
         end,
     }, frame, "Paragraph")
 end
@@ -2047,6 +2052,7 @@ function Tab:Dropdown(opts)
     })
     corner(panel, UDim.new(0, 10))
     local panelStroke = stroke(panel, Theme.Stroke, 1)
+    edgeHighlight(panel)
     local inner = create("Frame", {
         Size = UDim2.new(1, 0, 0, 120),
         BackgroundTransparency = 1,
@@ -2170,6 +2176,22 @@ function Tab:Dropdown(opts)
         return filter == "" or string.find(string.lower(tostring(option)), filter, 1, true) ~= nil
     end
 
+    -- Option labels are rich text, so the part matching the search can light up.
+    local function escapeRich(text)
+        return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+    end
+    local function optionText(option)
+        local text = tostring(option)
+        local at = filter ~= "" and string.find(string.lower(text), filter, 1, true)
+        if not at then
+            return escapeRich(text)
+        end
+        local stop = at + #filter - 1
+        return escapeRich(text:sub(1, at - 1))
+            .. '<font color="#' .. Theme.Accent:ToHex() .. '"><b>' .. escapeRich(text:sub(at, stop)) .. "</b></font>"
+            .. escapeRich(text:sub(stop + 1))
+    end
+
     if multi then
         for _, value in ipairs(opts.Default or {}) do
             selected[value] = true
@@ -2196,6 +2218,16 @@ function Tab:Dropdown(opts)
         return nil
     end
 
+    -- A picked row rests on a faint accent tint; hovering lifts either kind.
+    local function restRow(entry, duration)
+        local on, hover = entry.On == true, entry.Hover == true
+        tween(entry.Frame, {
+            BackgroundColor3 = on and Theme.Accent or Theme.Surface3,
+            BackgroundTransparency = on and (hover and 0.8 or 0.88) or (hover and 0.55 or 1),
+        }, duration)
+        tween(entry.Label, { TextColor3 = (on or hover) and Theme.Text or Theme.Muted }, duration)
+    end
+
     local function paintOption(button, animate)
         local on = selected[button.Option] == true
         if button.On == on and animate then
@@ -2203,10 +2235,17 @@ function Tab:Dropdown(opts)
         end
         button.On = on
         local duration = animate and 0.18 or 0
-        tween(button.Box, { BackgroundColor3 = on and Theme.Accent or Theme.Surface2 }, duration)
-        tween(button.BoxStroke, { Color = on and Theme.Accent or Theme.Stroke }, duration)
+        restRow(button, duration)
+        if multi then
+            tween(button.Box, { BackgroundColor3 = on and Theme.Accent or Theme.Surface2 }, duration)
+            tween(button.BoxStroke, { Color = on and Theme.Accent or Theme.Stroke }, duration)
+        else
+            tween(button.Bar, {
+                BackgroundTransparency = on and 0 or 1,
+                Size = UDim2.fromOffset(3, on and ROW - 14 or 4),
+            }, animate and 0.3 or 0, Enum.EasingStyle.Quint)
+        end
         tween(button.Check, { ImageTransparency = on and 0 or 1 }, duration)
-        tween(button.Label, { TextColor3 = on and Theme.Text or Theme.Muted }, duration)
         if animate and on then
             button.CheckScale.Scale = 0.5
             tween(button.CheckScale, { Scale = 1 }, 0.3, Enum.EasingStyle.Back)
@@ -2220,11 +2259,19 @@ function Tab:Dropdown(opts)
         if #options == 0 then
             fullText = opts.EmptyText or "None"
         elseif multi then
-            fullText = #value > 0 and table.concat(value, ", ") or (opts.NoneText or "None")
+            -- Two names at most, then a count, so a long pick stays readable.
+            if #value > 2 then
+                fullText = tostring(value[1]) .. ", " .. tostring(value[2]) .. "  +" .. (#value - 2)
+            else
+                fullText = #value > 0 and table.concat(value, ", ") or (opts.NoneText or "None")
+            end
         else
             fullText = value ~= nil and tostring(value) or (opts.NoneText or "None")
         end
         valueLabel.Text = trimmed()
+        -- A picked value reads in full colour; "None" stays muted.
+        local picked = #options > 0 and (if multi then #value > 0 else value ~= nil)
+        tween(valueLabel, { TextColor3 = picked and Theme.Text or Theme.Muted }, animate and 0.15 or 0)
         for _, button in pairs(optionButtons) do
             paintOption(button, animate)
         end
@@ -2290,7 +2337,11 @@ function Tab:Dropdown(opts)
 
     local function applyFilter()
         for option, button in pairs(optionButtons) do
-            button.Frame.Visible = matches(option)
+            local shown = matches(option)
+            button.Frame.Visible = shown
+            if shown then
+                button.Label.Text = optionText(option)
+            end
         end
     end
 
@@ -2357,7 +2408,8 @@ function Tab:Dropdown(opts)
         end
         self_.Open = open
         arrow:Set(open)
-        tween(chipStroke, { Color = open and Theme.StrokeHover or Theme.Stroke }, 0.2)
+        tween(chipStroke, { Color = open and Theme.Accent or Theme.Stroke, Transparency = open and 0.35 or 0 }, 0.2)
+        tween(chip, { BackgroundColor3 = open and Theme.Surface2 or Theme.Surface }, 0.2)
         closeGeneration += 1
         if open then
             if window._closePopup and window._closePopup ~= self_._close then
@@ -2371,6 +2423,7 @@ function Tab:Dropdown(opts)
             end
             filter = ""
             searchBox.Text = ""
+            searchBox.PlaceholderText = opts.SearchPlaceholder or (#options > 6 and ("Search " .. #options .. " options") or "Search")
             applyFilter()
             layoutPopup(true)
             renderValue(false)
@@ -2381,7 +2434,7 @@ function Tab:Dropdown(opts)
             popup.Visible = true
             tween(popup, { Size = UDim2.fromOffset(targetSize.X, targetSize.Y) }, 0.3, Enum.EasingStyle.Quint)
             tween(panelStroke, { Transparency = 0 }, 0.12)
-            tween(popupShadow, { ImageTransparency = 0.55 }, 0.3)
+            tween(popupShadow, { ImageTransparency = 0.4 }, 0.3)
             if not stopFollowing then
                 stopFollowing = window:_listen("Render", place)
             end
@@ -2450,37 +2503,64 @@ function Tab:Dropdown(opts)
                 Parent = list,
             })
             corner(row, UDim.new(0, 7))
-            local box = create("Frame", {
-                AnchorPoint = Vector2.new(0, 0.5),
-                Position = UDim2.new(0, 8, 0.5, 0),
-                Size = UDim2.fromOffset(18, 18),
-                BackgroundColor3 = Theme.Surface2,
-                BorderSizePixel = 0,
-                Parent = row,
-            })
-            corner(box, UDim.new(0, 5))
-            local boxStroke = stroke(box, Theme.Stroke)
-            local check = create("ImageLabel", {
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(12, 12),
-                BackgroundTransparency = 1,
-                ImageColor3 = Theme.AccentDark,
-                ImageTransparency = 1,
-                ScaleType = Enum.ScaleType.Fit,
-                Parent = box,
-            })
+            -- Multi selection ticks a checkbox on the left. A single pick
+            -- gets an accent bar on the left edge and a check on the right.
+            local box, boxStroke, bar, check
+            if multi then
+                box = create("Frame", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Position = UDim2.new(0, 8, 0.5, 0),
+                    Size = UDim2.fromOffset(18, 18),
+                    BackgroundColor3 = Theme.Surface2,
+                    BorderSizePixel = 0,
+                    Parent = row,
+                })
+                corner(box, UDim.new(0, 5))
+                boxStroke = stroke(box, Theme.Stroke)
+                check = create("ImageLabel", {
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.fromScale(0.5, 0.5),
+                    Size = UDim2.fromOffset(12, 12),
+                    BackgroundTransparency = 1,
+                    ImageColor3 = Theme.AccentDark,
+                    ImageTransparency = 1,
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = box,
+                })
+            else
+                bar = create("Frame", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Position = UDim2.new(0, 3, 0.5, 0),
+                    Size = UDim2.fromOffset(3, 4),
+                    BackgroundColor3 = Theme.Accent,
+                    BackgroundTransparency = 1,
+                    BorderSizePixel = 0,
+                    Parent = row,
+                })
+                corner(bar, UDim.new(1, 0))
+                check = create("ImageLabel", {
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Position = UDim2.new(1, -10, 0.5, 0),
+                    Size = UDim2.fromOffset(14, 14),
+                    BackgroundTransparency = 1,
+                    ImageColor3 = Theme.Accent,
+                    ImageTransparency = 1,
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = row,
+                })
+            end
             applyIcon(check, "check")
             local checkScale = create("UIScale", { Parent = check })
             local text_ = label({
-                Position = UDim2.fromOffset(36, 0),
-                Size = UDim2.new(1, -44, 1, 0),
-                Text = tostring(option),
+                Position = UDim2.fromOffset(multi and 36 or 14, 0),
+                Size = UDim2.new(1, multi and -44 or -46, 1, 0),
+                Text = optionText(option),
                 TextSize = 13,
                 TextColor3 = Theme.Muted,
+                RichText = true,
                 Parent = row,
             })
-            local entry = { Option = option, Frame = row, Box = box, BoxStroke = boxStroke, Check = check, CheckScale = checkScale, Label = text_, On = nil }
+            local entry = { Option = option, Frame = row, Box = box, BoxStroke = boxStroke, Bar = bar, Check = check, CheckScale = checkScale, Label = text_, On = nil, Hover = false }
             local isTap = tapGuard(row, function()
                 return list
             end)
@@ -2489,16 +2569,16 @@ function Tab:Dropdown(opts)
                 if usingTouch() then
                     return
                 end
-                tween(row, { BackgroundTransparency = 0.55 }, 0.15)
-                tween(text_, { TextColor3 = Theme.Text }, 0.15)
-                if not selected[option] then
+                entry.Hover = true
+                restRow(entry, 0.15)
+                if boxStroke and not selected[option] then
                     tween(boxStroke, { Color = Theme.StrokeHover }, 0.15)
                 end
             end)
             row.MouseLeave:Connect(function()
-                tween(row, { BackgroundTransparency = 1 }, 0.25)
-                tween(text_, { TextColor3 = selected[option] and Theme.Text or Theme.Muted }, 0.25)
-                if not selected[option] then
+                entry.Hover = false
+                restRow(entry, 0.25)
+                if boxStroke and not selected[option] then
                     tween(boxStroke, { Color = Theme.Stroke }, 0.25)
                 end
             end)
@@ -2627,6 +2707,19 @@ function Tab:Dropdown(opts)
     header.MouseButton1Click:Connect(function()
         if headerTap() then
             setOpen(not self_.Open)
+        end
+    end)
+    -- The chip answers the pointer before it is opened.
+    header.MouseEnter:Connect(function()
+        if not self_.Open and not usingTouch() then
+            tween(chipStroke, { Color = Theme.StrokeHover }, 0.15)
+            tween(chip, { BackgroundColor3 = Theme.Surface2 }, 0.15)
+        end
+    end)
+    header.MouseLeave:Connect(function()
+        if not self_.Open then
+            tween(chipStroke, { Color = Theme.Stroke }, 0.25)
+            tween(chip, { BackgroundColor3 = Theme.Surface }, 0.25)
         end
     end)
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -3327,7 +3420,8 @@ function Tab:Progress(opts)
         Size = UDim2.fromOffset(90, 18),
         TextXAlignment = Enum.TextXAlignment.Right,
         TextSize = 13,
-        TextColor3 = Theme.Accent,
+        TextColor3 = Library._color(opts.TextColor) or Theme.Accent,
+        RichText = true,
         Parent = frame,
     })
     local track = create("Frame", {
@@ -3340,7 +3434,7 @@ function Tab:Progress(opts)
     corner(track, UDim.new(1, 0))
     local fill = create("Frame", {
         Size = UDim2.new(0, 0, 1, 0),
-        BackgroundColor3 = opts.Color or Theme.Accent,
+        BackgroundColor3 = Library._color(opts.Color) or Theme.Accent,
         BorderSizePixel = 0,
         Parent = track,
     })
@@ -3352,7 +3446,7 @@ function Tab:Progress(opts)
         local frac = self_.Value
         tween(fill, { Size = UDim2.new(frac, 0, 1, 0) }, duration, Enum.EasingStyle.Quint)
         if type(formatter) == "function" then
-            valueLabel.Text = tostring(formatter(frac))
+            valueLabel.Text = Library._rich(formatter(frac))
         else
             valueLabel.Text = string.format("%d%%", math.floor(frac * 100 + 0.5))
         end
@@ -3372,9 +3466,16 @@ function Tab:Progress(opts)
         return self_.Value
     end
     function self_:SetColor(color)
-        tween(fill, { BackgroundColor3 = color }, 0)
+        tween(fill, { BackgroundColor3 = Library._color(color) or Theme.Accent }, 0.25)
     end
-    render(0)
+    -- The percentage's colour; nil goes back to the accent.
+    function self_:SetTextColor(color)
+        tween(valueLabel, { TextColor3 = Library._color(color) or Theme.Accent }, 0.25)
+    end
+    -- Runs render now, and again on a theme change for theme tags in Format.
+    onTheme(valueLabel, function()
+        render(0)
+    end)
     return finishElement(self, opts, self_, frame, "Progress")
 end
 
@@ -4158,6 +4259,7 @@ function Library.Window(_, opts)
         _hideAvatar = false,
         Title = opts.Title or "Airflow",
         _logoIcon = opts.Icon or Assets.Logo,
+        _islandLocked = opts.IslandDraggable == false,
     }, Window)
     local saving = type(opts.ConfigurationSaving) == "table" and opts.ConfigurationSaving or {}
     self.ConfigFolder = saving.FolderName or "AirflowUI"
@@ -4171,6 +4273,7 @@ function Library.Window(_, opts)
     end
     self:_applyDefaultTheme()
     self._uiScale = math.clamp(tonumber(opts.UIScale) or 1, 0.6, 1.5)
+    self._adaptive = opts.AdaptiveSize ~= false
     self.UIScale = self._uiScale
     if opts.Density ~= nil then
         Library:SetDensity(opts.Density)
@@ -5810,8 +5913,10 @@ function Window:_fitToScreen(instant)
         return
     end
     local size = self.Root.Size
-    -- The player's UI scale, shrunk further when the window wouldn't fit.
-    local scale = math.min(self._uiScale or 1, (viewport.X - 24) / math.max(size.X.Offset, 1), (viewport.Y - 24) / math.max(size.Y.Offset, 1))
+    -- The player's UI scale, times the adaptive factor for this screen, shrunk
+    -- further when the window wouldn't fit.
+    local wanted = (self._uiScale or 1) * (self._adaptive ~= false and Library._adaptiveFactor(viewport) or 1)
+    local scale = math.min(wanted, (viewport.X - 24) / math.max(size.X.Offset, 1), (viewport.Y - 24) / math.max(size.Y.Offset, 1))
     self._fitScale = math.max(scale, 0.45)
     if self._introDone and self.Open then
         if instant then
@@ -5820,6 +5925,35 @@ function Window:_fitToScreen(instant)
             tween(self.Scale, { Scale = self._fitScale }, 0.2)
         end
     end
+end
+
+-- Adaptive size: the window is drawn for a 1080p screen and grows on larger
+-- ones (up to 1.75x on 4K) or shrinks a little on small laptops, so it covers
+-- about the same share of any screen. 1080p-class screens, windowed or with
+-- the topbar inset, stay at exactly 1. Touch screens only use the fit.
+function Library._adaptiveFactor(viewport)
+    if TOUCH then
+        return 1
+    end
+    local factor = math.min(viewport.X / 1920, viewport.Y / 1020)
+    if factor > 0.9 and factor < 1.15 then
+        return 1
+    end
+    return math.clamp(math.floor(factor * 20 + 0.5) / 20, 0.85, 1.75)
+end
+
+function Window:SetAdaptiveSize(enabled)
+    self._adaptive = enabled ~= false
+    self:_fitToScreen()
+    task.delay(0.22, function()
+        if not self._destroyed then
+            self:_clampToScreen()
+        end
+    end)
+end
+
+function Window:GetAdaptiveSize()
+    return self._adaptive ~= false
 end
 
 -- UI scale: 0.6 to 1.5 on top of the automatic fit to small screens.
@@ -6979,6 +7113,61 @@ local function hexOf(color)
         math.floor(color.B * 255 + 0.5))
 end
 
+-- Coloured text for statuses, metrics, table cells and labels. A theme key
+-- used as a tag, <Success>online</Success>, follows theme changes; plain
+-- rich text such as <font color="#ff5a5a"> works too. Library.Colorize wraps
+-- text for you. Table fields, not locals: the chunk is at Luau's 200 limit.
+Library._toneTags = {}
+for _, name in ipairs(THEME_KEYS) do
+    Library._toneTags[string.lower(name)] = name
+end
+
+-- A theme key, a Color3, "#rrggbb" or { r, g, b } as a Color3.
+function Library._color(value)
+    if type(value) == "string" then
+        local key = Library._toneTags[string.lower(value)]
+        if key then
+            return Theme[key]
+        end
+    end
+    return toColor(value)
+end
+
+function Library._rich(text)
+    text = tostring(text == nil and "" or text)
+    if not string.find(text, "<", 1, true) then
+        return text
+    end
+    return (string.gsub(text, "<(/?)(%a+%d*)>", function(slash, name)
+        local key = Library._toneTags[string.lower(name)]
+        if not key then
+            return nil
+        end
+        if slash == "/" then
+            return "</font>"
+        end
+        return '<font color="' .. hexOf(Theme[key]) .. '">'
+    end))
+end
+
+-- Library.Colorize("12 ms", "Success") or Library:Colorize(text, Color3).
+function Library.Colorize(...)
+    local args = { ... }
+    if args[1] == Library then
+        table.remove(args, 1)
+    end
+    local text, color = tostring(args[1] == nil and "" or args[1]), args[2]
+    local key = type(color) == "string" and Library._toneTags[string.lower(color)]
+    if key then
+        return "<" .. key .. ">" .. text .. "</" .. key .. ">"
+    end
+    local resolved = toColor(color)
+    if not resolved then
+        return text
+    end
+    return '<font color="' .. hexOf(resolved) .. '">' .. text .. "</font>"
+end
+
 function Library:SetTheme(theme, instant)
     if type(theme) == "string" then
         local found = Library.ThemePresets[theme]
@@ -7546,8 +7735,21 @@ local function statTile(parent, order, icon, title)
         Text = "…",
         TextSize = 17,
         FontFace = Fonts.Bold,
+        RichText = true,
         Parent = tile,
     })
+end
+
+-- Health colour for a live metric: Success under good, Warning under bad,
+-- Error past it. lowerIsBetter flips the scale (ping, memory).
+function Library._healthColor(value, good, bad, lowerIsBetter)
+    if type(value) ~= "number" then
+        return Theme.Text
+    end
+    if lowerIsBetter then
+        return value <= good and Theme.Success or value <= bad and Theme.Warning or Theme.Error
+    end
+    return value >= good and Theme.Success or value >= bad and Theme.Warning or Theme.Error
 end
 
 local function bumpExecutions(folder)
@@ -8428,8 +8630,8 @@ function Tab:ThemeManager(opts)
     local manager = {}
     local themes, status, defaultRow, presets
     local weather, weatherMode, dim, transparent, dragSkeleton
-    local background, backgroundInput, backgroundOpacity
-    local uiScale, density
+    local background, backgroundInput, backgroundOpacity, backgroundLabel
+    local uiScale, density, adaptive
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
@@ -8518,6 +8720,16 @@ function Tab:ThemeManager(opts)
             end,
         })
     end
+    if opts.AdaptiveSize ~= false then
+        adaptive = host:Toggle({
+            Name = "Adaptive Size",
+            Tooltip = "Scales the window to your screen resolution, bigger on large monitors. UI Scale applies on top.",
+            Default = window:GetAdaptiveSize(),
+            Callback = function(value)
+                window:SetAdaptiveSize(value)
+            end,
+        })
+    end
     if opts.Scale ~= false then
         uiScale = host:Slider({
             Name = "UI Scale",
@@ -8553,7 +8765,7 @@ function Tab:ThemeManager(opts)
     end
     if opts.Background ~= false then
         -- The dropdown shows listed images by name, "custom" for ids and links.
-        local function backgroundLabel(source)
+        backgroundLabel = function(source)
             if source == nil or source == "" then
                 return "None"
             end
@@ -8765,10 +8977,12 @@ function Tab:ThemeManager(opts)
                 Colors = colors,
                 Weather = weather and window.Weather or nil,
                 WeatherMode = weatherMode and window.WeatherMode or nil,
-                Dim = dim and window._backdropDim or nil,
-                Transparent = transparent and window.Transparent == true or nil,
-                DragSkeleton = dragSkeleton and window.DragSkeleton or nil,
+                -- if-expressions, not and/or: a switched-off value is false, not nil.
+                Dim = if dim then window._backdropDim == true else nil,
+                Transparent = if transparent then window.Transparent == true else nil,
+                DragSkeleton = if dragSkeleton then window.DragSkeleton == true else nil,
                 UIScale = uiScale and window:GetUIScale() or nil,
+                AdaptiveSize = if adaptive then window:GetAdaptiveSize() else nil,
                 Density = density and Library.Density or nil,
                 -- "" is no background; a missing field leaves it alone on load.
                 Background = background and (window.Background or "") or nil,
@@ -8815,6 +9029,10 @@ function Tab:ThemeManager(opts)
                 window:SetDragSkeleton(value.DragSkeleton)
                 dragSkeleton:Set(value.DragSkeleton, true)
             end
+            if adaptive and type(value.AdaptiveSize) == "boolean" then
+                window:SetAdaptiveSize(value.AdaptiveSize)
+                adaptive:Set(value.AdaptiveSize, true)
+            end
             if uiScale and tonumber(value.UIScale) then
                 window:SetUIScale(tonumber(value.UIScale))
                 uiScale:Set(math.floor(window:GetUIScale() * 100 + 0.5), true)
@@ -8858,11 +9076,9 @@ Tab.CreateThemeManager = Tab.ThemeManager
 
 local STATUS_HEIGHT = { Plain = 22, Row = 24, Badge = 28, Dot = 24, Bar = 38, Stat = 46 }
 
+-- Tone: a theme key, a Color3 or "#rrggbb".
 local function toneColor(tone)
-    if type(tone) == "string" and typeof(Theme[tone]) == "Color3" then
-        return Theme[tone]
-    end
-    return Theme.Accent
+    return Library._color(tone) or Theme.Accent
 end
 
 local function formatNumber(value)
@@ -8901,7 +9117,7 @@ function Tab:Status(opts)
         Parent = frame,
     })
 
-    local handle = { Value = opts.Value, Max = opts.Max, Tone = opts.Tone or "Accent", Name = opts.Name or "" }
+    local handle = { Value = opts.Value, Max = opts.Max, Tone = opts.Tone or "Accent", Name = opts.Name or "", Color = opts.Color or opts.ValueColor }
     local keyLabel, valueLabel, chip, chipStroke, dot, pulse, fill
     local tinted = false
 
@@ -9049,7 +9265,7 @@ function Tab:Status(opts)
 
     local lastText = nil
     local function render(animate)
-        keyLabel.Text = keyText()
+        keyLabel.Text = Library._rich(keyText())
         local value = handle.Value
         local text = value == nil and (opts.Placeholder or "-") or tostring(value)
         if style == "Bar" then
@@ -9064,12 +9280,17 @@ function Tab:Status(opts)
                 tween(fill, { Size = UDim2.new(math.clamp(value, 0, 1), 0, 1, 0) }, animate and 0.4 or 0, Enum.EasingStyle.Quint)
             end
         end
-        text = (opts.Prefix or "") .. text .. (opts.Suffix or "")
+        text = Library._rich((opts.Prefix or "") .. text .. (opts.Suffix or ""))
         local changed = lastText ~= nil and text ~= lastText
         lastText = text
         valueLabel.Text = text
         local tone = toneColor(handle.Tone)
         local duration = animate and 0.25 or 0
+        -- Color paints the whole value; inline tags still win over it.
+        local valueColor = not tinted and Library._color(handle.Color) or Theme.Text
+        if not tinted and not (changed and animate and opts.Flash ~= false) then
+            tween(valueLabel, { TextColor3 = valueColor }, duration)
+        end
         if chip then
             tween(chip, { BackgroundColor3 = tone }, duration)
             tween(chipStroke, { Color = tone }, duration)
@@ -9087,11 +9308,20 @@ function Tab:Status(opts)
             tween(valueLabel, { TextColor3 = Theme.Accent }, 0.08)
             task.delay(0.1, function()
                 if valueLabel.Parent then
-                    tween(valueLabel, { TextColor3 = Theme.Text }, 0.45)
+                    tween(valueLabel, { TextColor3 = Library._color(handle.Color) or Theme.Text }, 0.45)
                 end
             end)
         end
     end
+
+    keyLabel.RichText = true
+    valueLabel.RichText = true
+    -- Theme tags in the text are baked to colours, so repaint on theme change.
+    onTheme(holder, function()
+        if lastText ~= nil then
+            render(false)
+        end
+    end)
 
     function handle:Set(value, max)
         handle.Value = value
@@ -9107,12 +9337,27 @@ function Tab:Status(opts)
         handle.Tone = tone
         render(true)
     end
+    -- nil goes back to the normal text colour.
+    function handle:SetColor(color)
+        handle.Color = color
+        render(true)
+    end
     function handle:SetName(name)
         handle.Name = tostring(name)
         render(false)
     end
     function handle:Text()
         return valueLabel.Text
+    end
+    -- The value's resting colour, for the copy pinned on the minimized island.
+    function handle._shownColor()
+        if handle.Color ~= nil then
+            return Library._color(handle.Color) or Theme.Text
+        end
+        if style == "Badge" or style == "Dot" or style == "Bar" then
+            return toneColor(handle.Tone)
+        end
+        return Theme.Text
     end
 
     handle._listeners = {}
@@ -9131,7 +9376,7 @@ function Tab:Status(opts)
                     end
                     if type(extra) == "number" then
                         handle.Max = extra
-                    elseif type(extra) == "string" then
+                    elseif type(extra) == "string" or typeof(extra) == "Color3" then
                         handle.Tone = extra
                     end
                     render(true)
@@ -9305,6 +9550,7 @@ function Tab:StatusList(opts)
                 TextColor3 = Theme.Muted,
                 TextWrapped = true,
                 TextTruncate = Enum.TextTruncate.None,
+                RichText = true,
                 Parent = holder,
             }),
             Value = label({
@@ -9316,6 +9562,7 @@ function Tab:StatusList(opts)
                 TextSize = 12,
                 FontFace = Fonts.Medium,
                 TextColor3 = Theme.Text,
+                RichText = true,
                 TextXAlignment = Enum.TextXAlignment.Right,
                 TextTruncate = Enum.TextTruncate.None,
                 Visible = false,
@@ -9334,17 +9581,18 @@ function Tab:StatusList(opts)
     local function normalizeRow(entry)
         if type(entry) == "table" then
             local text = entry.Text or entry.Name or entry[1]
+            local tone = entry.Tone or entry.Color
             return {
                 Text = tostring(text == nil and "" or text),
                 Value = entry.Value ~= nil and tostring(entry.Value) or nil,
-                Tone = type(entry.Tone) == "string" and entry.Tone or nil,
+                Tone = (type(tone) == "string" or typeof(tone) == "Color3") and tone or nil,
             }
         end
         return { Text = tostring(entry) }
     end
 
     local function rowKey(entry)
-        return entry.Text .. "\0" .. (entry.Value or "\1") .. "\0" .. (entry.Tone or "")
+        return entry.Text .. "\0" .. (entry.Value or "\1") .. "\0" .. tostring(entry.Tone or "")
     end
 
     -- Tone tints the value, or the text when there is no value.
@@ -9354,10 +9602,10 @@ function Tab:StatusList(opts)
             return
         end
         row.Key = key
-        row.Text.Text = entry.Text
-        local tone = entry.Tone and typeof(Theme[entry.Tone]) == "Color3" and Theme[entry.Tone] or nil
+        row.Text.Text = Library._rich(entry.Text)
+        local tone = entry.Tone and Library._color(entry.Tone) or nil
         if entry.Value then
-            row.Value.Text = entry.Value
+            row.Value.Text = Library._rich(entry.Value)
             row.Value.Visible = true
             tween(row.Value, { TextColor3 = tone or Theme.Text }, 0)
             tween(row.Text, { TextColor3 = Theme.Muted }, 0)
@@ -9429,6 +9677,16 @@ function Tab:StatusList(opts)
     function handle:SetUpdateRate(seconds)
         rate = math.max(tonumber(seconds) or rate, 0.05)
     end
+
+    -- Theme tags are baked into the text, so a theme change repaints the rows.
+    onTheme(content, function()
+        for index, row in ipairs(rowObjects) do
+            if rows[index] then
+                row.Key = nil
+                paint(row, rows[index])
+            end
+        end
+    end)
 
     local emptyConnection = empty:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
     table.insert(handle._listeners, function()
@@ -10205,6 +10463,7 @@ function Tab:Table(opts)
                 FontFace = column.Rank and Fonts.Bold or Fonts.Regular,
                 TextColor3 = Theme.Text,
                 TextXAlignment = alignment(column),
+                RichText = not column.Rank,
                 Parent = cell,
             })
             local badge
@@ -10298,16 +10557,24 @@ function Tab:Table(opts)
                     cell.Badge.BackgroundTransparency = medal and 0.05 or 1
                 else
                     local value = columnValue(row, column)
-                    cell.Label.Text = display(value, column, row)
-                    local color = highlighted and Theme.Accent or Theme.Text
-                    if typeof(column.Color) == "Color3" then
-                        color = column.Color
-                    elseif type(column.Color) == "function" then
-                        local ok, result = pcall(column.Color, value, row)
-                        if ok and typeof(result) == "Color3" then
-                            color = result
+                    cell.Label.Text = Library._rich(display(value, column, row))
+                    -- Column Color: a colour, a theme key or a function(value, row)
+                    -- returning either. A row's Colors[key or index] beats it.
+                    local wanted = column.Color
+                    if type(wanted) == "function" then
+                        local ok, result = pcall(wanted, value, row)
+                        wanted = ok and result or nil
+                    end
+                    if type(row.Colors) == "table" then
+                        local own = row.Colors[column.Key or column.Index]
+                        if own == nil then
+                            own = row.Colors[column.Index]
+                        end
+                        if own ~= nil then
+                            wanted = own
                         end
                     end
+                    local color = Library._color(wanted) or (highlighted and Theme.Accent or Theme.Text)
                     cell.Label.TextColor3 = color
                     bindColors(cell.Label, { TextColor3 = color })
                 end
@@ -10560,6 +10827,8 @@ function Tab:Table(opts)
         handle:Sort(opts.SortBy, opts.SortDescending ~= false)
     end
     fitHeight(true)
+    -- Theme tags in cells are baked to colours; repaint them on theme change.
+    onTheme(grid, render)
     return finishElement(self, opts, handle, frame, "Table")
 end
 
@@ -10959,35 +11228,113 @@ function Window:_searchResults(query)
     return results
 end
 
--- Pulses an accent wash and outline over a found control.
+-- Marks a found control: it pops, a soft accent glow blooms around it, a
+-- sheen of light sweeps across it and a bright spot runs round its border,
+-- then everything breathes once more and fades.
 function Window:_flash(frame, radius)
-    local old = frame:FindFirstChild("SearchFlash")
-    if old then
-        old:Destroy()
+    for _, name in ipairs({ "SearchFlash", "SearchGlow" }) do
+        local old = frame:FindFirstChild(name)
+        if old then
+            old:Destroy()
+        end
     end
+    radius = radius or 8
+    local accent = Theme.Accent
+    local bright = accent:Lerp(Color3.new(1, 1, 1), 0.65)
+
+    -- Outer glow: a wide, faint stroke around a second outline.
+    local halo = create("Frame", {
+        Name = "SearchGlow",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        ZIndex = 10,
+        Parent = frame,
+    })
+    corner(halo, UDim.new(0, radius))
+    local haloStroke = create("UIStroke", {
+        Color = accent,
+        Thickness = 1,
+        Transparency = 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Parent = halo,
+    })
+
+    -- Wash with a moving sheen: a brighter diagonal band crosses it once.
     local wash = create("Frame", {
         Name = "SearchFlash",
         Size = UDim2.fromScale(1, 1),
-        BackgroundColor3 = Theme.Accent,
+        BackgroundColor3 = accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ZIndex = 10,
         Parent = frame,
     })
-    corner(wash, UDim.new(0, radius or 8))
-    local ring = stroke(wash, Theme.Accent, 1, 1.5)
+    corner(wash, UDim.new(0, radius))
+    local sheen = create("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.7),
+            NumberSequenceKeypoint.new(0.4, 0.55),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(0.6, 0.55),
+            NumberSequenceKeypoint.new(1, 0.7),
+        }),
+        Rotation = 18,
+        Offset = Vector2.new(-1, 0),
+        Parent = wash,
+    })
+
+    -- Border light: the ring's gradient turns, so a bright spot runs round it.
+    local ring = create("UIStroke", {
+        Color = Color3.new(1, 1, 1),
+        Thickness = 1.6,
+        Transparency = 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Parent = wash,
+    })
+    local runner = create("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, accent),
+            ColorSequenceKeypoint.new(0.5, bright),
+            ColorSequenceKeypoint.new(1, accent),
+        }),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.45),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(1, 0.45),
+        }),
+        Parent = ring,
+    })
+
+    -- A small pop, unless something else is scaling the control already.
+    local pop
+    if not frame:FindFirstChildOfClass("UIScale") then
+        pop = create("UIScale", { Scale = 0.975, Parent = frame })
+        tween(pop, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
+    end
+
+    tween(wash, { BackgroundTransparency = 0.8 }, 0.2, Enum.EasingStyle.Quad)
+    tween(ring, { Transparency = 0 }, 0.2, Enum.EasingStyle.Quad)
+    tween(haloStroke, { Thickness = 6, Transparency = 0.72 }, 0.35, Enum.EasingStyle.Quint)
+    tween(sheen, { Offset = Vector2.new(1, 0) }, 0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+    tween(runner, { Rotation = 540 }, 2.2, Enum.EasingStyle.Quad)
     task.spawn(function()
-        for _ = 1, 2 do
-            tween(wash, { BackgroundTransparency = 0.84 }, 0.18)
-            tween(ring, { Transparency = 0 }, 0.18)
-            task.wait(0.22)
-            tween(wash, { BackgroundTransparency = 1 }, 0.45)
-            tween(ring, { Transparency = 0.6 }, 0.45)
-            task.wait(0.5)
-        end
-        tween(ring, { Transparency = 1 }, 0.6)
-        task.wait(0.65)
+        task.wait(0.75)
+        -- One softer breath, then fade out.
+        tween(wash, { BackgroundTransparency = 0.9 }, 0.35, Enum.EasingStyle.Sine)
+        tween(haloStroke, { Thickness = 3, Transparency = 0.85 }, 0.35, Enum.EasingStyle.Sine)
+        task.wait(0.35)
+        tween(wash, { BackgroundTransparency = 0.84 }, 0.3, Enum.EasingStyle.Sine)
+        tween(haloStroke, { Thickness = 5, Transparency = 0.76 }, 0.3, Enum.EasingStyle.Sine)
+        task.wait(0.4)
+        tween(wash, { BackgroundTransparency = 1 }, 0.55, Enum.EasingStyle.Quad)
+        tween(ring, { Transparency = 1 }, 0.65, Enum.EasingStyle.Quad)
+        tween(haloStroke, { Thickness = 10, Transparency = 1 }, 0.65, Enum.EasingStyle.Quad)
+        task.wait(0.7)
         wash:Destroy()
+        halo:Destroy()
+        if pop then
+            pop:Destroy()
+        end
     end)
 end
 
@@ -11120,6 +11467,7 @@ function Window:_buildSearch(content)
     })
     corner(panel, UDim.new(0, 10))
     local panelStroke = stroke(panel, Theme.Stroke, 1)
+    edgeHighlight(panel)
     local list = create("ScrollingFrame", {
         Position = UDim2.fromOffset(6, 6),
         Size = UDim2.new(1, -12, 1, -12),
@@ -12713,16 +13061,27 @@ function Window:_homeStats(list, opts, order, tab)
     self:_listen("Render", function()
         frames += 1
     end)
+    -- FPS, ping and memory are tinted by how healthy they are, unless the
+    -- script turns that off with StatColors = false.
+    local tinted = opts.StatColors ~= false
+    local function tint(valueLabel, color)
+        if tinted and valueLabel.TextColor3 ~= color then
+            tween(valueLabel, { TextColor3 = color }, 0.3)
+        end
+    end
     return function()
         if values.FPS then
             values.FPS.Text = tostring(frames)
+            tint(values.FPS, Library._healthColor(frames, 50, 30))
         end
         frames = 0
         if values.Ping then
             local ok, ping = pcall(function()
                 return math.floor(LocalPlayer:GetNetworkPing() * 1000)
             end)
-            values.Ping.Text = (ok and ping or 0) .. "ms"
+            ping = ok and ping or 0
+            values.Ping.Text = ping .. "ms"
+            tint(values.Ping, Library._healthColor(ping, 90, 180, true))
         end
         if values.Players then
             values.Players.Text = #Players:GetPlayers() .. "/" .. Players.MaxPlayers
@@ -12741,6 +13100,7 @@ function Window:_homeStats(list, opts, order, tab)
                 return StatsService:GetTotalMemoryUsageMb()
             end)
             values.Memory.Text = ok and string.format("%d MB", memory) or "—"
+            tint(values.Memory, ok and Library._healthColor(memory, 1500, 3000, true) or Theme.Text)
         end
     end, function()
         frames = 0
@@ -16799,6 +17159,7 @@ function Window:_buildMiniBar()
     local modeToken = 0
     local sizeTween, cornerTween
     local hovered, pressed = false, false
+    local dragFrom, dragAnchor, dragging, dragged = nil, nil, false, false
     local activityToken = 0
     local activityLive = false
 
@@ -16809,6 +17170,50 @@ function Window:_buildMiniBar()
             return Vector2.new(Mini.Wide, math.floor(math.max(activityList.AbsoluteSize.Y, 34) + 26 + 0.5)), 24
         end
         return Vector2.new(Mini.Width, Mini.Height), Mini.Height / 2
+    end
+
+    -- Where the island hangs: the top centre of its shape, as fractions of
+    -- the screen so it keeps its spot across resolutions. Dragging moves it;
+    -- each shape is clamped on screen, so the wide card slides in from an edge
+    -- and the pill goes back to its spot when it folds.
+    local saved = self:_readConfigSettings().IslandPosition
+    if type(saved) == "table" and tonumber(saved.X) and tonumber(saved.Y) then
+        self._islandAnchor = Vector2.new(math.clamp(tonumber(saved.X), 0, 1), math.clamp(tonumber(saved.Y), 0, 1))
+    end
+    local positionTween
+    local function anchorPixels()
+        local view = gui.AbsoluteSize
+        local anchor = self._islandAnchor
+        if not anchor then
+            return Vector2.new(view.X / 2, Mini.Top)
+        end
+        return Vector2.new(anchor.X * view.X, anchor.Y * view.Y)
+    end
+    local function islandSpot(size, from)
+        local view = gui.AbsoluteSize
+        local spot = from or anchorPixels()
+        local margin = 6
+        local x = math.clamp(spot.X, size.X / 2 + margin, math.max(view.X - size.X / 2 - margin, size.X / 2 + margin))
+        local y = math.clamp(spot.Y, margin, math.max(view.Y - size.Y - margin, margin))
+        return Vector2.new(x, y)
+    end
+    local function placeIsland(size, duration, style)
+        local spot = islandSpot(size)
+        if positionTween then
+            positionTween:Cancel()
+            positionTween = nil
+        end
+        if duration and duration > 0 then
+            positionTween = tween(island, { Position = UDim2.fromOffset(spot.X, spot.Y) }, duration, style or Enum.EasingStyle.Quint)
+        else
+            island.Position = UDim2.fromOffset(spot.X, spot.Y)
+        end
+    end
+    self._islandReset = function()
+        self._islandAnchor = nil
+        if island.Visible then
+            placeIsland(Vector2.new(island.Size.X.Offset, island.Size.Y.Offset), 0.35)
+        end
     end
 
     local function setMode(name, instant)
@@ -16828,6 +17233,7 @@ function Window:_buildMiniBar()
         if cornerTween then
             cornerTween:Cancel()
         end
+        placeIsland(size, duration)
         sizeTween = tween(island, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, growing and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
         cornerTween = tween(islandCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
         if not changed and not instant then
@@ -16851,7 +17257,7 @@ function Window:_buildMiniBar()
     end
 
     local function settleMode()
-        if hovered and not TOUCH then
+        if hovered and not TOUCH and not dragging then
             setMode("Expanded")
         elseif activityLive then
             setMode("Activity")
@@ -16868,17 +17274,18 @@ function Window:_buildMiniBar()
         islandScale.Scale = 1
         setMode("Compact", true)
         local size = Vector2.new(Mini.Width, Mini.Height)
-        return Vector2.new(gui.AbsoluteSize.X / 2 - size.X / 2, Mini.Top), size
+        local spot = islandSpot(size)
+        return Vector2.new(spot.X - size.X / 2, spot.Y), size
     end
 
     hit.MouseEnter:Connect(function()
-        if usingTouch() then
+        if usingTouch() or dragging then
             return
         end
         hovered = true
         self:_refreshMini()
         task.defer(function()
-            if hovered and self.Minimized then
+            if hovered and self.Minimized and not dragging then
                 setMode("Expanded")
             end
         end)
@@ -16894,17 +17301,82 @@ function Window:_buildMiniBar()
             end
         end)
     end)
-    hit.MouseButton1Down:Connect(function()
+    -- Press and pull to move the island anywhere on screen. It folds to the
+    -- pill while carried, lifts a little, and a drop near its home at the top
+    -- centre snaps back there. A drag never counts as the click that restores.
+    hit.InputBegan:Connect(function(input)
+        if not isPress(input) then
+            return
+        end
         pressed = true
+        dragged = false
         tween(islandScale, { Scale = 0.95 }, 0.12, Enum.EasingStyle.Quad)
+        if not self._islandLocked then
+            dragFrom = Vector2.new(input.Position.X, input.Position.Y)
+            dragAnchor = islandSpot(Vector2.new(Mini.Width, Mini.Height))
+        end
+    end)
+    self:_listen("Changed", function(input)
+        if not dragFrom or not isMove(input) or not self.Minimized then
+            return
+        end
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - dragFrom
+        if not dragging then
+            if delta.Magnitude < (TOUCH and 10 or 6) then
+                return
+            end
+            dragging, dragged = true, true
+            hovered = false
+            setMode("Compact")
+            tween(islandScale, { Scale = 1.06 }, 0.2, Enum.EasingStyle.Quint)
+        end
+        local spot = islandSpot(Vector2.new(Mini.Width, Mini.Height), dragAnchor + delta)
+        local view = gui.AbsoluteSize
+        self._islandAnchor = Vector2.new(spot.X / math.max(view.X, 1), spot.Y / math.max(view.Y, 1))
+        if positionTween then
+            positionTween:Cancel()
+            positionTween = nil
+        end
+        island.Position = UDim2.fromOffset(spot.X, spot.Y)
     end)
     table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
-        if pressed and isPress(input) then
+        if not isPress(input) then
+            return
+        end
+        dragFrom = nil
+        if pressed then
             pressed = false
             tween(islandScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
         end
+        if dragging then
+            dragging = false
+            local home = Vector2.new(gui.AbsoluteSize.X / 2, Mini.Top)
+            local spot = islandSpot(Vector2.new(Mini.Width, Mini.Height))
+            if (spot - home).Magnitude < 28 then
+                self._islandAnchor = nil
+                placeIsland(Vector2.new(Mini.Width, Mini.Height), 0.35, Enum.EasingStyle.Back)
+            end
+            local anchor = self._islandAnchor
+            self:_writeConfigSettings({ IslandPosition = anchor and { X = anchor.X, Y = anchor.Y } or false })
+            hovered = not usingTouch() and pointInside(pointerPosition(), island)
+            task.delay(0.1, function()
+                if self.Minimized and not dragging then
+                    settleMode()
+                end
+            end)
+        end
+    end))
+    -- Keeps the island on screen when the viewport changes size.
+    table.insert(self._connections, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if island.Visible and not dragging then
+            placeIsland(Vector2.new(island.Size.X.Offset, island.Size.Y.Offset), 0)
+        end
     end))
     hit.MouseButton1Click:Connect(function()
+        if dragged then
+            dragged = false
+            return
+        end
         if self.Minimized then
             self:Restore()
         end
@@ -16912,6 +17384,7 @@ function Window:_buildMiniBar()
     -- Restore hides the island under the pointer, so MouseLeave never fires.
     self._miniUnhover = function()
         hovered, pressed, activityLive = false, false, false
+        dragFrom, dragging = nil, false
         activityToken += 1
         islandScale.Scale = 1
         -- Clicked open while expanded: once the island has faded out, fold it
@@ -16947,7 +17420,7 @@ function Window:_buildMiniBar()
         activityToken += 1
         local token = activityToken
         task.defer(function()
-            if activityToken == token and not hovered then
+            if activityToken == token and not hovered and not dragging then
                 setMode("Activity")
                 islandScale.Scale = 0.96
                 tween(islandScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
@@ -17031,6 +17504,7 @@ function Window:_buildMiniBar()
                             TextSize = 12,
                             FontFace = Fonts.Regular,
                             TextColor3 = Theme.Muted,
+                            RichText = true,
                             Parent = frame,
                         }),
                         Value = label({
@@ -17039,14 +17513,21 @@ function Window:_buildMiniBar()
                             Size = UDim2.new(0.5, -4, 1, 0),
                             TextSize = 12,
                             TextXAlignment = Enum.TextXAlignment.Right,
+                            RichText = true,
                             Parent = frame,
                         }),
                     }
                     cardRows[index] = row
                 end
                 row.Frame.Visible = true
-                row.Key.Text = handle.Name
+                row.Key.Text = Library._rich(handle.Name)
                 row.Value.Text = handle:Text()
+                -- Carries the status's own colour: its Color, or its tone
+                -- for the tinted styles (badge, dot, bar).
+                local color = handle._shownColor and handle._shownColor() or Theme.Text
+                if row.Value.TextColor3 ~= color then
+                    tween(row.Value, { TextColor3 = color }, 0.2)
+                end
             elseif row then
                 row.Frame.Visible = false
             end
@@ -17198,6 +17679,20 @@ function Window:Restore()
             dissolve(self, ghost, ghostStroke, 0.22)
         end
     end)
+end
+
+-- The minimized island can be dragged anywhere; its spot is remembered in
+-- the config folder. These lock it in place or send it back to the top.
+function Window:SetIslandDraggable(enabled)
+    self._islandLocked = enabled == false
+end
+
+function Window:ResetIslandPosition()
+    self._islandAnchor = nil
+    if self._islandReset then
+        self._islandReset()
+    end
+    self:_writeConfigSettings({ IslandPosition = false })
 end
 
 function Window:SetMinimized(minimized)
@@ -17886,6 +18381,17 @@ Live:CreateStatus({ Name = "Server", Value = "Healthy", Style = "Badge", Tone = 
 Live:CreateStatus({ Name = "Rank", Style = "Bar", Tone = "Warning", Update = function()
     return (os.clock() * 100) % 7000, 7000 -- a number second return sets the max
 end, UpdateRate = 0.5 })
+
+-- Coloured text: theme tags follow the theme, Colorize wraps any colour,
+-- and Color paints a whole value.
+Live:CreateStatus({ Name = "Ping", Style = "Row", Pin = true, Update = function()
+    local ms = math.floor(game:GetService("Players").LocalPlayer:GetNetworkPing() * 1000)
+    local tone = ms < 90 and "Success" or ms < 180 and "Warning" or "Error"
+    return Airflow.Colorize(ms .. " ms", tone)
+end })
+Live:CreateStatus({ Name = "Loot", Style = "Row", Value = "<Accent>2</Accent> legendary · <Muted>14 common</Muted>" })
+Live:CreateStatus({ Name = "Mode", Style = "Row", Value = "Aggressive", Color = "Warning" })
+Live:CreateStatus({ Name = "Shield", Style = "Badge", Value = "Up", Tone = Color3.fromRGB(120, 180, 255) })
 
 -- Status list: grows with its rows up to MaxRows, then scrolls inside itself.
 local Hotbar = Run:AddRightGroupbox({ Name = "Hotbar", Icon = "zap" })

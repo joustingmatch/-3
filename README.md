@@ -1,10 +1,69 @@
+<div align="center">
+
 # Airflow UI
 
-> A UI library for Roblox. Windows, tabs, sub tabs, collapsible groupboxes and fourteen elements with lucide icons and eased motion.
+**A Roblox UI library with eased motion and a live theme engine.**
+
+Windows, tabs, sub tabs, collapsible groupboxes and fourteen elements, all with lucide icons, plus configs, cloud configs, weather backdrops and a Dynamic Island minimize.
+
+![Luau](https://img.shields.io/badge/Luau-00A2FF?style=flat-square&logo=lua&logoColor=white)
+![Roblox](https://img.shields.io/badge/Roblox-executor-E2231A?style=flat-square&logo=roblox&logoColor=white)
+![Themes](https://img.shields.io/badge/themes-29%20presets-EBC7F6?style=flat-square)
+![Single file](https://img.shields.io/badge/build-single%20file-2b2b2b?style=flat-square)
+
+[Quick start](#quick-start) · [Elements](#contents) · [Theme](#theme) · [Coloured text](#coloured-text) · [Configs](#configs) · [**llms.txt** for AI assistants](llms.txt)
+
+</div>
+
+---
+
+## Quick start
 
 ```lua
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
+
+local Window = Airflow:CreateWindow({
+    Name = "My Hub",
+    ConfigurationSaving = { Enabled = true, FolderName = "MyHub" },
+})
+
+local Main = Window:CreateTab({ Name = "Main", Icon = "swords" })
+local Farm = Main:CreateGroupbox({ Name = "Farming", Side = "Left" })
+
+Farm:CreateToggle({ Name = "Auto Farm", Flag = "AutoFarm", Callback = function(On) end })
+Farm:CreateStatus({ Name = "State", Value = "<Success>Idle</Success>", Style = "Row", Pin = true })
+
+local Settings = Window:CreateTab({ Name = "Settings", Icon = "settings" })
+Settings:CreateConfigManager({ Side = "Left" })
+Settings:CreateThemeManager({ Side = "Right" })
 ```
+
+`Example.luau` is a full showcase of every element; `Source.luau` is the same library, minified.
+
+### Highlights
+
+- **Motion everywhere.** Springy resize, a window that morphs out of its loader, popups that unfold from their chip, and a minimize that folds the window into a draggable Dynamic Island.
+- **Live themes.** 29 presets that cross-fade every colour in one pass, a player-facing theme manager, saved themes and per-player defaults.
+- **Adaptive size.** The window scales with the screen, so it looks the same on 1080p, 1440p and 4K. Touch devices get larger hit areas automatically.
+- **Coloured text.** `<Success>`, `<Warning>` and the other theme tags work in statuses, tables, progress bars and labels, and repaint when the theme changes.
+- **Window-wide search.** Jumps to any control in any tab and lights it up.
+- **Configs that just work.** Flags, autoload, share codes, a config manager and a cloud configs browser your backend can drive.
+
+### Contents
+
+| Structure | Elements | Data | Look and feel |
+| --- | --- | --- | --- |
+| [Window](#window) | [Button](#button) · [Button Row](#button-row) | [Flags](#flags) | [Theme](#theme) |
+| [Home](#home) | [Toggle](#toggle) · [Slider](#slider) · [Stepper](#stepper) | [Configs](#configs) | [Coloured text](#coloured-text) |
+| [Tab](#tab) · [Sub Tab](#sub-tab) | [Dropdown](#dropdown) · [Order List](#order-list) | [Cloud Configs](#cloud-configs) | [Icons](#icons) |
+| [Groupbox](#groupbox) | [Input](#input) · [Keybind](#keybind) · [Color Picker](#color-picker) | [Notification](#notification) | [Fonts](#fonts) |
+| [Visibility](#visibility) · [Tooltips](#tooltips) | [Label](#label) · [Paragraph](#paragraph) · [Section](#section) · [Divider](#divider) | [Confirm](#confirm) | |
+| [Search](#search) | [Status](#status) · [Status List](#status-list) · [Progress](#progress) | | |
+| | [Image](#image) · [Viewport](#viewport) · [Table](#table) | | |
+
+---
+
+## Conventions
 
 Every constructor also works without the `Create` prefix. `Tab:Toggle` is the same as `Tab:CreateToggle`. Every element handle also has `Destroy()`, which removes the card, its listeners and its flag, and `SetVisible(bool)` / `IsVisible()`. Every constructor takes `Visible = false` to start hidden (see [Visibility](#visibility)) and `Tooltip` to explain itself on hover (see [Tooltips](#tooltips)).
 
@@ -58,9 +117,9 @@ local Window = Airflow:CreateWindow({
 Window:Toggle(false)
 ```
 
-Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport.
+Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport. With **adaptive size** (on by default) it is drawn for a 1080p screen and scales with the resolution: 1x on 1080p, about 1.35x on 1440p, up to 1.75x on 4K, and a little smaller on small laptops, so it covers the same share of any monitor. Touch screens only use the fit. `UIScale` multiplies on top.
 
-The button in the top-right minimizes the window into a Dynamic Island: a black pill hanging from the top centre of the screen. Compact, it shows the logo and a small equalizer meter that dances while toggles are running, with the running count beside it. Hover it and it springs open into a card with the current tab, how many toggles are on, up to six pinned [statuses](#status) with live values, and the key that reopens the window. A notification sent while minimized opens the island for a few seconds to show it, coloured by its `Type`, then folds back (the usual toast still appears too). Click or tap it (or press the hide key) and it unfolds back into the window.
+The button in the top-right minimizes the window into a Dynamic Island: a black pill hanging from the top centre of the screen. Press and pull it to move it anywhere: it folds to the pill and lifts while carried, and a drop near the top centre snaps it home. Its spot is saved in the `ConfigurationSaving` folder, and when it opens near an edge the wide card slides inward to stay on screen. Compact, it shows the logo and a small equalizer meter that dances while toggles are running, with the running count beside it. Hover it and it springs open into a card with the current tab, how many toggles are on, up to six pinned [statuses](#status) with live values, and the key that reopens the window. A notification sent while minimized opens the island for a few seconds to show it, coloured by its `Type`, then folds back (the usual toast still appears too). Click or tap it (or press the hide key) and it unfolds back into the window.
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
@@ -97,6 +156,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Backdrop.Mode` | string | `"Screen"` | `"Screen"` drifts the weather across the whole screen, `"UI"` keeps it inside the window behind its content. |
 | `Backdrop.Density` / `Speed` | number | `1` / `1` | Particle count and fall speed multipliers. |
 | `Backdrop.Enabled` | boolean | `true` | `false` builds it off, to turn on later with `SetBackdrop(true)`. |
+| `AdaptiveSize` | boolean | `true` | Scale the window with the screen resolution (see above). Players can switch it in the [theme manager](#theme). |
+| `IslandDraggable` | boolean | `true` | `false` pins the minimized island to the top centre. |
 | `UIScale` | number | `1` | Size of the whole window, `0.6` to `1.5`. The window still shrinks further when it wouldn't fit the screen. Players can change it in the [theme manager](#theme). |
 | `Density` | string | `"Default"` | `"Compact"`, `"Default"` or `"Comfortable"`: the spacing between cards, groupboxes and groupbox rows. Shared by every window, like the theme. |
 | `Profile` | boolean | `true` | Player card at the bottom of the sidebar. |
@@ -134,6 +195,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
 | `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the island and back. |
 | `.Minimized` / `.Island` | Whether it's minimized, and the island itself (also `.MiniBar`). |
+| `SetIslandDraggable(enabled)` / `ResetIslandPosition()` | Lock the island in place, or send it back to the top centre and forget the saved spot. |
+| `SetAdaptiveSize(enabled)` / `GetAdaptiveSize()` | Turn resolution scaling on or off. Eases to the new size. |
 | `SetSize(Vector2, instant?)` / `GetSize()` | Resize to an exact size in pixels, kept within `MinSize` and `MaxSize`. Configs save and load it. |
 | `SetToggleButton(enabled)` | Show or hide the toggle button. |
 | `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
@@ -234,6 +297,7 @@ The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest
 | `TierIcon` | string | window icon | Icon in the badge. |
 | `Expiry` | number \| string \| function | — | Under the badge. A unix time counts down (`11h 57m`), a string is shown as is, a function is called every second. |
 | `Stats` | table | six shown above | Any of `"Players"`, `"Friends"`, `"Execs"`, `"Session"`, `"FPS"`, `"Ping"`, `"Executor"`, `"Game"`, `"Region"`, `"Time"`, `"ServerAge"`, `"Memory"`. |
+| `StatColors` | boolean | `true` | Tint `FPS`, `Ping` and `Memory` green, amber or red by how healthy they are (FPS 50+ / 30+, ping under 90 / 180 ms, memory under 1.5 / 3 GB). |
 | `StatsFolder` | string | config folder | Where the execution counter is stored. |
 | `TimeFormat` | string | `"%H:%M"` | `os.date` format for the time stat. |
 | `SupportedExecutors` | table | — | Names checked against the executor. Without it, the card checks for the file, clipboard and request functions. |
@@ -396,7 +460,7 @@ It is bare text with a thin dark outline, no background, with the icon and title
 
 ## Search
 
-The search box in the top-right filters the page you are on as you type. It matches element names and groupbox titles. A groupbox whose title matches stays whole; otherwise only its matching rows stay. Sections and dividers hide while searching. Switching tabs or sub tabs clears it.
+The search box in the top-right searches the whole window as you type: tabs, sub tabs, groupboxes and controls from every tab, best matches first (names that start with the query, then word starts). Picking a result opens its tab and sub tab, expands a collapsed groupbox, scrolls the control to the middle of the page and lights it up: the control pops, a soft accent glow blooms around it, a sheen sweeps across it and a bright spot runs round its border, then it breathes once and fades. Switching tabs clears the box.
 
 ---
 
@@ -453,16 +517,17 @@ Label:Set("Players: 13")
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Text` | string | `""` | The line. A bare string works too. |
-| `Color` | Color3 | muted | Text colour. |
-| `Update` | function | — | Called on a timer; its return value becomes the text. |
+| `Color` | Color3 \| string | muted | Text colour: a Color3, `"#rrggbb"` or a theme key such as `"Success"`. |
+| `Update` | function | — | Called on a timer; its return value becomes the text. Supports [coloured text](#coloured-text). |
 | `UpdateRate` | number | `1` | Seconds between `Update` calls. |
 
 ### Handle
 
 | Member | Description |
 | --- | --- |
-| `Set(text)` | Replace the line. |
+| `Set(text)` | Replace the line. [Coloured text](#coloured-text) works. |
 | `Get()` | The current text. |
+| `SetColor(color)` | Recolour the whole line. |
 | `SetUpdateRate(seconds)` | Change the timer, when `Update` was given. |
 
 ---
@@ -483,6 +548,14 @@ end })
 
 local Run = Group:CreateStatuses({ "Points", "Hearts", "Map" }, { Style = "Row" })
 Run.Hearts:Set(3)
+
+-- Coloured values: a theme tag, a whole-value colour, or a Color3 tone.
+Group:CreateStatus({ Name = "Ping", Style = "Row", Update = function()
+    local Ms = math.floor(game.Players.LocalPlayer:GetNetworkPing() * 1000)
+    return Ms < 100 and "<Success>" .. Ms .. " ms</Success>" or "<Error>" .. Ms .. " ms</Error>"
+end })
+Group:CreateStatus({ Name = "Mode", Value = "Aggressive", Style = "Row", Color = "Warning" })
+Group:CreateStatus({ Name = "Shield", Value = "Up", Style = "Badge", Tone = Color3.fromRGB(120, 180, 255) })
 ```
 
 | Style | Looks like |
@@ -494,7 +567,7 @@ Run.Hearts:Set(3)
 | `Bar` | Key and `current / max` with a progress bar. `"7859/10740"` strings, `Set(current, max)`, or a 0–1 number all work. |
 | `Stat` | Small key over a large value. |
 
-A changed value flashes the accent colour briefly. With `Update`, the function runs every `UpdateRate` seconds: its first return is the value, and a second return sets the max (a number) or the tone (a string).
+A changed value flashes the accent colour briefly. With `Update`, the function runs every `UpdateRate` seconds: its first return is the value, and a second return sets the max (a number) or the tone (a string or Color3). Keys and values are rich text, so [coloured text](#coloured-text) works anywhere in them, and pinned statuses keep their colour on the minimized island.
 
 ### Properties
 
@@ -503,7 +576,8 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | `Name` | string | — | The key. |
 | `Value` | any | `"-"` shown | The value. `nil` shows `Placeholder`. |
 | `Style` | string | `"Plain"` | See above. |
-| `Tone` | string | `"Accent"` | Any theme colour name: `"Success"`, `"Warning"`, `"Error"`, `"Muted"`… |
+| `Tone` | string \| Color3 | `"Accent"` | Tints the badge, dot and bar. Any theme colour name (`"Success"`, `"Warning"`, `"Error"`, `"Muted"`…), a Color3 or `"#rrggbb"`. |
+| `Color` | string \| Color3 | text colour | Colours the whole value in the `Plain`, `Row`, `Dot`, `Bar` and `Stat` styles. Same forms as `Tone`. `ValueColor` works too. |
 | `Max` | number | — | Max for `Bar`. |
 | `Prefix` / `Suffix` | string | — | Text around the value. |
 | `Placeholder` | string | `"-"` | Shown while the value is `nil`. |
@@ -516,7 +590,8 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | Member | Description |
 | --- | --- |
 | `Set(value, max?)` / `Get()` | Change or read the value. |
-| `SetTone(tone)` / `SetName(name)` | Recolour or rename. |
+| `SetTone(tone)` / `SetName(name)` | Recolour the tint or rename. |
+| `SetColor(color)` | Colour the whole value; `nil` goes back to the text colour. |
 | `SetUpdateRate(seconds)` | When `Update` is set. |
 | `Tab:CreateStatuses(entries, shared?)` | Several at once. Entries are names or option tables; `shared` fills missing options. Returns the handles by name. |
 
@@ -543,7 +618,7 @@ local Skills = Box:CreateStatusList({
 Skills:Set({ "one row", "another row" })
 ```
 
-A plain string is one muted line that wraps. A table `{ Text, Value?, Tone? }` puts `Text` on the left and `Value` on the right, like the `Row` status style. `Tone` is any theme colour name and tints the value, or the text when there is no value.
+A plain string is one muted line that wraps. A table `{ Text, Value?, Tone? }` puts `Text` on the left and `Value` on the right, like the `Row` status style. `Tone` (or `Color`) is a theme colour name, a Color3 or `"#rrggbb"` and tints the value, or the text when there is no value. Text and values are rich text, so [coloured text](#coloured-text) tags colour just part of a row, and theme tags repaint when the theme changes.
 
 Rows are reused between refreshes, and unchanged rows are skipped, so it never flickers. The scroll position survives a refresh. The mouse wheel scrolls the list, and at its top or bottom edge the page scrolls instead. `Update` only runs while the list is on screen: not while the window is hidden or minimized, another tab or sub tab is open, or the list or its groupbox is hidden. Search matches the list's `Name`, not its rows.
 
@@ -810,8 +885,9 @@ Progress:Set(0.5)
 | `Name` | string | `"Progress"` | The label. |
 | `Desc` | string | — | Hint text under the label. |
 | `CurrentValue` | number | `0` | The initial fraction. |
-| `Color` | Color3 | accent | Fill colour. |
-| `Format` | function | percentage | Returns the label text for a fraction. |
+| `Color` | Color3 \| string | accent | Fill colour: a Color3, `"#rrggbb"` or a theme key. |
+| `TextColor` | Color3 \| string | accent | Colour of the percentage on the right. |
+| `Format` | function | percentage | Returns the label text for a fraction. [Coloured text](#coloured-text) works. |
 | `Callback` | function | — | Runs on `Set` unless skipped. |
 
 ### Handle
@@ -820,7 +896,8 @@ Progress:Set(0.5)
 | --- | --- |
 | `.Value` | The current fraction. |
 | `Set(value, skipCallback?)` | Set the fraction. Eases the fill. |
-| `SetColor(color)` | Change the fill colour. |
+| `SetColor(color)` | Change the fill colour. Eases. |
+| `SetTextColor(color)` | Change the percentage's colour; `nil` goes back to the accent. |
 | `Get()` | The current fraction. |
 
 ---
@@ -845,7 +922,7 @@ local Dropdown = Tab:CreateDropdown({
 Dropdown:Set({ "T1", "T3" })
 ```
 
-Clicking the chip unfolds a popup out of it, floating over the window under the chip, or above it when there's no room below. It follows the window while open and closes on an outside click, `Esc` or a tab switch. The popup has a search box, **Select all** / **Clear all** in multi mode, and flat rows with square checkboxes that highlight on hover. Select all only picks the rows matching the search. Clicking a selected row unchecks it. The page behind stays put while the popup is open, so wheel and swipe input always scroll the list. A single-select list opens scrolled to its current value, and the list shrinks to fit short windows. On touch, rows are taller and a swipe that scrolls the list never selects a row.
+Clicking the chip unfolds a popup out of it, floating over the window under the chip, or above it when there's no room below. It follows the window while open and closes on an outside click, `Esc` or a tab switch. The chip lights up on hover and takes an accent outline while open; a picked value reads in full colour and `None` stays muted. A multi pick shows two names and a count (`Apple, Pear  +3`). The popup has a search box (it says how many options there are on long lists), **Select all** / **Clear all** in multi mode, and rows that highlight on hover. Picked rows rest on a faint accent tint. A single-pick list marks its value with an accent bar on the left and a check on the right; a multi-pick list ticks square checkboxes. Typing in the search lights up the matching part of each option in the accent colour. Select all only picks the rows matching the search. Clicking a selected row unchecks it. The page behind stays put while the popup is open, so wheel and swipe input always scroll the list. A single-select list opens scrolled to its current value, and the list shrinks to fit short windows. On touch, rows are taller and a swipe that scrolls the list never selects a row.
 
 ### Properties
 
@@ -1180,8 +1257,8 @@ A row is a list of values in column order, or a table keyed by each column's `Ke
 | --- | --- | --- | --- |
 | `Name` | string | — | Title above the table. |
 | `Desc` | string | — | Hint text under the title. |
-| `Columns` | table | — | Column names, or `{ Name, Key, Width, Align, Format, Color, Sortable }`. `Width` above 1 is pixels, up to 1 a share of the width; columns without one split what's left. `Align` is `"Left"`, `"Center"` or `"Right"`. `Format(value, row)` returns the text to show. `Color` is a Color3 or `function(value, row)` returning one. `Sortable = false` locks a column. |
-| `Rows` | table | `{}` | The rows. Put `Highlight = true` in a row to mark it. |
+| `Columns` | table | — | Column names, or `{ Name, Key, Width, Align, Format, Color, Sortable }`. `Width` above 1 is pixels, up to 1 a share of the width; columns without one split what's left. `Align` is `"Left"`, `"Center"` or `"Right"`. `Format(value, row)` returns the text to show. `Color` is a Color3, `"#rrggbb"`, a theme key (`"Success"`) or `function(value, row)` returning one. `Sortable = false` locks a column. |
+| `Rows` | table | `{}` | The rows. Put `Highlight = true` in a row to mark it, and `Colors = { [key or column number] = color }` to colour single cells. Cell text is rich text, so [coloured text](#coloured-text) works. |
 | `Rank` | boolean | `false` | Add the `#` column with medals. |
 | `Highlight` | function | — | `function(row, index)` returning `true` to mark a row, for example the player's own. |
 | `SortBy` / `SortDescending` | string \| number / boolean | — / `true` | Starting sort: a column name, key or number. |
@@ -1575,7 +1652,7 @@ Airflow.Assets.Shadow = "rbxassetid://6014261993"
 
 Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`, and the themed set `Halloween`, `Haunted`, `Christmas`, `Valentine`, `Lunar`, `Tropical`, `Dracula`, `Coffee`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
-The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
+The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, an **Adaptive Size** switch (on by default; scales the window with the screen resolution), a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 
 ### Properties
 
@@ -1590,7 +1667,7 @@ The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weat
 | `Accent` | Highlights, primary buttons, checkboxes, progress bars. |
 | `AccentDark` | Text on accent surfaces. |
 | `Text` / `Muted` | Primary and secondary text. |
-| `Success` / `Warning` / `Error` | Notification title tints. |
+| `Success` / `Warning` / `Error` | Notification title tints, status tones and [coloured text](#coloured-text). |
 | `Fonts.Regular` / `Medium` / `Bold` | Body text / titles and chips / emphasis. |
 | `Assets.Logo` / `Glow` / `Shadow` | Sidebar mark, glow decal, drop shadow. |
 
@@ -1604,6 +1681,31 @@ The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `AdaptiveSize` (`false` hides the adaptive size switch), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, adaptive size, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
+
+---
+
+## Coloured text
+
+> Colour any part of a status, status list row, table cell, progress label, label or paragraph.
+
+```lua
+Status:Set("<Success>Online</Success> · 3 players")             -- a theme key as a tag
+Status:Set(Airflow.Colorize("12 ms", "Success"))                 -- the same, built for you
+Status:Set(Airflow.Colorize("Boss", Color3.fromRGB(255, 90, 90))) -- any Color3 or "#rrggbb"
+Status:Set('<font color="#ff5a5a">raw</font> rich text')          -- plain Roblox rich text
+
+Group:CreateStatus({ Name = "Mode", Value = "Aggressive", Style = "Row", Color = "Warning" })
+Skills:Set({ { Text = "Dash", Value = "<Error>cooldown</Error> 4s" } })
+Board:SetRows({ { "Roblox", 57, Colors = { [2] = "Success" } } })
+```
+
+Every theme colour works as a tag: `<Accent>`, `<Success>`, `<Warning>`, `<Error>`, `<Muted>`, `<Text>` and the rest of the [theme keys](#theme), in any case. Theme tags are resolved when the text is drawn and drawn again when the theme changes, so `<Success>` follows the palette; a `Color3` or hex colour stays fixed. Tags that aren't theme keys (`<b>`, `<i>`, `<font>`, `<stroke>`…) pass straight through to Roblox rich text.
+
+Whole-value colours take the same forms everywhere: a theme key string, a `Color3`, `"#rrggbb"` or `{ r, g, b }`. Status `Color` and `Tone`, status list `Tone` / `Color`, table column `Color` and row `Colors`, progress `Color` / `TextColor` and label `Color` all accept them. The home tab tints its `FPS`, `Ping` and `Memory` stats by health on its own (`StatColors = false` turns that off).
+
+| Member | Description |
+| --- | --- |
+| `Airflow.Colorize(text, color)` | Wraps `text` in a colour. A theme key gives a tag that follows the theme; anything else is baked in. `Airflow:Colorize(...)` works too. |

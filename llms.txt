@@ -1,0 +1,137 @@
+# Airflow UI (OuroFlow)
+
+> Airflow UI is a single-file Luau UI library for Roblox executor scripts: a window with a sidebar of tabs, sub tabs, two-column collapsible groupboxes and fourteen elements (toggles, sliders, dropdowns, statuses, tables and more), plus configs, cloud configs, live themes, coloured text, window-wide search and a draggable Dynamic Island minimize. This file is a guide for language models writing scripts with it. Follow it exactly; the README holds every option.
+
+Load it once, build the window, add tabs, put groupboxes on tabs (or sub tabs), and put elements in groupboxes. Every element with a `Flag` is saved by configs. Everything returns a handle with `Set` / `Get` (where it has a value), `SetVisible`, `IsVisible`, `SetTooltip` and `Destroy`.
+
+## Files
+
+- [README.md](README.md): the full reference, one section per element with every option and handle member.
+- [Example.luau](Example.luau): the readable library followed by a demo that uses every element. Copy patterns from the demo, which starts at `local Airflow = Library`.
+- [Source.luau](Source.luau): the same library minified. This is what scripts `loadstring`.
+
+## Loading
+
+```lua
+local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
+```
+
+Optional, before `CreateWindow`: `Airflow:LoadFont({ Name = "ValleySans" })`, `Airflow:SetDefaultTheme("Obsidian")`, `Airflow:PreloadIcons()`.
+
+## Skeleton to start from
+
+```lua
+local Window = Airflow:CreateWindow({
+    Name = "My Hub",                       -- title, also names the ScreenGui
+    LoadingSubtitle = "by Me",
+    ToggleUIKeybind = "RightControl",      -- hides and shows the window
+    ConfigurationSaving = { Enabled = true, FolderName = "MyHub", FileName = "default" },
+    Home = { Discord = "dsc.gg/myhub" },   -- built-in first tab; false removes it
+})
+
+local Main = Window:CreateTab({ Name = "Main", Icon = "swords" })     -- Icon: any lucide name
+local Farm = Main:CreateGroupbox({ Name = "Farming", Side = "Left" })  -- or Main:AddLeftGroupbox("Farming", "sprout")
+local Info = Main:CreateGroupbox({ Name = "Info", Side = "Right" })
+
+local AutoFarm = Farm:CreateToggle({
+    Name = "Auto Farm",
+    Flag = "AutoFarm",                     -- unique; makes it saveable and reachable as Airflow.Flags.AutoFarm
+    CurrentValue = false,
+    Callback = function(On)
+        -- runs on every change, and once at creation when CurrentValue is true
+    end,
+})
+
+Farm:CreateSlider({ Name = "Range", Range = { 5, 50 }, Increment = 1, CurrentValue = 20, Suffix = " studs", Flag = "Range", Callback = function(V) end })
+Farm:CreateDropdown({ Name = "Mobs", Options = { "Bandit", "Wolf" }, MultipleOptions = true, Flag = "Mobs", Callback = function(List) end })
+
+Info:CreateStatus({ Name = "State", Style = "Row", Pin = true, Update = function()
+    return AutoFarm.Value and "<Success>Farming</Success>" or "<Muted>Idle</Muted>"
+end })
+
+local Settings = Window:CreateTab({ Name = "Settings", Icon = "settings" })
+Settings:CreateConfigManager({ Side = "Left" })
+Settings:CreateThemeManager({ Side = "Right" })
+
+Window:LoadAutoload()                      -- apply the player's autoload config, if any
+```
+
+## Rules that prevent most mistakes
+
+- Constructors exist with and without the `Create` prefix: `Tab:CreateToggle` and `Tab:Toggle` are the same. Pick one style per script.
+- Options are a single table. Legacy names are accepted (`Title` for `Name`, `Description` for `Desc`, `CurrentValue` / `Default` / `Value` for the start value, `MultipleOptions` / `Multi`), but prefer the names in this file.
+- Once a tab has sub tabs (`Tab:CreateSubTab({ Name = "Page" })`), add groupboxes and elements to the sub tabs, not the tab.
+- Elements added straight to a tab are full-width cards; elements in a groupbox are compact rows. Groupboxes are the normal choice.
+- `Flag` strings must be unique across the whole script. Toggles, sliders, steppers, dropdowns, order lists, inputs, keybinds and colour pickers take flags. Labels, buttons, statuses and tables do not.
+- Flagged toggles that are on count as "running" on the minimized island. Don't flag a toggle that is only a setting if that would mislead; a setting is still fine to flag.
+- `Set(value, true)` skips the callback. Use it when syncing UI from code.
+- `Update` functions may yield (`InvokeServer`, `task.wait`); they run on their own thread. Element callbacks run inline and errors are caught and warned, so keep them quick and wrap long loops in `task.spawn`. Library calls made from a thread that yielded in an engine call are made safe automatically.
+- `Update` functions on labels and statuses run every `UpdateRate` seconds (default 1). Status lists only refresh while visible.
+- `Window:LoadAutoload()` may run before every element exists: values for flags not created yet are held and applied when the element appears.
+- Never build your own config, theme or minimize UI. Use `CreateConfigManager`, `CreateThemeManager` and the built-in island.
+- Icons: a lucide name (`"zap"`, `"lucide:zap"`), an asset id number or `"rbxassetid://…"`, or `{ Image, RectOffset, RectSize, Tint }`.
+- `Airflow.Touch` is true on touch-only devices. Layout already adapts; only read it for game logic.
+
+## Elements
+
+Every element takes `Name`, `Desc` (a muted hint under the name), `Tooltip` (a string or `{ Title, Text, Icon }`) and `Visible`.
+
+| Constructor | Key options | Handle |
+| --- | --- | --- |
+| `Button` | `Icon`, `Style = "Primary"`, `Callback()` | `SetText(text)` |
+| `ButtonRow` | list of `{ Name, Callback, Style }` (`"Primary"` / `"Danger"`) | `SetText(i, text)`, `.Buttons` |
+| `Toggle` | `CurrentValue`, `Flag`, `Callback(bool)` | `.Value`, `Set`, `Get` |
+| `Slider` | `Range = { min, max }`, `Increment`, `Suffix`, `CurrentValue`, `Flag`, `Callback(n)`, `OnRelease(n)` | `.Value`, `.Dragging`, `Set`, `Get` |
+| `Stepper` | `Range`, `Increment`, `Suffix`, `CurrentValue`, `Flag`, `Callback(n)` | `.Value`, `Set`, `Get` |
+| `Dropdown` | `Options`, `CurrentOption`, `MultipleOptions`, `AllowNone`, `Searchable`, `MaxRows`, `NoneText`, `Stacked`, `Flag`, `Callback(value or list)` | `Set`, `Get`, `Refresh(options, keepSelection?, skipCallback?)`, `SetOpen`, `.Open` |
+| `OrderList` | `Items`, `MaxRows`, `Numbered`, `Arrows`, `Flag`, `Callback(order)` | `.Value`, `Set(order)`, `Refresh(items)`, `Get` |
+| `Input` | `PlaceholderText`, `CurrentValue`, `Numeric`, `Icon`, `Flag`, `Callback(text, enterPressed)` | `Set`, `Get` |
+| `Keybind` | `CurrentKeybind` (`"F"` or `Enum.KeyCode.F`), `Flag`, `Callback(key)`, `OnChanged(key)` | `.Value`, `.Listening`, `Set`, `Get` |
+| `ColorPicker` | `Color`, `Flag`, `Callback(Color3)` | `.Value`, `Set`, `Get`, `SetOpen` |
+| `Label` | `Text` (or a bare string), `Color`, `Update`, `UpdateRate` | `Set`, `Get`, `SetColor` |
+| `Paragraph` | `Title`, `Content` | `Set(text)` |
+| `Section` | a string | `Set(text)` |
+| `Divider` | `Text` (optional caption) | — |
+| `Status` | `Value`, `Style` (`Plain`, `Row`, `Badge`, `Dot`, `Bar`, `Stat`), `Tone`, `Color`, `Max`, `Prefix`, `Suffix`, `Pin`, `Update`, `UpdateRate` | `Set(value, max?)`, `Get`, `SetTone`, `SetColor`, `SetName` |
+| `Statuses` | `(entries, shared)`: names or option tables | table of status handles by name |
+| `StatusList` | `Rows`, `MaxRows`, `EmptyText`, `Update` returning rows | `Set(rows)`, `Get`, `Clear`, `SetName` |
+| `Progress` | `CurrentValue` 0..1, `Color`, `TextColor`, `Format(fraction)` | `Set`, `Get`, `SetColor`, `SetTextColor` |
+| `Table` | `Columns` (names or `{ Name, Key, Width, Align, Format, Color, Sortable }`), `Rows`, `Rank`, `SortBy`, `MaxRows`, `Highlight(row)`, `Callback(row, i)` | `SetRows`, `AddRow`, `UpdateRow`, `RemoveRow`, `Clear`, `Sort`, `SetColumns` |
+| `Image` | `Image` (asset id, link, file, preset or `"Avatar"`), `Height`, `Caption`, `ScaleType` | `SetImage`, `SetCaption`, `SetTitle` |
+| `Viewport` | `Model` (Instance, `"Avatar"`, Player or function), `Height`, `SpinSpeed` | `SetModel`, `Refresh`, `SetSpin` |
+
+Status list rows are strings (one muted wrapped line) or `{ Text, Value, Tone }`. Table rows are value lists in column order or tables keyed by column `Key`; add `Highlight = true` to mark a row and `Colors = { [key or index] = color }` to colour single cells.
+
+## Coloured text
+
+Status keys and values, status list rows, table cells, progress text, labels and paragraphs are rich text.
+
+- Theme tags follow the theme: `"<Success>Online</Success>"`, `"<Warning>3 left</Warning>"`, `"<Error>Down</Error>"`, `"<Accent>…</Accent>"`, `"<Muted>…</Muted>"`. Every theme key works as a tag.
+- `Airflow.Colorize(text, color)` builds it: a theme key gives a theme tag, a `Color3` or `"#rrggbb"` gives a fixed `<font color>`.
+- Plain Roblox rich text (`<b>`, `<i>`, `<font color="#ff5a5a">`) also works.
+- Whole-value colours accept a theme key string, `Color3`, `"#rrggbb"` or `{ r, g, b }`: status `Color` / `Tone`, status list `Tone` / `Color`, table column `Color` (or a function of `value, row`), progress `Color` / `TextColor`, label `Color`.
+- Escape `<`, `>` and `&` in user-provided text you put into these elements.
+
+Theme keys: `Background`, `Surface`, `Surface2`, `Surface3`, `Stroke`, `StrokeHover`, `Accent`, `AccentDark`, `Text`, `Muted`, `Success`, `Warning`, `Error`.
+
+## Window
+
+Useful options: `Size` (UDim2), `MinSize` / `MaxSize` (Vector2), `Icon`, `Theme`, `UIScale` (0.6 to 1.5), `AdaptiveSize` (default true: scale with screen resolution), `Density` (`"Compact"`, `"Default"`, `"Comfortable"`), `Backdrop` (`{ Weather = "Snow" }` or false), `Search`, `Profile`, `Loading`, `Disclaimer`, `ToggleButton`, `IslandDraggable` (default true).
+
+Useful methods: `Notify({ Title, Content, Type = "Success", Duration })`, `Confirm({ Title, Content, ConfirmText, Callback })`, `Dialog({ Buttons = { … } })`, `Toggle(open?)`, `Minimize()`, `Restore()`, `SelectTab(tab)`, `SetUIScale(n)`, `SetAdaptiveSize(bool)`, `SetTheme` (on `Airflow`), `SaveConfig` / `LoadConfig` / `ListConfigs`, `ResetIslandPosition()`, `Destroy()`.
+
+Minimizing folds the window into a Dynamic Island at the top of the screen. Players can drag it anywhere; `Pin = true` statuses show on it with their colours.
+
+## Theme
+
+- `Airflow:SetTheme("Midnight")` or `Airflow:SetTheme({ Accent = Color3.fromRGB(128, 160, 246) })`; every colour cross-fades live.
+- Presets: Airflow, Obsidian, Nebula, Synthwave, Sakura, Velvet, Rose, Crimson, Sunset, Amber, Gold, Cyber, Toxic, Matcha, Emerald, Aurora, Ocean, Frost, Midnight, Abyss, Mono, Halloween, Haunted, Christmas, Valentine, Lunar, Tropical, Dracula, Coffee.
+- `Tab:CreateThemeManager({ Side = "Right" })` gives players presets, weather, dim, transparency, drag skeleton, adaptive size, UI scale, density, background image and colour pickers. All of it is saved in configs under the hidden `__Theme` flag.
+- Read colours from `Airflow.Theme.Accent` and so on; don't cache them across theme changes.
+
+## Optional
+
+- [README: Cloud Configs](README.md#cloud-configs): a browse / install / publish tab driven by your backend's `OnFetch` and `OnPublish`.
+- [README: Home](README.md#home): profile card, live stats (FPS, ping and memory tinted by health), game and executor cards, feature list, changelog pages.
+- [README: Configs](README.md#configs): file format, share codes, autoload per account.
+- [README: Icons](README.md#icons) and [Fonts](README.md#fonts).
