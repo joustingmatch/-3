@@ -197,6 +197,15 @@ Library.ThemePresets = {
     Aurora = preset({ 10, 20, 22 }, { 12, 25, 27 }, { 15, 30, 33 }, { 26, 50, 53 }, { 24, 45, 48 }, { 50, 104, 104 }, { 94, 240, 180 }, { 6, 30, 22 }, { 224, 246, 240 }, { 102, 142, 134 }),
     Frost = preset({ 13, 17, 23 }, { 16, 21, 28 }, { 20, 26, 34 }, { 34, 43, 56 }, { 31, 40, 52 }, { 72, 92, 118 }, { 164, 214, 255 }, { 12, 22, 34 }, { 230, 238, 246 }, { 114, 128, 146 }),
     Abyss = preset({ 7, 11, 22 }, { 9, 14, 28 }, { 12, 18, 35 }, { 22, 31, 58 }, { 20, 28, 52 }, { 44, 64, 120 }, { 72, 148, 255 }, { 6, 14, 34 }, { 226, 234, 250 }, { 100, 116, 152 }),
+    -- Seasonal and themed palettes.
+    Halloween = preset({ 18, 12, 20 }, { 23, 15, 25 }, { 28, 18, 30 }, { 46, 30, 48 }, { 43, 28, 44 }, { 104, 62, 40 }, { 255, 138, 36 }, { 36, 16, 4 }, { 246, 234, 224 }, { 146, 120, 128 }),
+    Haunted = preset({ 14, 12, 20 }, { 18, 15, 26 }, { 22, 18, 32 }, { 38, 31, 54 }, { 35, 29, 50 }, { 70, 96, 64 }, { 156, 255, 110 }, { 14, 30, 8 }, { 232, 240, 228 }, { 120, 116, 140 }),
+    Christmas = preset({ 12, 20, 15 }, { 15, 25, 19 }, { 19, 30, 23 }, { 32, 50, 38 }, { 30, 46, 35 }, { 100, 54, 56 }, { 236, 72, 80 }, { 34, 8, 10 }, { 240, 244, 236 }, { 120, 142, 128 }),
+    Valentine = preset({ 24, 12, 17 }, { 30, 14, 21 }, { 36, 17, 25 }, { 58, 27, 40 }, { 54, 25, 37 }, { 130, 56, 84 }, { 255, 92, 140 }, { 40, 8, 20 }, { 252, 232, 240 }, { 160, 112, 132 }),
+    Lunar = preset({ 22, 10, 10 }, { 28, 12, 12 }, { 34, 15, 14 }, { 54, 24, 22 }, { 50, 22, 20 }, { 130, 92, 40 }, { 246, 196, 84 }, { 38, 16, 6 }, { 250, 236, 222 }, { 160, 120, 108 }),
+    Tropical = preset({ 10, 22, 24 }, { 12, 27, 30 }, { 15, 33, 36 }, { 26, 54, 58 }, { 24, 50, 54 }, { 44, 110, 110 }, { 255, 170, 90 }, { 36, 18, 6 }, { 232, 246, 244 }, { 104, 144, 142 }),
+    Dracula = preset({ 24, 25, 33 }, { 29, 30, 40 }, { 34, 36, 47 }, { 52, 55, 70 }, { 48, 50, 64 }, { 98, 114, 164 }, { 189, 147, 249 }, { 26, 18, 44 }, { 246, 246, 238 }, { 126, 132, 168 }),
+    Coffee = preset({ 20, 16, 13 }, { 25, 20, 16 }, { 30, 24, 19 }, { 48, 39, 31 }, { 45, 36, 29 }, { 104, 82, 62 }, { 214, 170, 124 }, { 32, 22, 12 }, { 240, 230, 218 }, { 142, 124, 108 }),
 }
 
 Library.ThemeName = "Airflow"
@@ -4491,6 +4500,23 @@ function Library.Window(_, opts)
     self.MaxSize = opts.MaxSize
     self.KeepOnScreen = opts.KeepOnScreen ~= false
     self:_enableResize(opts.MinSize or Vector2.new(480, 360))
+    -- The window's exact size rides along in configs as a hidden flag.
+    if opts.SaveSize ~= false then
+        local window = self
+        local sizeFlag = { _type = "WindowSize", _listeners = {} }
+        function sizeFlag:Get()
+            local current = window:GetSize()
+            return { Width = current.X, Height = current.Y }
+        end
+        function sizeFlag:Set(value)
+            if type(value) == "table" and tonumber(value.Width) and tonumber(value.Height) then
+                window:SetSize(Vector2.new(tonumber(value.Width), tonumber(value.Height)))
+            end
+        end
+        local flag = type(opts.SaveSize) == "string" and opts.SaveSize or "__WindowSize"
+        Library.Flags[flag] = sizeFlag
+        self:_flagCreated(flag, sizeFlag)
+    end
 
     table.insert(self._connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then
@@ -4716,7 +4742,6 @@ function Window:_tooltipCard()
     local holder = create("CanvasGroup", {
         Name = "Tooltip",
         Size = UDim2.fromOffset(0, 0),
-        AutomaticSize = Enum.AutomaticSize.XY,
         BackgroundTransparency = 1,
         GroupTransparency = 1,
         Visible = false,
@@ -4724,24 +4749,33 @@ function Window:_tooltipCard()
         Parent = self.Gui,
     })
     local tipScale = create("UIScale", { Parent = holder })
-    padding(holder, 2, 2, 2, 2)
+    -- Bare text, no card: a dark outline keeps it readable over anything.
+    -- The holder is sized from the text by hand, since scale sizes inside an
+    -- automatic size would stretch it across the screen.
+    local PAD = 4
     local panel = create("Frame", {
+        Position = UDim2.fromOffset(PAD, PAD),
         Size = UDim2.fromOffset(0, 0),
         AutomaticSize = Enum.AutomaticSize.XY,
-        BackgroundColor3 = Theme.Surface2,
-        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
         Parent = holder,
     })
-    corner(panel, UDim.new(0, 8))
-    stroke(panel, Theme.StrokeHover)
-    padding(panel, 10, 10, 7, 8)
     create("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 3),
+        Padding = UDim.new(0, 2),
         Parent = panel,
     })
+    local function outline(object)
+        create("UIStroke", {
+            Color = Color3.new(0, 0, 0),
+            Transparency = 0.35,
+            Thickness = 1,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+            Parent = object,
+        })
+    end
     local head = create("Frame", {
-        Size = UDim2.fromOffset(0, 16),
+        Size = UDim2.fromOffset(0, 18),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundTransparency = 1,
         LayoutOrder = 1,
@@ -4763,7 +4797,7 @@ function Window:_tooltipCard()
         Parent = head,
     })
     local title = label({
-        Size = UDim2.fromOffset(0, 16),
+        Size = UDim2.fromOffset(0, 18),
         AutomaticSize = Enum.AutomaticSize.X,
         TextSize = 13,
         FontFace = Fonts.Bold,
@@ -4771,20 +4805,38 @@ function Window:_tooltipCard()
         LayoutOrder = 2,
         Parent = head,
     })
+    outline(title)
     local body = label({
         Size = UDim2.fromOffset(0, 0),
         AutomaticSize = Enum.AutomaticSize.XY,
         TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
+        FontFace = Fonts.Medium,
         TextWrapped = true,
         TextTruncate = Enum.TextTruncate.None,
         TextYAlignment = Enum.TextYAlignment.Top,
+        LineHeight = 1.1,
         LayoutOrder = 2,
         Parent = panel,
     })
+    outline(body)
     create("UISizeConstraint", { MaxSize = Vector2.new(240, math.huge), Parent = body })
-    local tip = { Holder = holder, Scale = tipScale, Head = head, Icon = icon, Title = title, Body = body, Shown = false }
+    local function fit()
+        local scale = math.max(tipScale.Scale, 0.01)
+        local size = panel.AbsoluteSize / scale
+        holder.Size = UDim2.fromOffset(size.X + PAD * 2, size.Y + PAD * 2)
+    end
+    panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+    local tip = {
+        Holder = holder,
+        Scale = tipScale,
+        Pad = PAD,
+        Head = head,
+        Icon = icon,
+        Title = title,
+        Body = body,
+        Shown = false,
+        Fit = fit,
+    }
     self._tip = tip
     -- Follow the pointer, and drop the card once its element is gone or off
     -- screen (tab switched, window hidden or minimized).
@@ -4800,7 +4852,8 @@ function Window:_tooltipCard()
             return
         end
         local pointer = pointerPosition() - self.Gui.AbsolutePosition
-        local size = holder.AbsoluteSize
+        local pad = tip.Pad * tipScale.Scale
+        local size = holder.AbsoluteSize - Vector2.one * pad * 2
         local view = self.Gui.AbsoluteSize
         local x, y
         if tip.Touch then
@@ -4820,13 +4873,14 @@ function Window:_tooltipCard()
         )
         local current = tip.Position
         if not current or tip.Snap then
-            current = target
+            -- Rises a few pixels into place as it fades in.
+            current = target + Vector2.new(0, 6)
             tip.Snap = false
         else
             current = current:Lerp(target, math.min(deltaTime * 22, 1))
         end
         tip.Position = current
-        holder.Position = UDim2.fromOffset(math.floor(current.X + 0.5), math.floor(current.Y + 0.5))
+        holder.Position = UDim2.fromOffset(math.floor(current.X - pad + 0.5), math.floor(current.Y - pad + 0.5))
     end)
     -- A press anywhere (a dropdown chip inside the card, a key) hides it.
     self:_listen("Began", function(input)
@@ -4851,14 +4905,16 @@ function Window:_showTooltip(element, touch)
     end
     local tip = self:_tooltipCard()
     tip.Title.Text = titleText or ""
+    tip.Title.Visible = titleText ~= nil and titleText ~= ""
     tip.Icon.Visible = iconName ~= nil
     if iconName ~= nil then
         applyIcon(tip.Icon, iconName)
     end
-    tip.Head.Visible = (titleText ~= nil and titleText ~= "") or iconName ~= nil
+    tip.Head.Visible = tip.Title.Visible or iconName ~= nil
     tip.Body.Text = text or ""
     tip.Body.Visible = text ~= nil and text ~= ""
-    tip.Body.TextColor3 = tip.Head.Visible and Theme.Muted or Theme.Text
+    tip.Fit()
+    tip.Body.TextColor3 = Theme.Text
     tip.Scale.Scale = math.max(self.Scale.Scale, 0.75)
     tip.Touch = touch == true
     local wasShown = tip.Shown
@@ -6091,6 +6147,7 @@ end
 
 function Window:_enableResize(minSize)
     local maxSize = self.MaxSize or Vector2.new(math.huge, math.huge)
+    self._minSize = minSize
     local root = self.Root
     local grip = create("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -6221,6 +6278,39 @@ function Window:_enableResize(minSize)
             root.Size = UDim2.fromOffset(target.X, target.Y)
             unpin()
             self._resizeActive = false
+            self:_fitToScreen()
+            self:_clampToScreen()
+        end
+    end)
+end
+
+-- The window's own size in pixels, before the UI scale and screen fit.
+function Window:GetSize()
+    return Vector2.new(self.Root.Size.X.Offset, self.Root.Size.Y.Offset)
+end
+
+-- Resizes to an exact size, kept within MinSize and MaxSize. Ignored while the
+-- player is dragging the grip.
+function Window:SetSize(size, instant)
+    if typeof(size) == "UDim2" then
+        size = Vector2.new(size.X.Offset, size.Y.Offset)
+    end
+    if typeof(size) ~= "Vector2" or self._resizeActive then
+        return
+    end
+    local minSize = self._minSize or Vector2.zero
+    local maxSize = self.MaxSize or Vector2.new(math.huge, math.huge)
+    size = Vector2.new(
+        math.floor(math.clamp(size.X, minSize.X, maxSize.X) + 0.5),
+        math.floor(math.clamp(size.Y, minSize.Y, maxSize.Y) + 0.5)
+    )
+    if size == self:GetSize() then
+        return
+    end
+    local duration = (instant or not self.Root.Visible) and 0 or 0.3
+    tween(self.Root, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, Enum.EasingStyle.Quint)
+    task.delay(duration + 0.02, function()
+        if not self._destroyed then
             self:_fitToScreen()
             self:_clampToScreen()
         end
@@ -8307,6 +8397,7 @@ end
 local PRESET_ORDER = {
     "Airflow", "Obsidian", "Nebula", "Synthwave", "Sakura", "Velvet", "Rose", "Crimson", "Sunset", "Amber", "Gold",
     "Cyber", "Toxic", "Matcha", "Emerald", "Aurora", "Ocean", "Frost", "Midnight", "Abyss", "Mono",
+    "Halloween", "Haunted", "Christmas", "Valentine", "Lunar", "Tropical", "Dracula", "Coffee",
 }
 
 local function presetNames()
@@ -8659,7 +8750,7 @@ function Tab:ThemeManager(opts)
 
     -- One hidden flag carries the palette and the look settings above, so
     -- configs save and load the theme. Not a flag per toggle: flagged toggles
-    -- would count as running features on the minimized orb.
+    -- would count as running features on the minimized island.
     if opts.Flag ~= false then
         local flag = type(opts.Flag) == "string" and opts.Flag or "__Theme"
         local look = { _type = "Theme", _searchName = "Theme", _searchKey = "theme", _listeners = {} }
@@ -16372,21 +16463,20 @@ function Window:SetWeatherSpeed(speed)
     self._weatherSpeed = math.clamp(tonumber(speed) or 1, 0.1, 3)
 end
 
--- Minimize: the window folds into a small orb that docks on the nearest side
--- of the screen. Running toggles circle it as a snake of dots. Left alone it
--- tucks half behind the edge and dims, and slides back out when the pointer
--- comes near. Hovering shows a card with the tab and pinned statuses. Click or
--- tap restores; drag it to move it, and it snaps to whichever side is closer.
+-- Minimize: the window folds into a Dynamic Island style pill hanging from
+-- the top of the screen. Compact, it shows the logo and a live meter of
+-- running toggles. Hovering springs it open into a card with the tab, the
+-- running count, pinned statuses and the key that reopens the window. A
+-- notification while minimized opens it briefly to show it. Click or tap
+-- restores.
 
 -- One table, not separate locals: the main chunk is at Luau's 200 local limit.
 local Mini = {
-    Orb = TOUCH and 48 or 44,
-    Frame = TOUCH and 84 or 80, -- the orb plus room for the orbiting dots
-    Margin = 10, -- gap between the orb and the screen edge when out
-    Peek = 16, -- how much of the orb stays on screen when tucked
-    TuckDelay = 2.2,
-    Near = 130, -- pointer distance that brings it back out
-    MaxDots = 8,
+    Top = 10, -- gap from the top of the screen
+    Width = TOUCH and 150 or 140, -- compact
+    Height = TOUCH and 40 or 36,
+    Wide = 320, -- expanded and activity
+    Bars = 4,
     Pinned = 6,
 }
 
@@ -16437,349 +16527,468 @@ function Window:_buildMiniBar()
         return self.MiniBar
     end
     local gui = self.Gui
-    -- Positioned by its centre so the press and hover scale grow from the middle.
-    local bar = create("CanvasGroup", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.fromOffset(Mini.Frame, Mini.Frame),
-        BackgroundTransparency = 1,
+
+    -- The island itself: a black pill hanging from the top of the screen. It
+    -- is a canvas so its rounded shape clips whatever layer is showing.
+    local island = create("CanvasGroup", {
+        Name = "Island",
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, Mini.Top),
+        Size = UDim2.fromOffset(Mini.Width, Mini.Height),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BorderSizePixel = 0,
         GroupTransparency = 1,
         Visible = false,
         ZIndex = 30,
         Parent = gui,
     })
-    local barScale = create("UIScale", { Parent = bar })
-    self._miniScale = barScale
+    local islandCorner = corner(island, UDim.new(0, Mini.Height / 2))
+    local islandScale = create("UIScale", { Parent = island })
+    self._miniScale = islandScale
+    self._miniOrb = island
 
-    -- The dots live in a frame that spins forever, so they orbit for free.
-    local orbit = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
+    -- The wide layers keep a fixed width, so nothing reflows while the island
+    -- grows around them.
+    local function layer(name)
+        return create("CanvasGroup", {
+            Name = name,
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.fromScale(0.5, 0),
+            Size = UDim2.new(0, Mini.Wide, 0, 400),
+            BackgroundTransparency = 1,
+            GroupTransparency = 1,
+            Parent = island,
+        })
+    end
+
+    -- Compact: the logo leading, a live meter of running toggles trailing.
+    local compact = create("CanvasGroup", {
+        Name = "Compact",
         Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
-        ZIndex = 1,
-        Parent = bar,
+        Parent = island,
     })
-    TweenService:Create(orbit, TweenInfo.new(10, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), {
-        Rotation = 360,
-    }):Play()
-    local radius = Mini.Orb / 2 + 9
-    local track = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(radius * 2, radius * 2),
-        BackgroundTransparency = 1,
-        Parent = orbit,
-    })
-    corner(track, UDim.new(1, 0))
-    local trackStroke = stroke(track, Theme.Accent, 1)
-
-    local orb = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(Mini.Orb, Mini.Orb),
-        BackgroundColor3 = Theme.Background,
-        BorderSizePixel = 0,
-        ZIndex = 2,
-        Parent = bar,
-    })
-    corner(orb, UDim.new(1, 0))
-    local orbStroke = stroke(orb, Theme.Stroke)
     local logo = create("ImageLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(math.floor(Mini.Orb * 0.5), math.floor(Mini.Orb * 0.5)),
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 13, 0.5, 0),
+        Size = UDim2.fromOffset(18, 18),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = orb,
+        Parent = compact,
     })
     applyIcon(logo, self._logoIcon, true)
+    local meter = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.fromOffset(0, 18),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+        Parent = compact,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 7),
+        Parent = meter,
+    })
+    local barsHolder = create("Frame", {
+        Size = UDim2.fromOffset(Mini.Bars * 3 + (Mini.Bars - 1) * 2, 16),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Parent = meter,
+    })
+    local bars = {}
+    for index = 1, Mini.Bars do
+        local bar = create("Frame", {
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, (index - 1) * 5, 0.5, 0),
+            Size = UDim2.fromOffset(3, 3),
+            BackgroundColor3 = Theme.Muted,
+            BorderSizePixel = 0,
+            Parent = barsHolder,
+        })
+        corner(bar, UDim.new(1, 0))
+        bars[index] = bar
+    end
+    local countLabel = label({
+        Size = UDim2.fromOffset(0, 18),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = "",
+        TextSize = 13,
+        FontFace = Fonts.Bold,
+        TextTruncate = Enum.TextTruncate.None,
+        Visible = false,
+        LayoutOrder = 2,
+        Parent = meter,
+    })
+
+    -- Expanded, on hover: the tab, how many are running, pinned statuses and
+    -- the key that reopens the window.
+    local expanded = layer("Expanded")
+    local expandedList = create("Frame", {
+        Position = UDim2.fromOffset(16, 14),
+        Size = UDim2.new(1, -32, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = expanded,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+        Parent = expandedList,
+    })
+    local top = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 38),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Parent = expandedList,
+    })
+    local chip = create("Frame", {
+        Size = UDim2.fromOffset(38, 38),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.85,
+        BorderSizePixel = 0,
+        Parent = top,
+    })
+    corner(chip, UDim.new(0, 12))
+    local chipLogo = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(20, 20),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Accent,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = chip,
+    })
+    applyIcon(chipLogo, self._logoIcon, true)
+    label({
+        Position = UDim2.fromOffset(50, 1),
+        Size = UDim2.new(1, -120, 0, 18),
+        Text = self.Title,
+        TextSize = 15,
+        FontFace = Fonts.Bold,
+        Parent = top,
+    })
+    local tabLabel = label({
+        Position = UDim2.fromOffset(50, 20),
+        Size = UDim2.new(1, -120, 0, 15),
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        Parent = top,
+    })
+    local bigCount = label({
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, 0, 0, -2),
+        Size = UDim2.fromOffset(64, 24),
+        Text = "0",
+        TextSize = 22,
+        FontFace = Fonts.Bold,
+        TextColor3 = Theme.Accent,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = top,
+    })
+    label({
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, 0, 0, 22),
+        Size = UDim2.fromOffset(64, 14),
+        Text = "running",
+        TextSize = 11,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = top,
+    })
+    local rowsHolder = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Visible = false,
+        LayoutOrder = 2,
+        Parent = expandedList,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = rowsHolder,
+    })
+    local hint = label({
+        Size = UDim2.new(1, 0, 0, 14),
+        TextSize = 11,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        LayoutOrder = 3,
+        Parent = expandedList,
+    })
+
+    -- Activity: a notification that arrives while minimized drops in here.
+    local activity = layer("Activity")
+    local activityList = create("Frame", {
+        Position = UDim2.fromOffset(16, 13),
+        Size = UDim2.new(1, -32, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = activity,
+    })
+    local activityChip = create("Frame", {
+        Size = UDim2.fromOffset(34, 34),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.85,
+        BorderSizePixel = 0,
+        Parent = activityList,
+    })
+    corner(activityChip, UDim.new(1, 0))
+    local activityIcon = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(17, 17),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Accent,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = activityChip,
+    })
+    local activityText = create("Frame", {
+        Position = UDim2.fromOffset(46, 0),
+        Size = UDim2.new(1, -46, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = activityList,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 1),
+        Parent = activityText,
+    })
+    local activityTitle = label({
+        Size = UDim2.new(1, 0, 0, 18),
+        TextSize = 14,
+        FontFace = Fonts.Bold,
+        LayoutOrder = 1,
+        Parent = activityText,
+    })
+    local activityBody = label({
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextWrapped = true,
+        TextTruncate = Enum.TextTruncate.None,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        MaxVisibleGraphemes = 140,
+        LayoutOrder = 2,
+        Parent = activityText,
+    })
+
     local hit = create("TextButton", {
         Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
         Text = "",
         AutoButtonColor = false,
-        ZIndex = 5,
-        Parent = orb,
+        ZIndex = 10,
+        Parent = island,
     })
-    self._miniOrb = orb
 
-    -- Hover card, PC only. A sibling of the orb, since the canvas would clip it.
-    local card = create("CanvasGroup", {
-        Size = UDim2.fromOffset(0, 0),
-        AutomaticSize = Enum.AutomaticSize.XY,
-        BackgroundColor3 = Theme.Background,
-        BorderSizePixel = 0,
-        GroupTransparency = 1,
-        Visible = false,
-        ZIndex = 31,
-        Parent = gui,
-    })
-    corner(card, UDim.new(0, 10))
-    stroke(card, Theme.Stroke)
-    padding(card, 12, 12, 10, 10)
-    create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
-        Parent = card,
-    })
-    local function line(order, size, color, font)
-        return label({
-            Size = UDim2.fromOffset(0, size + 4),
-            AutomaticSize = Enum.AutomaticSize.X,
-            TextSize = size,
-            TextColor3 = color,
-            FontFace = font or Fonts.Medium,
-            TextTruncate = Enum.TextTruncate.None,
-            LayoutOrder = order,
-            Parent = card,
-        })
-    end
-    line(1, 13, Theme.Text, Fonts.Bold).Text = self.Title
-    local cardTab = line(2, 11, Theme.Muted)
-    local cardRunning = line(3, 11, Theme.Accent)
-    local cardRows = {}
-    local cardHint = line(100, 11, Theme.Muted)
+    -- Morphing between shapes: the island springs to its new size while the
+    -- old layer fades out and the new one fades in just behind it.
+    local layers = { Compact = compact, Expanded = expanded, Activity = activity }
+    local mode = "Compact"
+    local modeToken = 0
+    local hovered, pressed = false, false
+    local activityToken = 0
+    local activityLive = false
 
-    local tucked, hovered, near, dragging = false, false, false, false
-    local tuckToken = 0
-    local function centreFor(tuck)
-        local screen = gui.AbsoluteSize
-        local half = Mini.Orb / 2
-        local x = tuck and Mini.Peek - half or Mini.Margin + half
-        if self._miniSide == "right" then
-            x = screen.X - x
+    local function shapeFor(name)
+        if name == "Expanded" then
+            return Vector2.new(Mini.Wide, math.floor(expandedList.AbsoluteSize.Y + 28 + 0.5)), 24
+        elseif name == "Activity" then
+            return Vector2.new(Mini.Wide, math.floor(math.max(activityList.AbsoluteSize.Y, 34) + 26 + 0.5)), 24
         end
-        local edge = Mini.Frame / 2
-        return Vector2.new(x, math.clamp(self._miniY or screen.Y / 2, edge, math.max(screen.Y - edge, edge)))
-    end
-    local function currentCentre()
-        return bar.AbsolutePosition + bar.AbsoluteSize / 2 - gui.AbsolutePosition
+        return Vector2.new(Mini.Width, Mini.Height), Mini.Height / 2
     end
 
-    local function placeCard()
-        local centre = centreFor(false)
-        local right = self._miniSide == "right"
-        local height = card.AbsoluteSize.Y
-        local y = math.clamp(centre.Y - height / 2, 8, math.max(gui.AbsoluteSize.Y - height - 8, 8))
-        card.AnchorPoint = Vector2.new(right and 1 or 0, 0)
-        local gap = Mini.Orb / 2 + 14
-        return UDim2.fromOffset(centre.X + (right and -gap or gap), y), right and 1 or -1
-    end
-    local function showCard(on)
-        if TOUCH then
+    local function setMode(name, instant)
+        local size, radius = shapeFor(name)
+        local changed = name ~= mode
+        mode = name
+        modeToken += 1
+        local token = modeToken
+        local current = Vector2.new(island.Size.X.Offset, island.Size.Y.Offset)
+        local growing = size.X > current.X + 1 or size.Y > current.Y + 1
+        local duration = instant and 0 or (growing and 0.5 or 0.38)
+        tween(island, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, growing and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
+        tween(islandCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
+        if not changed and not instant then
             return
         end
-        if on then
-            self:_refreshMini()
-            card.Visible = true
-            local position, away = placeCard()
-            card.Position = position + UDim2.fromOffset(6 * away, 0)
-            tween(card, { Position = position, GroupTransparency = 0 }, 0.2, Enum.EasingStyle.Quint)
-        elseif card.Visible then
-            tween(card, { GroupTransparency = 1 }, 0.12)
-            task.delay(0.12, function()
-                if not hovered then
-                    card.Visible = false
+        for key, group in pairs(layers) do
+            if key ~= name then
+                tween(group, { GroupTransparency = 1 }, instant and 0 or 0.14, Enum.EasingStyle.Quad)
+            end
+        end
+        local target = layers[name]
+        if instant then
+            target.GroupTransparency = 0
+        else
+            task.delay(0.1, function()
+                if modeToken == token then
+                    tween(target, { GroupTransparency = 0 }, 0.22, Enum.EasingStyle.Quad)
                 end
             end)
         end
     end
 
-    local function settle(tuck)
-        tucked = tuck
-        local centre = centreFor(tuck)
-        tween(bar, { Position = UDim2.fromOffset(centre.X, centre.Y) }, tuck and 0.6 or 0.4, tuck and Enum.EasingStyle.Quint or Enum.EasingStyle.Back)
-        tween(bar, { GroupTransparency = tuck and 0.4 or 0 }, 0.3)
-    end
-    local function scheduleTuck()
-        tuckToken += 1
-        local token = tuckToken
-        task.delay(Mini.TuckDelay, function()
-            if token == tuckToken and self.Minimized and not tucked and not (hovered or near or dragging) then
-                settle(true)
-            end
-        end)
-    end
-    local function wake()
-        tuckToken += 1
-        if tucked then
-            settle(false)
+    local function settleMode()
+        if hovered and not TOUCH then
+            setMode("Expanded")
+        elseif activityLive then
+            setMode("Activity")
+        else
+            setMode("Compact")
         end
     end
 
-    -- Called by Minimize once the window is out of the way. The first time,
-    -- the orb docks on the side nearest the window, level with it.
-    function self:_miniLand(from)
-        if not self._miniSide then
-            self._miniSide = from.X < gui.AbsoluteSize.X / 2 and "left" or "right"
-            self._miniY = from.Y
-        end
-        tucked = false
-        local centre = centreFor(false)
-        bar.Position = UDim2.fromOffset(centre.X, centre.Y)
-        scheduleTuck()
-        return centre - Vector2.one * (Mini.Orb / 2), Vector2.one * Mini.Orb
+    -- Called by Minimize once the window is out of the way: the island is
+    -- reset to its compact pill and its spot handed back for the ghost.
+    function self:_miniLand()
+        hovered, activityLive = false, false
+        activityToken += 1
+        islandScale.Scale = 1
+        setMode("Compact", true)
+        local size = Vector2.new(Mini.Width, Mini.Height)
+        return Vector2.new(gui.AbsoluteSize.X / 2 - size.X / 2, Mini.Top), size
     end
 
     hit.MouseEnter:Connect(function()
-        hovered = true
-        wake()
-        tween(orbStroke, { Color = Theme.StrokeHover }, 0.15)
-        if not dragging then
-            tween(barScale, { Scale = 1.08 }, 0.25, Enum.EasingStyle.Quint)
-            showCard(true)
+        if usingTouch() then
+            return
         end
+        hovered = true
+        self:_refreshMini()
+        task.defer(function()
+            if hovered and self.Minimized then
+                setMode("Expanded")
+            end
+        end)
     end)
     hit.MouseLeave:Connect(function()
         hovered = false
-        tween(orbStroke, { Color = Theme.Stroke }, 0.25)
-        if not dragging then
-            tween(barScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
-            scheduleTuck()
+        if not pressed then
+            tween(islandScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
         end
-        showCard(false)
-    end)
-    -- Restore hides the orb under the pointer, so MouseLeave never fires.
-    self._miniUnhover = function()
-        hovered, near, dragging = false, false, false
-        tuckToken += 1
-        barScale.Scale = 1
-        orbStroke.Color = Theme.Stroke
-        showCard(false)
-    end
-
-    -- The pointer coming close pulls it back out of the edge.
-    table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
-        if TOUCH or input.UserInputType ~= Enum.UserInputType.MouseMovement or not self.Minimized or not bar.Visible then
-            return
-        end
-        local close = (pointerPosition() - gui.AbsolutePosition - centreFor(false)).Magnitude < Mini.Near
-        if close ~= near then
-            near = close
-            if near then
-                wake()
-            else
-                scheduleTuck()
+        task.delay(0.1, function()
+            if not hovered and self.Minimized then
+                settleMode()
             end
-        end
-    end))
-
-    local moved = false
-    local grab, pressedAt = Vector2.zero, Vector2.zero
-    hit.InputBegan:Connect(function(input)
-        if not isPress(input) or not self.Minimized then
-            return
-        end
-        dragging, moved = true, false
-        pressedAt = pointerPosition()
-        grab = pressedAt - gui.AbsolutePosition - currentCentre()
-        tuckToken += 1
-        tween(barScale, { Scale = 0.92 }, 0.12, Enum.EasingStyle.Quad)
+        end)
     end)
-    table.insert(self._connections, UserInputService.InputChanged:Connect(function(input)
-        if not dragging or not isMove(input) then
-            return
-        end
-        if not self.Minimized then
-            dragging = false
-            return
-        end
-        -- Fingers wobble: only a real drag moves it, a tap still restores.
-        if not moved and (pointerPosition() - pressedAt).Magnitude > (TOUCH and 10 or 4) then
-            moved = true
-            tucked = false
-            showCard(false)
-            tween(bar, { GroupTransparency = 0 }, 0.15)
-            tween(barScale, { Scale = 1.05 }, 0.2, Enum.EasingStyle.Quint)
-        end
-        if moved then
-            local screen = gui.AbsoluteSize
-            local point = pointerPosition() - gui.AbsolutePosition - grab
-            bar.Position = UDim2.fromOffset(math.clamp(point.X, 0, screen.X), math.clamp(point.Y, 0, screen.Y))
-        end
-    end))
+    hit.MouseButton1Down:Connect(function()
+        pressed = true
+        tween(islandScale, { Scale = 0.95 }, 0.12, Enum.EasingStyle.Quad)
+    end)
     table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
-        if not dragging or not isPress(input) then
-            return
-        end
-        dragging = false
-        tween(barScale, { Scale = hovered and 1.08 or 1 }, 0.25, Enum.EasingStyle.Quint)
-        if moved then
-            -- Let go anywhere and it snaps to the nearer side.
-            local centre = currentCentre()
-            self._miniSide = centre.X < gui.AbsoluteSize.X / 2 and "left" or "right"
-            self._miniY = centre.Y
-            settle(false)
-            scheduleTuck()
-            if hovered then
-                task.delay(0.4, function()
-                    if hovered and not dragging and self.Minimized then
-                        showCard(true)
-                    end
-                end)
-            end
-        elseif self.Minimized then
-            self:Restore()
-        else
-            scheduleTuck()
+        if pressed and isPress(input) then
+            pressed = false
+            tween(islandScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
         end
     end))
-
-    -- One dot per running toggle, head first with the tail fading behind it.
-    local dots = {}
-    local dotCount = -1
-    local function placeDots(count)
-        if count == dotCount then
-            return
+    hit.MouseButton1Click:Connect(function()
+        if self.Minimized then
+            self:Restore()
         end
-        dotCount = count
-        tween(trackStroke, { Transparency = count > 0 and 0.82 or 1 }, 0.3)
-        for index = 1, math.max(count, #dots) do
-            local dot = dots[index]
-            if index <= count then
-                if not dot then
-                    dot = create("Frame", {
-                        AnchorPoint = Vector2.new(0.5, 0.5),
-                        Position = UDim2.fromScale(0.5, 0.5),
-                        Size = UDim2.fromOffset(index == 1 and 7 or 5, index == 1 and 7 or 5),
-                        BackgroundColor3 = Theme.Accent,
-                        BackgroundTransparency = 1,
-                        BorderSizePixel = 0,
-                        Parent = orbit,
-                    })
-                    corner(dot, UDim.new(1, 0))
-                    dots[index] = dot
-                end
-                local angle = -math.pi / 2 - (index - 1) / count * math.pi * 2
-                tween(dot, {
-                    Position = UDim2.new(0.5, math.cos(angle) * radius, 0.5, math.sin(angle) * radius),
-                    BackgroundTransparency = (index - 1) / count * 0.6,
-                }, 0.5, Enum.EasingStyle.Quint)
-            elseif dot then
-                tween(dot, { Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1 }, 0.35, Enum.EasingStyle.Quint)
-            end
-        end
+    end)
+    -- Restore hides the island under the pointer, so MouseLeave never fires.
+    self._miniUnhover = function()
+        hovered, pressed, activityLive = false, false, false
+        activityToken += 1
+        islandScale.Scale = 1
     end
 
+    -- A notification while minimized: the island opens to show it for a few
+    -- seconds, then folds back.
+    self._islandActivity = function(opts)
+        if not self.Minimized or not island.Visible then
+            return
+        end
+        local color = NOTIFY_COLORS[opts.Type] or Theme.Accent
+        activityTitle.Text = tostring(opts.Title or "Notification")
+        activityTitle.TextColor3 = NOTIFY_COLORS[opts.Type] or Theme.Text
+        activityBody.Text = tostring(opts.Content or "")
+        activityBody.Visible = activityBody.Text ~= ""
+        local icon = opts.Icon
+        if icon == nil then
+            icon = ({ Success = "circle-check", Warning = "triangle-alert", Error = "circle-x" })[opts.Type] or "bell"
+        end
+        applyIcon(activityIcon, icon)
+        if not activityIcon:GetAttribute("CustomIcon") then
+            activityIcon.ImageColor3 = color
+        end
+        activityChip.BackgroundColor3 = color
+        activityLive = true
+        activityToken += 1
+        local token = activityToken
+        task.defer(function()
+            if activityToken == token and not hovered then
+                setMode("Activity")
+                islandScale.Scale = 0.96
+                tween(islandScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
+            end
+        end)
+        task.delay(math.clamp(tonumber(opts.Duration) or 3, 1.5, 5), function()
+            if activityToken == token then
+                activityLive = false
+                if self.Minimized and not hovered then
+                    settleMode()
+                end
+            end
+        end)
+    end
+
+    -- The meter dances while anything runs and lies flat when nothing does.
+    local running = 0
+    self:_listen("Render", function()
+        if island.Visible and running > 0 and mode == "Compact" then
+            local now = os.clock()
+            for index, bar in ipairs(bars) do
+                local wave = 0.5 + 0.5 * math.sin(now * (6 + index * 1.4) + index * 1.9)
+                bar.Size = UDim2.fromOffset(3, math.floor(4 + wave * 11 + 0.5))
+            end
+        end
+    end)
+
+    local cardRows = {}
     function self:_refreshMini()
-        local running = 0
+        local count = 0
         for _, element in pairs(Library.Flags) do
             if element._type == "Toggle" and element.Value == true then
-                running += 1
+                count += 1
             end
         end
-        placeDots(math.min(running, Mini.MaxDots))
-        if TOUCH or not card.Visible and not hovered then
-            return
+        if count ~= running then
+            local rising = count > running
+            running = count
+            countLabel.Text = tostring(count)
+            countLabel.Visible = count > 0
+            for _, bar in ipairs(bars) do
+                tween(bar, { BackgroundColor3 = count > 0 and Theme.Accent or Theme.Muted }, 0.25)
+                if count == 0 then
+                    tween(bar, { Size = UDim2.fromOffset(3, 3) }, 0.25)
+                end
+            end
+            -- A small bump, like a live activity updating.
+            if rising and mode == "Compact" and island.Visible then
+                islandScale.Scale = 1.06
+                tween(islandScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
+            end
         end
+        bigCount.Text = tostring(count)
         local tab = self.CurrentTab
-        cardTab.Visible = tab ~= nil
-        cardTab.Text = tab and tab.Name or ""
-        cardRunning.Visible = running > 0
-        cardRunning.Text = running .. " running"
+        tabLabel.Text = tab and tab.Name or ""
         local key = typeof(self.Keybind) == "EnumItem" and keyName(self.Keybind)
-        cardHint.Text = key and ("Click or press " .. key .. " to open") or "Click to open"
+        hint.Text = TOUCH and "Tap to open" or (key and ("Click or press " .. key .. " to open") or "Click to open")
 
         local list = {}
         for _, handle in ipairs(self._pinned) do
@@ -16787,38 +16996,36 @@ function Window:_buildMiniBar()
                 table.insert(list, handle)
             end
         end
+        rowsHolder.Visible = #list > 0
         for index = 1, math.max(#list, #cardRows) do
             local handle = list[index]
             local row = cardRows[index]
             if handle then
                 if not row then
-                    -- Name, then the live value.
                     local frame = create("Frame", {
-                        Size = UDim2.fromOffset(0, 16),
-                        AutomaticSize = Enum.AutomaticSize.X,
+                        Size = UDim2.new(1, 0, 0, 18),
                         BackgroundTransparency = 1,
-                        LayoutOrder = 10 + index,
-                        Parent = card,
+                        LayoutOrder = index,
+                        Parent = rowsHolder,
                     })
-                    create("UIListLayout", {
-                        FillDirection = Enum.FillDirection.Horizontal,
-                        VerticalAlignment = Enum.VerticalAlignment.Center,
-                        Padding = UDim.new(0, 8),
-                        SortOrder = Enum.SortOrder.LayoutOrder,
-                        Parent = frame,
-                    })
-                    local function part(order, color)
-                        return label({
-                            Size = UDim2.fromScale(0, 1),
-                            AutomaticSize = Enum.AutomaticSize.X,
-                            TextSize = order == 1 and 11 or 12,
-                            TextColor3 = color,
-                            TextTruncate = Enum.TextTruncate.None,
-                            LayoutOrder = order,
+                    row = {
+                        Frame = frame,
+                        Key = label({
+                            Size = UDim2.new(0.5, -4, 1, 0),
+                            TextSize = 12,
+                            FontFace = Fonts.Regular,
+                            TextColor3 = Theme.Muted,
                             Parent = frame,
-                        })
-                    end
-                    row = { Frame = frame, Key = part(1, Theme.Muted), Value = part(2, Theme.Text) }
+                        }),
+                        Value = label({
+                            AnchorPoint = Vector2.new(1, 0),
+                            Position = UDim2.fromScale(1, 0),
+                            Size = UDim2.new(0.5, -4, 1, 0),
+                            TextSize = 12,
+                            TextXAlignment = Enum.TextXAlignment.Right,
+                            Parent = frame,
+                        }),
+                    }
                     cardRows[index] = row
                 end
                 row.Frame.Visible = true
@@ -16828,18 +17035,22 @@ function Window:_buildMiniBar()
                 row.Frame.Visible = false
             end
         end
+        -- Rows coming and going change the expanded height.
+        if mode == "Expanded" then
+            task.defer(function()
+                if mode == "Expanded" then
+                    local size = shapeFor("Expanded")
+                    if math.abs(size.Y - island.Size.Y.Offset) > 1 then
+                        setMode("Expanded")
+                    end
+                end
+            end)
+        end
     end
 
-    -- Stay docked to the edge when the screen shrinks or rotates.
-    table.insert(self._connections, gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        if bar.Visible and self.Minimized and not dragging then
-            local centre = centreFor(tucked)
-            bar.Position = UDim2.fromOffset(centre.X, centre.Y)
-        end
-    end))
-
-    self.MiniBar = bar
-    return bar
+    self.MiniBar = island
+    self.Island = island
+    return island
 end
 
 function Window:Minimize()
@@ -16883,7 +17094,7 @@ function Window:Minimize()
             return
         end
         -- 2. Covered by the ghost, the window is hidden and the ghost folds
-        -- down into the orb on the edge.
+        -- down into the island.
         self.Root.Visible = false
         self.Scale.Scale = self._fitScale or 1
         local target, size = self:_miniLand(fromPosition + fromSize / 2)
@@ -16892,7 +17103,7 @@ function Window:Minimize()
             if self._minimizeGeneration ~= generation or self._destroyed then
                 return
             end
-            -- 3. The orb fades in on top as the ghost lands.
+            -- 3. The island fades in on top as the ghost lands.
             self._miniScale.Scale = 0.9
             tween(self._miniScale, { Scale = 1 }, 0.3, Enum.EasingStyle.Quint)
             tween(bar, { GroupTransparency = 0 }, 0.18, Enum.EasingStyle.Quad)
@@ -16925,7 +17136,7 @@ function Window:Restore()
     local target = centre - size / 2
 
     -- Picks up from whatever is on screen: a ghost still mid-flight if
-    -- minimize was interrupted, otherwise the orb, even tucked into the edge.
+    -- minimize was interrupted, otherwise the island.
     local fromPosition, fromSize = target, size
     local fromAlpha = 1
     if self._ghost then
@@ -17075,6 +17286,9 @@ end
 
 function Window:Notify(opts)
     opts = normalize(opts, { Text = "Content", Message = "Content", Image = "Icon" })
+    if self.Minimized and self._islandActivity then
+        self._islandActivity(opts)
+    end
     local duration = opts.Duration or 4
     local titleColor = NOTIFY_COLORS[opts.Type] or Theme.Text
 
@@ -17624,7 +17838,7 @@ Priority:CreateOrderList({
     end,
 })
 
--- Status labels in every style. Pin = true also shows one on the minimized orb.
+-- Status labels in every style. Pin = true also shows one on the minimized island.
 local Run = Farm:CreateSubTab({ Name = "Run" })
 
 local RunInfo = Run:AddLeftGroupbox({ Name = "Run Info", Icon = "activity" })

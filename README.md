@@ -60,7 +60,7 @@ Window:Toggle(false)
 
 Drag any empty area to move it and the grip in the bottom-right corner to resize it. While resizing, the top-left corner stays put and the size follows the pointer through a spring, so it glides and settles instead of snapping. The window only renders through a CanvasGroup while it fades in or out, so resizing never re-renders it into a texture. It scales itself down on small screens and stays inside the viewport.
 
-The button in the top-right minimizes the window: it folds into a small orb with the logo, docked to whichever side of the screen the window was nearer. Each running toggle circles the orb as a dot (up to eight), the lead dot bright and the tail fading behind it. Left alone for a couple of seconds it tucks half behind the edge and dims, then slides back out when the cursor comes near. Hover it to see the current tab, how many toggles are on, up to six pinned [statuses](#status) with live values, and the key that reopens the window. Click or tap it (or press the hide key) and it unfolds back into the window. Drag it anywhere and let go: it snaps to the nearer side and remembers where you left it.
+The button in the top-right minimizes the window into a Dynamic Island: a black pill hanging from the top centre of the screen. Compact, it shows the logo and a small equalizer meter that dances while toggles are running, with the running count beside it. Hover it and it springs open into a card with the current tab, how many toggles are on, up to six pinned [statuses](#status) with live values, and the key that reopens the window. A notification sent while minimized opens the island for a few seconds to show it, coloured by its `Type`, then folds back (the usual toast still appears too). Click or tap it (or press the hide key) and it unfolds back into the window.
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
@@ -77,6 +77,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Size` | UDim2 | `760 × 520` | Starting size. |
 | `MinSize` | Vector2 | `480 × 360` | Smallest size the resize grip allows. |
 | `MaxSize` | Vector2 | unlimited | Largest size the resize grip allows. |
+| `SaveSize` | boolean \| string | `true` | Save the window's exact size (in pixels, not the UI scale) in configs, under a hidden `__WindowSize` flag. A string renames the flag; `false` leaves size out of configs. |
 | `MaxNotifications` | number | `4` | Oldest toast is dismissed past this. |
 | `KeepOnScreen` | boolean | `true` | Nudge the window back inside the viewport after a drag, resize or screen change. |
 | `Transparent` | boolean | `false` | See-through window body and sidebar. |
@@ -131,8 +132,9 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `.Home` | The home tab, unless `Home = false`. |
 | `.SearchBox` | The search TextBox. |
 | `Toggle(open?)` | Show, hide, or flip. Restores the window when minimized. |
-| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the orb and back. |
-| `.Minimized` / `.MiniBar` | Whether it's minimized, and the orb itself. |
+| `Minimize()` / `Restore()` / `SetMinimized(bool)` | Fold into the island and back. |
+| `.Minimized` / `.Island` | Whether it's minimized, and the island itself (also `.MiniBar`). |
+| `SetSize(Vector2, instant?)` / `GetSize()` | Resize to an exact size in pixels, kept within `MinSize` and `MaxSize`. Configs save and load it. |
 | `SetToggleButton(enabled)` | Show or hide the toggle button. |
 | `SetToggleButtonPlatform(platform)` | `"Mobile"` or `"Both"`. |
 | `SetToggleButtonIcon(icon)` | Swap its icon. |
@@ -369,7 +371,7 @@ Charge = Box:CreateSlider({ Name = "Charge Distance", Range = { 5, 60 }, Visible
 - Search never reveals something you hid, and clearing the search leaves it hidden.
 - Hidden elements keep their flag. They still save, load and run callbacks, so loading a config with `HoldSkills` on shows `Charge`. Visibility itself is not saved.
 - Hiding an open dropdown or colour picker closes it, and hiding a keybind stops a capture.
-- A hidden pinned status leaves the orb's hover card until it is shown again.
+- A hidden pinned status leaves the minimized island until it is shown again.
 
 ---
 
@@ -388,7 +390,7 @@ Box:CreateSlider({
 Toggle:SetTooltip("New text") -- nil or false removes it
 ```
 
-The card fades in after a short hover and follows the pointer, flipping to the other side near the screen edge. Moving straight from one element to another swaps the card without the wait. Any click or key press hides it, as does switching tabs or hiding the window. On touch screens a half-second press shows it above the finger and lifting hides it; a finger that starts scrolling doesn't. `GetTooltip()` returns the current value.
+It is bare text with a thin dark outline, no background, with the icon and title on top when given. It rises in after a short hover and follows the pointer, flipping to the other side near the screen edge. Moving straight from one element to another swaps the card without the wait. Any click or key press hides it, as does switching tabs or hiding the window. On touch screens a half-second press shows it above the finger and lifting hides it; a finger that starts scrolling doesn't. `GetTooltip()` returns the current value.
 
 ---
 
@@ -506,7 +508,7 @@ A changed value flashes the accent colour briefly. With `Update`, the function r
 | `Prefix` / `Suffix` | string | — | Text around the value. |
 | `Placeholder` | string | `"-"` | Shown while the value is `nil`. |
 | `Update` / `UpdateRate` | function / number | — / `1` | Refresh on a timer. |
-| `Pin` | boolean | `false` | Also show it on the minimized orb's hover card. |
+| `Pin` | boolean | `false` | Also show it on the minimized island. |
 | `Pulse` / `Flash` | boolean | `true` | The `Dot` pulse and the change flash. |
 
 ### Handle
@@ -1571,7 +1573,7 @@ Airflow.Assets.Glow = "rbxassetid://8992230677"
 Airflow.Assets.Shadow = "rbxassetid://6014261993"
 ```
 
-Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
+Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`, and the themed set `Halloween`, `Haunted`, `Christmas`, `Valentine`, `Lunar`, `Tropical`, `Dracula`, `Coffee`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
 The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 
