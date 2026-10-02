@@ -4263,7 +4263,7 @@ function Library.Window(_, opts)
     }, Window)
     local saving = type(opts.ConfigurationSaving) == "table" and opts.ConfigurationSaving or {}
     self.ConfigFolder = saving.FolderName or "AirflowUI"
-    self.ConfigName = saving.FileName or "default"
+    self.ConfigName = saving.FileName
     self._configListeners = {}
     self._pendingFlags = {}
 
@@ -6760,6 +6760,9 @@ end
 
 function Window:SaveConfig(name)
     name = name or self.ConfigName
+    if not name then
+        return false, "no config name"
+    end
     local ok, err = writeConfig(self, name, collectFlags(self))
     if ok then
         self.ConfigName = name
@@ -6769,6 +6772,9 @@ end
 
 function Window:LoadConfig(name, silent)
     name = name or self.ConfigName
+    if not name then
+        return false, "no config name"
+    end
     local data, err = readConfig(self, name)
     if not data then
         return false, err
@@ -18275,7 +18281,7 @@ local Window = Airflow:CreateWindow({
     ToggleUIKeybind = "RightControl", -- key that hides and shows the window
     -- examples: "RightShift", "RightControl", "LeftAlt", "Insert", "Home", "F1", "Backquote"
     -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift
-    ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample", FileName = "default" },
+    ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample" },
     ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
     Backdrop = { Weather = "Snow", Tint = 0.45 }, -- black tint + weather behind the open window: "Snow", "Rain", "Hell Fire", "Sakura", "Fireflies", "Matrix" or "None". false turns it off
     -- UIScale = 1, -- 0.6 to 1.5 on top of the automatic fit to small screens. Players can change it in the theme manager

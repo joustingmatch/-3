@@ -25,7 +25,7 @@ local Window = Airflow:CreateWindow({
     Name = "My Hub",                       -- title, also names the ScreenGui
     LoadingSubtitle = "by Me",
     ToggleUIKeybind = "RightControl",      -- hides and shows the window
-    ConfigurationSaving = { Enabled = true, FolderName = "MyHub", FileName = "default" },
+    ConfigurationSaving = { Enabled = true, FolderName = "MyHub" },
     Home = { Discord = "dsc.gg/myhub" },   -- built-in first tab; false removes it
 })
 

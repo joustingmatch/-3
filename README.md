@@ -104,7 +104,6 @@ local Window = Airflow:CreateWindow({
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "MyHub",
-        FileName = "default",
     },
     Home = {
         Tier = "Free",
@@ -1395,7 +1394,7 @@ Toggles, sliders, steppers, dropdowns, inputs, keybinds and colour pickers creat
 ```lua
 local Window = Airflow:CreateWindow({
     Name = "Airflow",
-    ConfigurationSaving = { Enabled = true, FolderName = "MyHub", FileName = "default" },
+    ConfigurationSaving = { Enabled = true, FolderName = "MyHub" },
 })
 
 local Settings = Window:CreateTab({ Name = "Settings", Icon = "settings" })
@@ -1440,7 +1439,7 @@ Requires `writefile` / `readfile`.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `FolderName` | string | `"AirflowUI"` | Folder in the executor workspace. Can be nested, like `"MyHub/Game"`; missing folders are made. |
-| `FileName` | string | `"default"` | Config used when `SaveConfig` / `LoadConfig` get no name. |
+| `FileName` | string | none | Optional config used when `SaveConfig` / `LoadConfig` get no name. With none set, there is no default config: only configs you create exist. |
 
 `CreateConfigManager` takes `Name`, `Icon`, `Side` and `Placeholder`. Called on a groupbox it adds its rows there instead of making its own.
 
