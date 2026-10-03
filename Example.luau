@@ -16954,10 +16954,13 @@ end
 
 -- One table, not separate locals: the main chunk is at Luau's 200 local limit.
 local Mini = {
-    Top = 10, -- gap from the top of the screen
-    Width = TOUCH and 150 or 140, -- compact
-    Height = TOUCH and 40 or 36,
-    Wide = 320, -- expanded and activity
+    -- Sized after the iPhone 18 island: a slimmer, shorter pill sitting close
+    -- to the top edge, opening into a wide card with deep rounded corners.
+    Top = 8, -- gap from the top of the screen
+    Width = TOUCH and 132 or 124, -- compact
+    Height = TOUCH and 36 or 32,
+    Wide = 340, -- expanded and activity
+    Radius = 34, -- corner of the expanded and activity cards
     Bars = 4,
     Pinned = 6,
 }
@@ -17287,9 +17290,9 @@ function Window:_buildMiniBar()
 
     local function shapeFor(name)
         if name == "Expanded" then
-            return Vector2.new(Mini.Wide, math.floor(expandedList.AbsoluteSize.Y + 28 + 0.5)), 24
+            return Vector2.new(Mini.Wide, math.floor(expandedList.AbsoluteSize.Y + 28 + 0.5)), Mini.Radius
         elseif name == "Activity" then
-            return Vector2.new(Mini.Wide, math.floor(math.max(activityList.AbsoluteSize.Y, 34) + 26 + 0.5)), 24
+            return Vector2.new(Mini.Wide, math.floor(math.max(activityList.AbsoluteSize.Y, 34) + 26 + 0.5)), Mini.Radius
         end
         return Vector2.new(Mini.Width, Mini.Height), Mini.Height / 2
     end
@@ -17358,6 +17361,12 @@ function Window:_buildMiniBar()
         placeIsland(size, duration)
         sizeTween = tween(island, { Size = UDim2.fromOffset(size.X, size.Y) }, duration, growing and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
         cornerTween = tween(islandCorner, { CornerRadius = UDim.new(0, radius) }, duration, Enum.EasingStyle.Quint)
+        -- The iOS island gives a soft squeeze as it swells open, then springs
+        -- back, so the morph reads as one elastic body rather than a resize.
+        if changed and not instant and not pressed and not dragging then
+            islandScale.Scale = growing and 0.96 or 1.03
+            tween(islandScale, { Scale = 1 }, growing and 0.55 or 0.4, Enum.EasingStyle.Back)
+        end
         if not changed and not instant then
             return
         end
@@ -17570,6 +17579,84 @@ function Window:_buildMiniBar()
         end
     end)
 
+    -- Split, like iOS with two Live Activities: when toggles are running and
+    -- a status is pinned, the pill keeps the status (logo leading, value
+    -- trailing) and the running meter buds off into its own little circle
+    -- beside it. One activity alone stays in the single pill.
+    local pinValue = label({
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.new(1, -52, 0, 18),
+        TextSize = 13,
+        FontFace = Fonts.Bold,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        RichText = true,
+        TextTransparency = 1,
+        Parent = compact,
+    })
+    local bubble = create("TextButton", {
+        Name = "IslandBubble",
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.fromOffset(0, 0),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        Visible = false,
+        ZIndex = 30,
+        Parent = gui,
+    })
+    corner(bubble, UDim.new(1, 0))
+    local split = create("NumberValue", { Value = 0 })
+    local splitOn = false
+    local pinnedLead = nil
+    local function setSplit(on)
+        if on == splitOn then
+            return
+        end
+        splitOn = on
+        barsHolder.Parent = on and bubble or meter
+        barsHolder.AnchorPoint = on and Vector2.new(0.5, 0.5) or Vector2.new(0, 0)
+        barsHolder.Position = on and UDim2.fromScale(0.5, 0.5) or UDim2.new()
+        meter.Visible = not on
+        tween(pinValue, { TextTransparency = on and 0 or 1 }, 0.2, Enum.EasingStyle.Quad)
+        -- Buds off with a spring, and is drawn back in quicker.
+        tween(split, { Value = on and 1 or 0 }, on and 0.55 or 0.3, on and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
+        if on then
+            islandScale.Scale = 0.96
+            tween(islandScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
+        end
+    end
+    self:_listen("Render", function()
+        local t = split.Value
+        local shown = island.Visible and mode == "Compact" and t > 0.01 and island.GroupTransparency < 0.5
+        bubble.Visible = shown
+        if not shown then
+            return
+        end
+        local origin = gui.AbsolutePosition
+        local pos, size = island.AbsolutePosition - origin, island.AbsoluteSize
+        local d = size.Y
+        local gap = 6
+        -- Buds off the side with room to spare: the right, or the left near
+        -- the right edge of the screen.
+        local right = pos.X + size.X + gap + d <= gui.AbsoluteSize.X
+        local edge = right and pos.X + size.X or pos.X
+        local dir = right and 1 or -1
+        local inner = edge - dir * d / 2
+        local outer = edge + dir * (gap + d / 2)
+        local x = inner + (outer - inner) * t
+        local scale = math.clamp(0.35 + 0.65 * t, 0, 1.2)
+        bubble.Position = UDim2.fromOffset(x, pos.Y + d / 2)
+        bubble.Size = UDim2.fromOffset(d * scale, d * scale)
+        bubble.BackgroundTransparency = island.GroupTransparency
+    end)
+    bubble.MouseButton1Click:Connect(function()
+        if self.Minimized then
+            self:Restore()
+        end
+    end)
+
     local cardRows = {}
     function self:_refreshMini()
         local count = 0
@@ -17596,6 +17683,18 @@ function Window:_buildMiniBar()
             end
         end
         bigCount.Text = tostring(count)
+        pinnedLead = nil
+        for _, handle in ipairs(self._pinned) do
+            if not handle._isShown or handle:_isShown() then
+                pinnedLead = handle
+                break
+            end
+        end
+        if pinnedLead then
+            pinValue.Text = pinnedLead:Text()
+            pinValue.TextColor3 = pinnedLead._shownColor and pinnedLead._shownColor() or Theme.Text
+        end
+        setSplit(running > 0 and pinnedLead ~= nil)
         local tab = self.CurrentTab
         tabLabel.Text = tab and tab.Name or ""
         local key = typeof(self.Keybind) == "EnumItem" and keyName(self.Keybind)
