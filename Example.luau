@@ -17030,6 +17030,10 @@ function Window:_buildMiniBar()
     local islandCorner = corner(island, UDim.new(0, Mini.Height / 2))
     local islandScale = create("UIScale", { Parent = island })
     self._miniScale = islandScale
+    -- How far the split bubble is out of the pill: drawn back in while the
+    -- island is open, budded off again once it settles to the pill.
+    local merge = create("NumberValue", { Value = 1 })
+    local mergeTween
     self._miniOrb = island
 
     -- The wide layers keep a fixed width, so nothing reflows while the island
@@ -17367,6 +17371,24 @@ function Window:_buildMiniBar()
             islandScale.Scale = growing and 0.96 or 1.03
             tween(islandScale, { Scale = 1 }, growing and 0.55 or 0.4, Enum.EasingStyle.Back)
         end
+        if changed or instant then
+            if mergeTween then
+                mergeTween:Cancel()
+                mergeTween = nil
+            end
+            if instant then
+                merge.Value = name == "Compact" and 1 or 0
+            elseif name == "Compact" then
+                -- Wait for the pill to shrink most of the way, then bud off.
+                task.delay(duration * 0.55, function()
+                    if modeToken == token then
+                        mergeTween = tween(merge, { Value = 1 }, 0.6, Enum.EasingStyle.Back)
+                    end
+                end)
+            else
+                mergeTween = tween(merge, { Value = 0 }, 0.2, Enum.EasingStyle.Quint)
+            end
+        end
         if not changed and not instant then
             return
         end
@@ -17628,27 +17650,30 @@ function Window:_buildMiniBar()
         end
     end
     self:_listen("Render", function()
-        local t = split.Value
-        local shown = island.Visible and mode == "Compact" and t > 0.01 and island.GroupTransparency < 0.5
+        local t = split.Value * merge.Value
+        local shown = island.Visible and t > 0.02 and island.GroupTransparency < 0.5
         bubble.Visible = shown
         if not shown then
             return
         end
         local origin = gui.AbsolutePosition
         local pos, size = island.AbsolutePosition - origin, island.AbsoluteSize
-        local d = size.Y
+        local d = math.min(size.Y, Mini.Height)
         local gap = 6
         -- Buds off the side with room to spare: the right, or the left near
         -- the right edge of the screen.
         local right = pos.X + size.X + gap + d <= gui.AbsoluteSize.X
         local edge = right and pos.X + size.X or pos.X
         local dir = right and 1 or -1
-        local inner = edge - dir * d / 2
+        local inner = edge - dir * d * 0.6
         local outer = edge + dir * (gap + d / 2)
         local x = inner + (outer - inner) * t
         local scale = math.clamp(0.35 + 0.65 * t, 0, 1.2)
+        -- Liquid: mid-flight the drop stretches along its path and thins,
+        -- then rounds back into a circle as it settles.
+        local stretch = math.sin(math.clamp(t, 0, 1) * math.pi)
         bubble.Position = UDim2.fromOffset(x, pos.Y + d / 2)
-        bubble.Size = UDim2.fromOffset(d * scale, d * scale)
+        bubble.Size = UDim2.fromOffset(d * scale * (1 + 0.4 * stretch), d * scale * (1 - 0.18 * stretch))
         bubble.BackgroundTransparency = island.GroupTransparency
     end)
     bubble.MouseButton1Click:Connect(function()
