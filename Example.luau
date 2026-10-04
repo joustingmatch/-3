@@ -2760,6 +2760,24 @@ function Tab:Dropdown(opts)
     return finishElement(self, opts, self_, frame, "Dropdown")
 end
 
+Library._amountSuffixes = { k = 1e3, m = 1e6, b = 1e9, t = 1e12, qa = 1e15, qi = 1e18 }
+
+function Library._parseAmount(text)
+    text = string.lower(tostring(text)):gsub("[%s,_%$]", "")
+    text = text:gsub("kg$", ""):gsub("/s$", "")
+    local number = tonumber(text)
+    if number then
+        return number
+    end
+    local digits, suffix = text:match("^(.-)(%a+)$")
+    local scale = suffix and Library._amountSuffixes[suffix]
+    number = digits and tonumber(digits)
+    if number and scale then
+        return number * scale
+    end
+    return nil
+end
+
 function Tab:Input(opts)
     local frame, frameStroke, _, titleLabel, descLabel
     opts, frame, frameStroke, _, titleLabel, descLabel = beginElement(self, opts, { Title = "Name", Description = "Desc", PlaceholderText = "Placeholder", CurrentValue = "Default", Value = "Default" }, "Frame", 160, "Input")
@@ -2799,6 +2817,11 @@ function Tab:Input(opts)
     })
     boxHolder.ClipsDescendants = true
 
+    local lastText = box.Text
+    local value = opts.Numeric and Library._parseAmount(lastText) or nil
+    if opts.Numeric and not value then
+        lastText = ""
+    end
     local focused = false
     local textInset = (boxIcon and 30 or 8) + 8
     local function fitBox(instant)
@@ -2847,23 +2870,40 @@ function Tab:Input(opts)
         tween(boxStroke, { Color = Theme.Stroke }, 0.15)
         fitBox(false)
         if opts.Numeric then
-            local number = tonumber(box.Text)
+            local number = Library._parseAmount(box.Text)
             if not number then
-                box.Text = ""
+                box.Text = lastText
                 return
             end
+            lastText, value = box.Text, number
+            safeCall(opts.Callback, number, enterPressed)
+            return
         end
         safeCall(opts.Callback, box.Text, enterPressed)
     end)
 
     return finishElement(self, opts, {
-        Set = function(_, value)
-            box.Text = tostring(value)
+        Set = function(_, newValue)
+            box.Text = tostring(newValue)
+            if opts.Numeric then
+                local number = Library._parseAmount(box.Text)
+                if number then
+                    lastText, value = box.Text, number
+                else
+                    box.Text = lastText
+                end
+            end
             flashStroke(frameStroke)
         end,
         Get = function()
+            if opts.Numeric then
+                return value
+            end
             return box.Text
         end,
+        _saveValue = opts.Numeric and function()
+            return lastText
+        end or nil,
     }, frame, "Input")
 end
 
