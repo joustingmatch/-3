@@ -16,7 +16,7 @@ Load it once, build the window, add tabs, put groupboxes on tabs (or sub tabs), 
 local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
 ```
 
-Optional, before `CreateWindow`: `Airflow:LoadFont({ Name = "ValleySans" })`, `Airflow:SetDefaultTheme("Obsidian")`, `Airflow:PreloadIcons()`.
+Optional, before `CreateWindow`: `Airflow:LoadFont({ Name = "ValleySans" })`, `Airflow:SetDefaultTheme("Nebula")`, `Airflow:PreloadIcons()`.
 
 ## Skeleton to start from
 
@@ -125,7 +125,7 @@ Minimizing folds the window into a Dynamic Island at the top of the screen. Play
 ## Theme
 
 - `Airflow:SetTheme("Midnight")` or `Airflow:SetTheme({ Accent = Color3.fromRGB(128, 160, 246) })`; every colour cross-fades live.
-- Presets: Airflow, Obsidian, Nebula, Synthwave, Sakura, Velvet, Rose, Crimson, Sunset, Amber, Gold, Cyber, Toxic, Matcha, Emerald, Aurora, Ocean, Frost, Midnight, Abyss, Mono, Halloween, Haunted, Christmas, Valentine, Lunar, Tropical, Dracula, Coffee.
+- Presets: Midnight (default), Nebula, Synthwave, Sakura, Velvet, Rose, Crimson, Sunset, Amber, Gold, Cyber, Toxic, Matcha, Emerald, Aurora, Ocean, Frost, Abyss, Mono, Halloween, Haunted, Christmas, Valentine, Lunar, Tropical, Dracula, Coffee.
 - `Tab:CreateThemeManager({ Side = "Right" })` gives players presets, weather, dim, transparency, drag skeleton, adaptive size, UI scale, density, background image and colour pickers. All of it is saved in configs under the hidden `__Theme` flag.
 - Read colours from `Airflow.Theme.Accent` and so on; don't cache them across theme changes.
 

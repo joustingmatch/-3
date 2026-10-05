@@ -122,7 +122,7 @@ The button in the top-right minimizes the window into a Dynamic Island: a black 
 
 The toggle button is a small rounded square floating on the left edge. Tapping it minimizes the window, tapping it again restores it, and it also brings back a window hidden with the hide key. Drag it anywhere. Its border lights up in the accent colour while the window is folded away. By default it only shows on touch devices; `Platform = "Both"` shows it on PC too.
 
-The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile, an accent pill beside it, and fades at the ends when the list scrolls. The selected tile scrolls into view. `Tab:SetBadge(value)` puts a small accent badge on a tile: a number or short text, `true` for a dot, `nil` to hide it. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
+The sidebar is an inset rounded rail: the logo on top, then one tile per tab with its icon over its name, with a highlight that glides to the selected tile, an accent pill beside it, and fades at the ends when the list scrolls. The selected tile scrolls into view. The bottom shows the player's headshot, display name and the current game. Clicking it opens the home tab.
 
 ### Properties
 
@@ -290,7 +290,7 @@ The game card has Rejoin, Server Hop, Copy Job ID, Copy Universe and Join Lowest
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Name` / `Desc` / `Icon` | string | `"Home"`, `"house"` | The tab itself. |
-| `Title` | string | `"Welcome to <Name>!"` | Page heading. |
+| `Title` | string | `"Home"` | Page heading. |
 | `Welcome` | string | `"Welcome back,"` | Line above the display name. |
 | `Tier` | string \| false | `"Free"` | Badge on the player card. `false` hides it. |
 | `TierIcon` | string | window icon | Icon in the badge. |
@@ -1652,7 +1652,7 @@ Airflow.Assets.Glow = "rbxassetid://8992230677"
 Airflow.Assets.Shadow = "rbxassetid://6014261993"
 ```
 
-Presets: `Airflow` (default), `Obsidian`, `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Midnight`, `Abyss`, `Mono`, and the themed set `Halloween`, `Haunted`, `Christmas`, `Valentine`, `Lunar`, `Tropical`, `Dracula`, `Coffee`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
+Presets: `Midnight` (default), `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Abyss`, `Mono`, and the themed set `Halloween`, `Haunted`, `Christmas`, `Valentine`, `Lunar`, `Tropical`, `Dracula`, `Coffee`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
 The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, an **Adaptive Size** switch (on by default; scales the window with the screen resolution), a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 

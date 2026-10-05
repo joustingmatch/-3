@@ -133,16 +133,16 @@ local function finishElement(tab, opts, element, frame, kind)
 end
 
 Library.Theme = {
-    Background = Color3.fromRGB(20, 16, 20),
-    Surface = Color3.fromRGB(24, 19, 24),
-    Surface2 = Color3.fromRGB(28, 22, 28),
-    Surface3 = Color3.fromRGB(42, 36, 43),
-    Stroke = Color3.fromRGB(40, 32, 41),
-    StrokeHover = Color3.fromRGB(88, 70, 90),
-    Accent = Color3.fromRGB(235, 199, 246),
-    AccentDark = Color3.fromRGB(24, 18, 26),
-    Text = Color3.fromRGB(233, 229, 234),
-    Muted = Color3.fromRGB(125, 115, 126),
+    Background = Color3.fromRGB(15, 18, 26),
+    Surface = Color3.fromRGB(18, 22, 31),
+    Surface2 = Color3.fromRGB(22, 26, 37),
+    Surface3 = Color3.fromRGB(37, 44, 60),
+    Stroke = Color3.fromRGB(34, 40, 55),
+    StrokeHover = Color3.fromRGB(70, 84, 112),
+    Accent = Color3.fromRGB(128, 160, 246),
+    AccentDark = Color3.fromRGB(14, 18, 30),
+    Text = Color3.fromRGB(228, 232, 242),
+    Muted = Color3.fromRGB(116, 126, 148),
     Warning = Color3.fromRGB(240, 176, 108),
     Success = Color3.fromRGB(150, 220, 170),
     Error = Color3.fromRGB(240, 120, 120),
@@ -174,16 +174,14 @@ local function preset(background, surface, surface2, surface3, strokeColor, stro
 end
 
 Library.ThemePresets = {
-    Airflow = preset({ 20, 16, 20 }, { 24, 19, 24 }, { 28, 22, 28 }, { 42, 36, 43 }, { 40, 32, 41 }, { 88, 70, 90 }, { 235, 199, 246 }, { 24, 18, 26 }, { 233, 229, 234 }, { 125, 115, 126 }),
+    -- Colours here must not be pure white, pure black or any other colour the
+    -- library hard-codes, or those objects would get bound to the theme.
     Midnight = preset({ 15, 18, 26 }, { 18, 22, 31 }, { 22, 26, 37 }, { 37, 44, 60 }, { 34, 40, 55 }, { 70, 84, 112 }, { 128, 160, 246 }, { 14, 18, 30 }, { 228, 232, 242 }, { 116, 126, 148 }),
     Ocean = preset({ 12, 20, 24 }, { 15, 24, 29 }, { 18, 29, 35 }, { 31, 48, 56 }, { 29, 44, 52 }, { 58, 92, 104 }, { 110, 214, 222 }, { 10, 24, 28 }, { 226, 238, 240 }, { 108, 134, 140 }),
     Rose = preset({ 22, 15, 18 }, { 27, 18, 22 }, { 32, 21, 26 }, { 48, 34, 40 }, { 45, 30, 37 }, { 98, 64, 78 }, { 246, 160, 186 }, { 30, 14, 20 }, { 240, 228, 232 }, { 138, 112, 120 }),
     Emerald = preset({ 13, 20, 17 }, { 16, 24, 20 }, { 20, 29, 24 }, { 33, 47, 40 }, { 30, 44, 37 }, { 62, 96, 78 }, { 132, 226, 170 }, { 12, 26, 18 }, { 228, 240, 233 }, { 110, 136, 122 }),
     Amber = preset({ 22, 18, 13 }, { 27, 22, 16 }, { 32, 26, 19 }, { 49, 41, 31 }, { 46, 38, 28 }, { 100, 82, 58 }, { 246, 196, 120 }, { 30, 22, 10 }, { 242, 236, 226 }, { 140, 126, 106 }),
     Mono = preset({ 16, 16, 17 }, { 20, 20, 21 }, { 25, 25, 26 }, { 40, 40, 42 }, { 38, 38, 40 }, { 84, 84, 88 }, { 236, 236, 240 }, { 20, 20, 22 }, { 234, 234, 236 }, { 122, 122, 128 }),
-    -- Colours here must not be pure white, pure black or any other colour the
-    -- library hard-codes, or those objects would get bound to the theme.
-    Obsidian = preset({ 12, 11, 16 }, { 16, 15, 21 }, { 20, 18, 27 }, { 34, 31, 45 }, { 31, 28, 41 }, { 76, 66, 104 }, { 167, 139, 250 }, { 18, 12, 34 }, { 236, 233, 245 }, { 118, 112, 138 }),
     Nebula = preset({ 14, 12, 28 }, { 18, 15, 35 }, { 23, 19, 43 }, { 39, 32, 68 }, { 35, 29, 62 }, { 84, 68, 140 }, { 199, 125, 255 }, { 22, 10, 40 }, { 236, 230, 252 }, { 124, 114, 160 }),
     Synthwave = preset({ 20, 12, 30 }, { 25, 15, 37 }, { 31, 18, 45 }, { 52, 30, 72 }, { 47, 27, 66 }, { 110, 58, 150 }, { 255, 94, 198 }, { 38, 8, 30 }, { 250, 232, 246 }, { 150, 118, 160 }),
     Sakura = preset({ 24, 14, 20 }, { 29, 17, 24 }, { 35, 20, 29 }, { 54, 32, 45 }, { 50, 29, 41 }, { 112, 66, 92 }, { 255, 158, 200 }, { 36, 12, 24 }, { 248, 232, 240 }, { 150, 112, 132 }),
@@ -208,7 +206,7 @@ Library.ThemePresets = {
     Coffee = preset({ 20, 16, 13 }, { 25, 20, 16 }, { 30, 24, 19 }, { 48, 39, 31 }, { 45, 36, 29 }, { 104, 82, 62 }, { 214, 170, 124 }, { 32, 22, 12 }, { 240, 230, 218 }, { 142, 124, 108 }),
 }
 
-Library.ThemeName = "Airflow"
+Library.ThemeName = "Midnight"
 
 Library.Assets = {
     Shadow = "rbxassetid://6014261993",
@@ -429,14 +427,14 @@ local Fonts = Library.Fonts
 local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 Library.Touch = TOUCH
 
-local SIDEBAR_WIDTH = 92
-local HEADER_HEIGHT = 66
-local TAB_TILE_HEIGHT = 52
+local SIDEBAR_WIDTH = 188
+local HEADER_HEIGHT = 62
+local TAB_TILE_HEIGHT = 34
 local CARD_HEIGHT = TOUCH and 54 or 48
 local CARD_HEIGHT_DESC = TOUCH and 70 or 64
 local DROPDOWN_OPTION_HEIGHT = TOUCH and 40 or 34
 local CHIP_HEIGHT = TOUCH and 34 or 28
-local PROFILE_HEIGHT = 96
+local PROFILE_HEIGHT = 64
 local SEARCH_WIDTH = 176
 local STACK_BELOW = 440
 
@@ -711,7 +709,8 @@ local function glow(parent, size, position, transparency, rotation)
         BackgroundTransparency = 1,
         Image = Assets.Glow,
         ImageColor3 = Color3.fromRGB(226, 218, 230),
-        ImageTransparency = transparency,
+        ImageTransparency = 1,
+        Visible = false,
         ZIndex = 0,
         Parent = parent,
     })
@@ -730,7 +729,7 @@ local function edgeHighlight(parent)
         Position = UDim2.fromOffset(0, 0),
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Color3.new(1, 1, 1),
-        BackgroundTransparency = 0.93,
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ZIndex = 0,
         Parent = parent,
@@ -3012,7 +3011,7 @@ function Tab:Keybind(opts)
 end
 
 function Tab:ColorPicker(opts)
-    local PANEL_HEIGHT = 168
+    local PANEL_HEIGHT = 194
     local frame, frameStroke, height
     opts, frame, frameStroke, height = beginElement(self, opts, { Title = "Name", Description = "Desc", Color = "Default", CurrentValue = "Default", Value = "Default" }, "Frame")
     frame.ClipsDescendants = true
@@ -3026,17 +3025,28 @@ function Tab:ColorPicker(opts)
         AutoButtonColor = false,
         Parent = frame,
     })
-    titleDesc(header, opts.Name or "Color", opts.Desc, 90, metrics)
+    titleDesc(header, opts.Name or "Color", opts.Desc, 140, metrics)
 
+    -- Closed, the row shows the hex code beside a rounded swatch.
     local swatch = create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, compact and -38 or -34, 0.5, 0),
-        Size = UDim2.fromOffset(36, 20),
+        Size = UDim2.fromOffset(22, 22),
         BorderSizePixel = 0,
         Parent = header,
     })
     corner(swatch, UDim.new(0, 6))
     stroke(swatch, Theme.Stroke)
+    local swatchHex = label({
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, compact and -68 or -64, 0.5, 0),
+        Size = UDim2.fromOffset(64, 16),
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = header,
+    })
     local arrow = arrowIndicator(header, 1, compact and -14 or -12)
 
     local panel = create("Frame", {
@@ -3047,16 +3057,17 @@ function Tab:ColorPicker(opts)
         Parent = frame,
     })
 
+    -- Saturation runs left to right, brightness top to bottom.
     local svBox = create("TextButton", {
-        Size = UDim2.new(1, -30, 0, 110),
+        Size = UDim2.new(1, 0, 0, 118),
         BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
-        ClipsDescendants = true,
         Parent = panel,
     })
-    corner(svBox, UDim.new(0, 6))
+    corner(svBox, UDim.new(0, 8))
+    stroke(svBox, Theme.Stroke)
     local svHueGradient = create("UIGradient", {
         Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 0, 0)),
         Parent = svBox,
@@ -3067,6 +3078,7 @@ function Tab:ColorPicker(opts)
         BorderSizePixel = 0,
         Parent = svBox,
     })
+    corner(svDark, UDim.new(0, 8))
     create("UIGradient", {
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 1),
@@ -3075,26 +3087,44 @@ function Tab:ColorPicker(opts)
         Rotation = 90,
         Parent = svDark,
     })
-    local svCursor = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.fromOffset(10, 10),
-        BackgroundTransparency = 1,
-        ZIndex = 3,
-        Parent = svBox,
-    })
-    corner(svCursor, UDim.new(1, 0))
-    stroke(svCursor, Color3.new(1, 1, 1), 0, 2)
 
+    -- Both handles are a white ring filled with the colour under them, with a
+    -- faint dark edge so they read on light and dark spots alike.
+    local function knob(parent, size)
+        local ring = create("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.fromOffset(size, size),
+            BackgroundColor3 = Color3.new(1, 1, 1),
+            BorderSizePixel = 0,
+            ZIndex = 3,
+            Parent = parent,
+        })
+        corner(ring, UDim.new(1, 0))
+        stroke(ring, Color3.new(0, 0, 0), 0.7)
+        local fill = create("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(1, -4, 1, -4),
+            BorderSizePixel = 0,
+            ZIndex = 3,
+            Parent = ring,
+        })
+        corner(fill, UDim.new(1, 0))
+        return ring, fill
+    end
+    local svCursor, svFill = knob(svBox, 14)
+
+    -- Hue is a slim horizontal track under the square.
     local hueBar = create("TextButton", {
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, 0, 0, 0),
-        Size = UDim2.fromOffset(14, 110),
+        Position = UDim2.fromOffset(0, 132),
+        Size = UDim2.new(1, 0, 0, 10),
+        BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
         Parent = panel,
     })
-    corner(hueBar, UDim.new(0, 6))
+    corner(hueBar, UDim.new(1, 0))
     create("UIGradient", {
         Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
@@ -3105,33 +3135,33 @@ function Tab:ColorPicker(opts)
             ColorSequenceKeypoint.new(5 / 6, Color3.fromRGB(255, 0, 255)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
         }),
-        Rotation = 90,
         Parent = hueBar,
     })
-    local hueCursor = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0, 0),
-        Size = UDim2.fromOffset(18, 5),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BorderSizePixel = 0,
-        ZIndex = 3,
-        Parent = hueBar,
-    })
-    corner(hueCursor, UDim.new(1, 0))
-    stroke(hueCursor, Theme.AccentDark, 0.4)
+    local hueCursor, hueFill = knob(hueBar, 16)
+    hueCursor.Position = UDim2.fromScale(0, 0.5)
 
+    -- Bottom row: a preview chip and hex field on the left, RGB on the right.
     local hexHolder = create("Frame", {
-        Position = UDim2.fromOffset(compact and 0 or 6, 122),
-        Size = UDim2.fromOffset(compact and 96 or 118, 28),
+        Position = UDim2.fromOffset(0, 154),
+        Size = UDim2.fromOffset(compact and 110 or 124, 28),
         BackgroundColor3 = Theme.Surface,
         BorderSizePixel = 0,
         Parent = panel,
     })
-    corner(hexHolder, UDim.new(0, 6))
+    corner(hexHolder, UDim.new(0, 7))
     local hexStroke = stroke(hexHolder)
+    local preview = create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 6, 0.5, 0),
+        Size = UDim2.fromOffset(16, 16),
+        BorderSizePixel = 0,
+        Parent = hexHolder,
+    })
+    corner(preview, UDim.new(0, 4))
+    stroke(preview, Theme.Stroke)
     local hexBox = create("TextBox", {
-        Position = UDim2.fromOffset(14, 0),
-        Size = UDim2.new(1, -24, 1, 0),
+        Position = UDim2.fromOffset(30, 0),
+        Size = UDim2.new(1, -38, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
         TextTruncate = Enum.TextTruncate.None,
@@ -3144,10 +3174,10 @@ function Tab:ColorPicker(opts)
         Parent = hexHolder,
     })
     local rgbLabel = label({
-        Position = UDim2.fromOffset(compact and 104 or 134, 122),
-        Size = UDim2.new(1, compact and -104 or -134, 0, 28),
+        Position = UDim2.fromOffset(compact and 118 or 134, 154),
+        Size = UDim2.new(1, compact and -118 or -134, 0, 28),
         TextXAlignment = Enum.TextXAlignment.Right,
-        TextSize = compact and 12 or 13,
+        TextSize = 12,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
         Parent = panel,
@@ -3168,13 +3198,17 @@ function Tab:ColorPicker(opts)
         local color = Color3.fromHSV(hue, sat, val)
         self_.Value = color
         swatch.BackgroundColor3 = color
+        preview.BackgroundColor3 = color
+        svFill.BackgroundColor3 = color
+        hueFill.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+        swatchHex.Text = toHex(color)
         svHueGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(hue, 1, 1))
-        tween(svCursor, { Position = UDim2.fromScale(sat, 1 - val) }, duration, Enum.EasingStyle.Linear)
-        tween(hueCursor, { Position = UDim2.new(0.5, 0, hue, 0) }, duration, Enum.EasingStyle.Linear)
+        tween(svCursor, { Position = UDim2.fromScale(sat, 1 - val) }, duration, Enum.EasingStyle.Quint)
+        tween(hueCursor, { Position = UDim2.fromScale(hue, 0.5) }, duration, Enum.EasingStyle.Quint)
         if not hexBox:IsFocused() then
             hexBox.Text = toHex(color)
         end
-        rgbLabel.Text = string.format("RGB %d, %d, %d",
+        rgbLabel.Text = string.format("%d  %d  %d",
             math.floor(color.R * 255 + 0.5),
             math.floor(color.G * 255 + 0.5),
             math.floor(color.B * 255 + 0.5))
@@ -3226,21 +3260,21 @@ function Tab:ColorPicker(opts)
         commit(0.04)
     end
     local function updateHue(position)
-        hue = math.clamp((position.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y, 0, 0.999)
+        hue = math.clamp((position.X - hueBar.AbsolutePosition.X) / hueBar.AbsoluteSize.X, 0, 0.999)
         commit(0.04)
     end
 
     svBox.InputBegan:Connect(function(input)
         if isPress(input) then
             dragTarget = "sv"
-            tween(svCursor, { Size = UDim2.fromOffset(14, 14) }, 0.15, Enum.EasingStyle.Back)
+            tween(svCursor, { Size = UDim2.fromOffset(18, 18) }, 0.2, Enum.EasingStyle.Quint)
             updateSV(pointerPosition())
         end
     end)
     hueBar.InputBegan:Connect(function(input)
         if isPress(input) then
             dragTarget = "hue"
-            tween(hueCursor, { Size = UDim2.fromOffset(20, 7) }, 0.15, Enum.EasingStyle.Back)
+            tween(hueCursor, { Size = UDim2.fromOffset(20, 20) }, 0.2, Enum.EasingStyle.Quint)
             updateHue(pointerPosition())
         end
     end)
@@ -3258,8 +3292,8 @@ function Tab:ColorPicker(opts)
     self.Window:_listen("Ended", function(input)
         if dragTarget and isPress(input) then
             dragTarget = nil
-            tween(svCursor, { Size = UDim2.fromOffset(10, 10) }, 0.2)
-            tween(hueCursor, { Size = UDim2.fromOffset(18, 5) }, 0.2)
+            tween(svCursor, { Size = UDim2.fromOffset(14, 14) }, 0.25, Enum.EasingStyle.Quint)
+            tween(hueCursor, { Size = UDim2.fromOffset(16, 16) }, 0.25, Enum.EasingStyle.Quint)
         end
     end, self_)
 
@@ -4299,6 +4333,7 @@ function Library.Window(_, opts)
         _hideAvatar = false,
         Title = opts.Title or "Airflow",
         _logoIcon = opts.Icon or Assets.Logo,
+        _sessionStart = os.clock(),
         _islandLocked = opts.IslandDraggable == false,
     }, Window)
     local saving = type(opts.ConfigurationSaving) == "table" and opts.ConfigurationSaving or {}
@@ -4411,31 +4446,40 @@ function Library.Window(_, opts)
     self.BackgroundTransparency = math.clamp(tonumber(opts.BackgroundTransparency) or 0.35, 0, 1)
     self._backgroundGeneration = 0
 
-    glow(body, UDim2.fromOffset(500, 180), UDim2.new(0.5, 0, 1, 8), 0.86, 270)
-    glow(body, UDim2.fromOffset(130, 60), UDim2.new(0, 60, 1, -16), 0.75, 90)
-    glow(body, UDim2.fromOffset(520, 240), UDim2.new(1, -80, 0, 30), 0.92, 90)
-
-    -- The sidebar is an inset rail with its own rounded panel and a soft
-    -- top-lit gradient.
+    -- The sidebar is a flush, solid rail down the left edge, split from the
+    -- content by a single hairline.
     local sidebar = create("Frame", {
         Name = "Sidebar",
-        Position = UDim2.fromOffset(8, 8),
-        Size = UDim2.new(0, SIDEBAR_WIDTH - 8, 1, -16),
-        BackgroundColor3 = Color3.new(1, 1, 1),
+        Size = UDim2.new(0, SIDEBAR_WIDTH, 1, 0),
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
+        ClipsDescendants = true,
         Parent = body,
     })
     self.Sidebar = sidebar
-    corner(sidebar, UDim.new(0, 12))
-    stroke(sidebar, Theme.Stroke)
-    local railGradient = create("UIGradient", { Rotation = 90, Parent = sidebar })
-    onTheme(railGradient, function()
-        railGradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Theme.Surface3),
-            ColorSequenceKeypoint.new(0.3, Theme.Surface2),
-            ColorSequenceKeypoint.new(1, Theme.Surface2),
-        })
-    end)
+    -- One rounded fill that runs past the rail's right edge, where the rail
+    -- clips it: the left corners round with the window, the right edge is
+    -- square, and nothing overlaps, so it fades evenly when see-through.
+    local sidebarFill = create("Frame", {
+        Name = "Fill",
+        Size = UDim2.new(1, 12, 1, 0),
+        BackgroundColor3 = Theme.Surface,
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Parent = sidebar,
+    })
+    corner(sidebarFill, UDim.new(0, 10))
+    self.SidebarFill = sidebarFill
+    create("Frame", {
+        Name = "Divider",
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.fromScale(1, 0),
+        Size = UDim2.new(0, 1, 1, 0),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = sidebar,
+    })
 
     local header = create("Frame", {
         Name = "Header",
@@ -4444,9 +4488,9 @@ function Library.Window(_, opts)
         Parent = sidebar,
     })
     local logo = create("ImageLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 2),
-        Size = UDim2.fromOffset(42, 42),
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 14, 0.5, 0),
+        Size = UDim2.fromOffset(32, 32),
         BackgroundTransparency = 1,
         Image = "",
         ImageColor3 = Theme.Accent,
@@ -4454,6 +4498,26 @@ function Library.Window(_, opts)
         Parent = header,
     })
     applyIcon(logo, opts.Icon or Assets.Logo, true)
+    local subtitle = opts.Version or opts.Subtitle
+    label({
+        Position = UDim2.new(0, 56, 0.5, subtitle and -15 or -9),
+        Size = UDim2.new(1, -68, 0, 18),
+        Text = self.Title,
+        TextSize = 14,
+        FontFace = Fonts.Bold,
+        Parent = header,
+    })
+    if subtitle then
+        label({
+            Position = UDim2.new(0, 56, 0.5, 3),
+            Size = UDim2.new(1, -68, 0, 14),
+            Text = tostring(subtitle),
+            TextSize = 11,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            Parent = header,
+        })
+    end
 
     local profileEnabled = opts.Profile ~= false
     local tabList = create("ScrollingFrame", {
@@ -4480,30 +4544,15 @@ function Library.Window(_, opts)
         Visible = false,
         Parent = tabList,
     })
-    corner(indicator, UDim.new(0, 10))
-    stroke(indicator, Theme.Stroke)
-    -- An accent wash that fades out to the right, and a small accent pill in
-    -- the gutter beside the tile, both gliding with the highlight.
-    local sheen = create("Frame", {
-        Size = UDim2.fromScale(1, 1),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 0.82,
-        BorderSizePixel = 0,
-        Parent = indicator,
-    })
-    corner(sheen, UDim.new(0, 10))
-    create("UIGradient", {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(1, 1),
-        }),
-        Parent = sheen,
-    })
+    corner(indicator, UDim.new(0, 7))
+    -- The active tab is just a quiet neutral fill with white text; the bar
+    -- is kept for callers but stays hidden.
     local pill = create("Frame", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(0, -3, 0.5, 0),
-        Size = UDim2.fromOffset(3, 20),
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 0, 0.5, 0),
+        Size = UDim2.fromOffset(2, 14),
         BackgroundColor3 = Theme.Accent,
+        Visible = false,
         BorderSizePixel = 0,
         Parent = indicator,
     })
@@ -4521,13 +4570,13 @@ function Library.Window(_, opts)
     })
     create("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
+        Padding = UDim.new(0, 2),
         Parent = stack,
     })
     self._tabStack = stack
 
     -- More tabs than fit: a fade and a small "more" chip at the hidden end.
-    self:_overflowHint(sidebar, tabList, stack, true, Theme.Surface2)
+    self:_overflowHint(sidebar, tabList, stack, true, Theme.Surface)
 
     if profileEnabled then
         self:_buildProfile(sidebar)
@@ -4542,6 +4591,7 @@ function Library.Window(_, opts)
         Parent = body,
     })
     self.Content = content
+    self:_sidebarResize(sidebar, tonumber(opts.SidebarWidth) or SIDEBAR_WIDTH)
     self._outLayer = create("CanvasGroup", {
         Name = "TransitionOut",
         Size = UDim2.fromScale(1, 1),
@@ -4571,26 +4621,23 @@ function Library.Window(_, opts)
         Parent = content,
     })
     minimizeButton:SetAttribute("NoDrag", true)
-    corner(minimizeButton, UDim.new(0, 8))
-    local minimizeStroke = stroke(minimizeButton, Theme.Stroke, 1)
-    local minimizeGlyph = create("Frame", {
+    -- A bare "minimize" arrows glyph, no box: muted at rest, full text
+    -- colour and a touch smaller on hover, as if pulling in.
+    local minimizeGlyph = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(12, 2),
-        BackgroundColor3 = Theme.Muted,
-        BorderSizePixel = 0,
+        Size = UDim2.fromOffset(20, 20),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
         Parent = minimizeButton,
     })
-    corner(minimizeGlyph, UDim.new(1, 0))
+    applyIcon(minimizeGlyph, "minimize-2")
     minimizeButton.MouseEnter:Connect(function()
-        tween(minimizeButton, { BackgroundTransparency = 0 }, 0.15)
-        tween(minimizeStroke, { Transparency = 0 }, 0.15)
-        tween(minimizeGlyph, { BackgroundColor3 = Theme.Text, Size = UDim2.fromOffset(14, 2) }, 0.2, Enum.EasingStyle.Quint)
+        tween(minimizeGlyph, { ImageColor3 = Theme.Text, Size = UDim2.fromOffset(18, 18) }, 0.2, Enum.EasingStyle.Quint)
     end)
     minimizeButton.MouseLeave:Connect(function()
-        tween(minimizeButton, { BackgroundTransparency = 1 }, 0.2)
-        tween(minimizeStroke, { Transparency = 1 }, 0.2)
-        tween(minimizeGlyph, { BackgroundColor3 = Theme.Muted, Size = UDim2.fromOffset(12, 2) }, 0.2, Enum.EasingStyle.Quint)
+        tween(minimizeGlyph, { ImageColor3 = Theme.Muted, Size = UDim2.fromOffset(20, 20) }, 0.25, Enum.EasingStyle.Quint)
     end)
     minimizeButton.MouseButton1Click:Connect(function()
         self:Minimize()
@@ -5300,6 +5347,77 @@ function Window:SetDragSkeleton(enabled)
     self.DragSkeleton = enabled ~= false
 end
 
+-- The sidebar's divider is a grab strip: dragging it sets the rail's width,
+-- kept between a usable minimum and enough room for the content.
+function Window:_sidebarResize(sidebar, width)
+    local divider = sidebar:FindFirstChild("Divider")
+    local want = width
+    local function apply(value, remember)
+        if remember ~= false then
+            want = value
+        end
+        local room = self.Body.AbsoluteSize.X / self.Scale.Scale - 300
+        value = math.floor(math.clamp(value, 150, math.max(math.min(300, room), 150)))
+        self.SidebarWidth = value
+        sidebar.Size = UDim2.new(0, value, 1, 0)
+        self.Content.Position = UDim2.fromOffset(value + 1, 0)
+        self.Content.Size = UDim2.new(1, -(value + 1), 1, 0)
+    end
+    self.SetSidebarWidth = function(_, value)
+        apply(tonumber(value) or SIDEBAR_WIDTH)
+    end
+    apply(width)
+    local grip = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, 0, 0, 0),
+        Size = UDim2.new(0, 6, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+        ZIndex = 6,
+        Parent = sidebar,
+    })
+    grip:SetAttribute("NoDrag", true)
+    local dragging, startX, startWidth = false, 0, width
+    local function light(on)
+        if divider then
+            tween(divider, { BackgroundColor3 = on and Theme.Accent or Theme.Stroke }, 0.15)
+        end
+    end
+    grip.MouseEnter:Connect(function()
+        light(true)
+    end)
+    grip.MouseLeave:Connect(function()
+        if not dragging then
+            light(false)
+        end
+    end)
+    grip.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, startX, startWidth = true, input.Position.X, self.SidebarWidth
+            want = startWidth
+            light(true)
+        end
+    end)
+    self:_listen("Changed", function(input)
+        if dragging and isMove(input) then
+            apply(startWidth + (input.Position.X - startX) / self.Scale.Scale)
+        end
+    end)
+    self:_listen("Ended", function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = false
+            light(false)
+        end
+    end)
+    -- Shrinking the window pulls an over-wide rail back in.
+    self.Body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        if not dragging then
+            apply(want, false)
+        end
+    end)
+end
+
 -- See-through window: the body and sidebar let the game show through, and the
 -- shadow lightens so it doesn't smudge behind them.
 function Window:SetTransparent(enabled)
@@ -5307,7 +5425,10 @@ function Window:SetTransparent(enabled)
     local on = self.Transparent
     self._shadowRest = on and 0.85 or 0.6
     tween(self.Body, { BackgroundTransparency = on and 0.35 or 0 }, 0.25)
-    tween(self.Sidebar, { BackgroundTransparency = (on or self.Background) and 0.3 or 0 }, 0.25)
+    -- See-through, the rail stays a touch more solid than the body so the
+    -- tabs keep their contrast; over a background image it lets more through.
+    local railAlpha = on and 0.5 or (self.Background and 0.45 or 0)
+    tween(self.SidebarFill, { BackgroundTransparency = railAlpha }, 0.25)
     if self.Open and not self.Minimized and self.Root.Visible then
         tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.25)
     end
@@ -5425,21 +5546,27 @@ end
 function Window:_showLoader(opts)
     local duration = opts.LoadingDuration or 1.6
     local gui = self.Gui
+    -- A compact card: logo, title and subtitle on top, a checklist of the
+    -- loading steps under a hairline, and a thin progress line along the
+    -- bottom edge. Everything but the prompt cards lives in one canvas group
+    -- so it can fade as a unit.
+    local steps = opts.LoadingSteps or { "Preparing interface", "Loading icons", "Almost there" }
+    local WIDTH, PAD, STEP = 340, 22, 24
+    local listTop = 80
+    local height = listTop + #steps * STEP + 18
     local loader = create("CanvasGroup", {
         AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 16),
-        Size = UDim2.fromOffset(340, 150),
+        Position = UDim2.new(0.5, 0, 0.5, 10),
+        Size = UDim2.fromOffset(WIDTH, height),
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
         GroupTransparency = 1,
         ZIndex = 10,
         Parent = gui,
     })
-    local loaderCorner = corner(loader, UDim.new(0, 14))
+    local loaderCorner = corner(loader, UDim.new(0, 12))
     local loaderStroke = stroke(loader, Theme.Stroke, 1)
-    edgeHighlight(loader)
-    glow(loader, UDim2.fromOffset(340, 150), UDim2.new(1, -20, 0, -20), 0.88, 90)
-    local loaderScale = create("UIScale", { Scale = 0.92, Parent = loader })
+    local loaderScale = create("UIScale", { Scale = 0.97, Parent = loader })
     local loaderShadow = create("ImageLabel", {
         Position = UDim2.fromOffset(-25, -25),
         Size = UDim2.new(1, 50, 1, 50),
@@ -5452,168 +5579,200 @@ function Window:_showLoader(opts)
         ZIndex = 0,
         Parent = loader,
     })
-
-    -- Logo on the left, title and status beside it, progress along the bottom.
-    local TEXT_X = 104
-    local logoHolder = create("Frame", {
-        Position = UDim2.fromOffset(24, 22),
-        Size = UDim2.fromOffset(64, 64),
+    local content = create("CanvasGroup", {
+        Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
         Parent = loader,
     })
+
     local logo = create("ImageLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromScale(0.6, 0.6),
-        Rotation = -20,
+        Position = UDim2.fromOffset(PAD, PAD),
+        Size = UDim2.fromOffset(30, 30),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
-        ImageTransparency = 1,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = logoHolder,
+        Parent = content,
     })
     applyIcon(logo, opts.Icon or Assets.Logo, true)
-    -- The logo settles in, then drifts gently while the bar fills.
-    local float = TweenService:Create(logo, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-        Position = UDim2.new(0.5, 0, 0.5, -3),
-    })
-    task.delay(0.1, function()
-        tween(logo, { Size = UDim2.fromScale(1, 1), Rotation = 0, ImageTransparency = 0 }, 0.7, Enum.EasingStyle.Back)
-        task.delay(0.7, function()
-            if loader.Parent then
-                float:Play()
-            end
-        end)
-    end)
-
+    local TEXT_X = PAD + 42
     local titleLabel = label({
-        Position = UDim2.fromOffset(TEXT_X + 10, 32),
-        Size = UDim2.new(1, -TEXT_X - 24, 0, 24),
+        Position = UDim2.fromOffset(TEXT_X, PAD - 2),
+        Size = UDim2.new(1, -(TEXT_X + 70), 0, 18),
         Text = opts.LoadingTitle or opts.Title or "Airflow",
-        TextSize = 22,
-        TextTransparency = 1,
-        Parent = loader,
+        TextSize = 15,
+        FontFace = Fonts.Bold,
+        Parent = content,
     })
     local statusLabel = label({
-        Position = UDim2.fromOffset(TEXT_X + 10, 60),
-        Size = UDim2.new(1, -TEXT_X - 24, 0, 16),
+        Position = UDim2.fromOffset(TEXT_X, PAD + 17),
+        Size = UDim2.new(1, -(TEXT_X + 70), 0, 15),
         Text = opts.LoadingText or opts.Subtitle or "Loading",
-        TextSize = 13,
+        TextSize = 12,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
-        TextTransparency = 1,
-        Parent = loader,
-    })
-    -- Title and status slide in a beat after the card.
-    task.delay(0.15, function()
-        tween(titleLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 32) }, 0.45, Enum.EasingStyle.Quint)
-    end)
-    task.delay(0.25, function()
-        tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 60) }, 0.45, Enum.EasingStyle.Quint)
-    end)
-
-    local track = create("Frame", {
-        Position = UDim2.new(0, 24, 1, -34),
-        Size = UDim2.new(1, -100, 0, 6),
-        BackgroundColor3 = Theme.Surface3,
-        BorderSizePixel = 0,
-        ClipsDescendants = true,
-        Parent = loader,
-    })
-    corner(track, UDim.new(1, 0))
-    local fill = create("Frame", {
-        Size = UDim2.fromScale(0, 1),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BorderSizePixel = 0,
-        Parent = track,
-    })
-    corner(fill, UDim.new(1, 0))
-    create("UIGradient", {
-        Color = ColorSequence.new(Theme.Accent:Lerp(Color3.new(0, 0, 0), 0.25), Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.2)),
-        Parent = fill,
-    })
-    local sheen = create("Frame", {
-        Position = UDim2.fromScale(-0.4, 0),
-        Size = UDim2.fromScale(0.4, 1),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BackgroundTransparency = 0.65,
-        BorderSizePixel = 0,
-        ZIndex = 2,
-        Parent = track,
-    })
-    create("UIGradient", {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.5, 0),
-            NumberSequenceKeypoint.new(1, 1),
-        }),
-        Parent = sheen,
+        Parent = content,
     })
     local percentLabel = label({
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -24, 1, -31),
-        Size = UDim2.fromOffset(44, 16),
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -PAD, 0, PAD + 6),
+        Size = UDim2.fromOffset(56, 16),
         Text = "0%",
         TextSize = 13,
+        FontFace = Fonts.Medium,
+        TextColor3 = Theme.Muted,
         TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = loader,
+        Parent = content,
+    })
+    create("Frame", {
+        Position = UDim2.fromOffset(PAD, listTop - 14),
+        Size = UDim2.new(1, -PAD * 2, 0, 1),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        Parent = content,
     })
 
-    tween(loader, { GroupTransparency = 0, Position = UDim2.fromScale(0.5, 0.5) }, 0.4, Enum.EasingStyle.Quint)
-    tween(loaderScale, { Scale = 1 }, 0.5, Enum.EasingStyle.Back)
-    tween(loaderShadow, { ImageTransparency = 0.55 }, 0.4)
-    local sweep = TweenService:Create(sheen, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1), {
-        Position = UDim2.fromScale(1, 0),
+    -- Each step: a marker and its text. Pending is a dim dot, the running
+    -- step a turning arc, and a finished one a check.
+    local rows = {}
+    for index, text in ipairs(steps) do
+        local row = create("Frame", {
+            Position = UDim2.fromOffset(PAD, listTop + (index - 1) * STEP),
+            Size = UDim2.new(1, -PAD * 2, 0, STEP),
+            BackgroundTransparency = 1,
+            Parent = content,
+        })
+        local dot = create("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, 7, 0.5, 0),
+            Size = UDim2.fromOffset(6, 6),
+            BackgroundColor3 = Theme.Surface3,
+            BorderSizePixel = 0,
+            Parent = row,
+        })
+        corner(dot, UDim.new(1, 0))
+        local spinner = create("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, 7, 0.5, 0),
+            Size = UDim2.fromOffset(12, 12),
+            BackgroundTransparency = 1,
+            Visible = false,
+            Parent = row,
+        })
+        corner(spinner, UDim.new(1, 0))
+        local spinnerStroke = create("UIStroke", {
+            Color = Theme.Accent,
+            Thickness = 2,
+            Parent = spinner,
+        })
+        create("UIGradient", {
+            Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(0.5, 0),
+                NumberSequenceKeypoint.new(0.501, 1),
+                NumberSequenceKeypoint.new(1, 1),
+            }),
+            Parent = spinnerStroke,
+        })
+        local check = create("ImageLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, 7, 0.5, 0),
+            Size = UDim2.fromOffset(14, 14),
+            BackgroundTransparency = 1,
+            ImageColor3 = Theme.Accent,
+            ImageTransparency = 1,
+            ScaleType = Enum.ScaleType.Fit,
+            Parent = row,
+        })
+        applyIcon(check, "check")
+        local stepLabel = label({
+            Position = UDim2.fromOffset(24, 0),
+            Size = UDim2.new(1, -24, 1, 0),
+            Text = tostring(text),
+            TextSize = 13,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextTransparency = 1,
+            Parent = row,
+        })
+        rows[index] = { Dot = dot, Spinner = spinner, Check = check, Label = stepLabel, State = "pending" }
+        -- The rows fade in one after another once the card is up.
+        task.delay(0.15 + index * 0.06, function()
+            if loader.Parent and rows[index].State == "pending" then
+                tween(stepLabel, { TextTransparency = 0.45 }, 0.3)
+            end
+        end)
+    end
+    local function setStep(index, state)
+        local row = rows[index]
+        if not row or row.State == state then
+            return
+        end
+        row.State = state
+        row.Dot.Visible = state == "pending"
+        row.Spinner.Visible = state == "active"
+        tween(row.Check, { ImageTransparency = state == "done" and 0 or 1 }, 0.2)
+        tween(row.Label, {
+            TextTransparency = state == "pending" and 0.45 or 0,
+            TextColor3 = state == "active" and Theme.Text or Theme.Muted,
+        }, 0.2)
+    end
+
+    local track = create("Frame", {
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.fromScale(0, 1),
+        Size = UDim2.new(1, 0, 0, 2),
+        BackgroundColor3 = Theme.Surface3,
+        BorderSizePixel = 0,
+        Parent = content,
     })
-    sweep:Play()
+    local fill = create("Frame", {
+        Size = UDim2.fromScale(0, 1),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        Parent = track,
+    })
+
+    tween(loader, { GroupTransparency = 0, Position = UDim2.fromScale(0.5, 0.5) }, 0.45, Enum.EasingStyle.Quint)
+    tween(loaderScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Quint)
+    tween(loaderShadow, { ImageTransparency = 0.55 }, 0.4)
     tween(fill, { Size = UDim2.fromScale(0.85, 1) }, duration * 0.8, Enum.EasingStyle.Quart)
-    -- The percentage simply follows the bar.
+    -- The percentage follows the bar and the running step's arc turns.
     local percentStep
-    percentStep = RunService.RenderStepped:Connect(function()
+    percentStep = RunService.RenderStepped:Connect(function(deltaTime)
         if not loader.Parent then
             percentStep:Disconnect()
             return
         end
         percentLabel.Text = math.floor(fill.Size.X.Scale * 100 + 0.5) .. "%"
+        for _, row in ipairs(rows) do
+            if row.State == "active" then
+                row.Spinner.Rotation = (row.Spinner.Rotation + deltaTime * 360) % 360
+            end
+        end
     end)
 
     task.spawn(loadLucide)
 
-    local steps = opts.LoadingSteps or { "Preparing interface", "Loading icons", "Almost there" }
-    for index, text in ipairs(steps) do
+    for index in ipairs(steps) do
         task.delay(duration * (index - 1) / #steps, function()
             if not loader.Parent then
                 return
             end
-            if index == 1 then
-                statusLabel.Text = text
-                return
+            if index > 1 then
+                setStep(index - 1, "done")
             end
-            -- Old step drifts up and out, the new one rises in under it.
-            tween(statusLabel, { TextTransparency = 1, Position = UDim2.fromOffset(TEXT_X, 56) }, 0.12)
-            task.delay(0.12, function()
-                if not loader.Parent then
-                    return
-                end
-                statusLabel.Text = text
-                statusLabel.Position = UDim2.fromOffset(TEXT_X, 64)
-                tween(statusLabel, { TextTransparency = 0, Position = UDim2.fromOffset(TEXT_X, 60) }, 0.22, Enum.EasingStyle.Quint)
-            end)
+            setStep(index, "active")
         end)
+    end
+    local function completeSteps()
+        for index in ipairs(rows) do
+            setStep(index, "done")
+        end
     end
 
     local function finish()
-        sweep:Cancel()
-        float:Cancel()
-        for _, item in ipairs(loader:GetChildren()) do
-            if item:IsA("TextLabel") then
-                tween(item, { TextTransparency = 1 }, 0.15)
-            end
-        end
-        tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
-        tween(track, { BackgroundTransparency = 1 }, 0.15)
-        tween(fill, { BackgroundTransparency = 1 }, 0.15)
-        tween(sheen, { BackgroundTransparency = 1 }, 0.1)
+        completeSteps()
+        tween(content, { GroupTransparency = 1 }, 0.18)
 
         local fit = self._fitScale or 1
         local target = self.Root.Size
@@ -5635,19 +5794,12 @@ function Window:_showLoader(opts)
         end)
     end
 
-    -- Prompt cards (unsupported executor, custom disclaimers): the bar gives
-    -- way to one card at a time, each with Exit and Continue, before the
-    -- window opens.
+    -- Prompt cards (unsupported executor, custom disclaimers): the checklist
+    -- gives way to one card at a time, each with Exit and Continue, before
+    -- the window opens.
     local function hideBar()
-        sweep:Cancel()
-        float:Cancel()
-        tween(titleLabel, { TextTransparency = 1 }, 0.15)
-        tween(statusLabel, { TextTransparency = 1 }, 0.15)
-        tween(percentLabel, { TextTransparency = 1 }, 0.15)
-        tween(logo, { ImageTransparency = 1, Size = UDim2.fromScale(0.85, 0.85) }, 0.15)
-        tween(track, { BackgroundTransparency = 1 }, 0.15)
-        tween(fill, { BackgroundTransparency = 1 }, 0.15)
-        tween(sheen, { BackgroundTransparency = 1 }, 0.1)
+        completeSteps()
+        tween(content, { GroupTransparency = 1 }, 0.18)
     end
 
     local function showCard(info, onContinue)
@@ -6333,17 +6485,40 @@ function Window:_enableResize(minSize)
         Parent = root,
     })
     self._grip = grip
-    local gripImage = create("ImageLabel", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, -16, 0.5, -16),
-        Size = UDim2.fromOffset(96, 96),
+    -- An arc that traces the window's own rounded corner: a rounded square
+    -- laid over the corner whose outline fades out away from it, so only the
+    -- curve and a short run of each edge show. Faint at rest, accent in use.
+    local gripArc = create("Frame", {
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.fromOffset(12, 12),
+        Size = UDim2.fromOffset(26, 26),
         BackgroundTransparency = 1,
-        Image = "rbxassetid://120997033468887",
-        ImageColor3 = Theme.Accent,
-        ImageTransparency = 0.8,
         ZIndex = 20,
         Parent = grip,
     })
+    corner(gripArc, UDim.new(0, 10))
+    local gripStroke = create("UIStroke", {
+        Color = Theme.Muted,
+        Thickness = 2,
+        Transparency = 0.55,
+        Parent = gripArc,
+    })
+    create("UIGradient", {
+        Rotation = 45,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.55, 1),
+            NumberSequenceKeypoint.new(0.85, 0),
+            NumberSequenceKeypoint.new(1, 0),
+        }),
+        Parent = gripStroke,
+    })
+    local function lightGrip(on)
+        tween(gripStroke, {
+            Color = on and Theme.Accent or Theme.Muted,
+            Transparency = on and 0 or 0.55,
+        }, on and 0.15 or 0.3, Enum.EasingStyle.Quint)
+    end
 
     -- The size follows the pointer through a critically damped spring, so it
     -- glides after the cursor and eases to rest when released instead of
@@ -6405,22 +6580,22 @@ function Window:_enableResize(minSize)
         startSize = current
         startPointer = pointerPosition()
         target = clampSize(startSize)
-        tween(gripImage, { ImageTransparency = 0.35 }, 0.1)
+        lightGrip(true)
     end)
     grip.MouseEnter:Connect(function()
         if not resizing then
-            tween(gripImage, { ImageTransparency = 0.35 }, 0.1)
+            lightGrip(true)
         end
     end)
     grip.MouseLeave:Connect(function()
         if not resizing then
-            tween(gripImage, { ImageTransparency = 0.8 }, 0.17)
+            lightGrip(false)
         end
     end)
     table.insert(self._connections, UserInputService.InputEnded:Connect(function(input)
         if resizing and isPress(input) then
             resizing = false
-            tween(gripImage, { ImageTransparency = 0.8 }, 0.17)
+            lightGrip(false)
         end
     end))
 
@@ -7755,37 +7930,6 @@ local STAT_TYPES = {
     Memory = { "cpu", "Memory" },
 }
 
-local function statTile(parent, order, icon, title)
-    local tile = create("Frame", {
-        BackgroundColor3 = Theme.Surface2,
-        BorderSizePixel = 0,
-        LayoutOrder = order,
-        Parent = parent,
-    })
-    tile:SetAttribute("NoDrag", true)
-    corner(tile, UDim.new(0, 10))
-    stroke(tile)
-    local holder = glowIcon(tile, icon, Theme.Accent, UDim2.new(0, 12, 0, 20))
-    holder.Size = UDim2.fromOffset(14, 14)
-    label({
-        Position = UDim2.fromOffset(31, 12),
-        Size = UDim2.new(1, -37, 0, 16),
-        Text = title,
-        TextSize = 12,
-        TextColor3 = Theme.Muted,
-        Parent = tile,
-    })
-    return label({
-        Position = UDim2.fromOffset(12, 33),
-        Size = UDim2.new(1, -20, 0, 20),
-        Text = "…",
-        TextSize = 17,
-        FontFace = Fonts.Bold,
-        RichText = true,
-        Parent = tile,
-    })
-end
-
 -- Health colour for a live metric: Success under good, Warning under bad,
 -- Error past it. lowerIsBetter flips the scale (ping, memory).
 function Library._healthColor(value, good, bad, lowerIsBetter)
@@ -7968,63 +8112,60 @@ function Tab:Groupbox(opts, icon)
         Parent = box,
     })
 
+    -- The header is a filled strip: icon and bold title on the left, a
+    -- chevron on the right. Pressing anywhere on it folds the box.
     local header = create("TextButton", {
         Size = UDim2.new(1, 0, 0, 40),
-        BackgroundTransparency = 1,
+        BackgroundColor3 = Theme.Surface3,
+        BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
         LayoutOrder = 1,
         Parent = box,
     })
+    corner(header, UDim.new(0, 10))
+    -- Squares the strip's lower corners so it meets the body flat.
+    local headerFill = create("Frame", {
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.fromScale(0, 1),
+        Size = UDim2.new(1, 0, 0, 10),
+        BackgroundColor3 = Theme.Surface3,
+        BorderSizePixel = 0,
+        Parent = header,
+    })
+    local titleX = 14
     if opts.Icon then
-        local image = create("ImageLabel", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -14, 0.5, 0),
-            Size = UDim2.fromOffset(16, 16),
+        local headerIcon = create("ImageLabel", {
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 14, 0.5, 0),
+            Size = UDim2.fromOffset(14, 14),
             BackgroundTransparency = 1,
             ImageColor3 = Theme.Accent,
             ScaleType = Enum.ScaleType.Fit,
+            ZIndex = 2,
             Parent = header,
         })
-        applyIcon(image, opts.Icon)
+        applyIcon(headerIcon, opts.Icon)
+        titleX = 37
     end
-    local collapseButton = create("TextButton", {
+    local collapseButton = create("ImageLabel", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, opts.Icon and -36 or -10, 0.5, 0),
-        Size = UDim2.fromOffset(22, 22),
-        BackgroundColor3 = Theme.Surface3,
+        Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.fromOffset(14, 14),
         BackgroundTransparency = 1,
-        Text = "",
-        AutoButtonColor = false,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        ZIndex = 2,
         Parent = header,
     })
-    corner(collapseButton, UDim.new(0, 6))
-    local glyph = create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(10, 10),
-        BackgroundTransparency = 1,
-        Parent = collapseButton,
-    })
-    local function bar(size)
-        local frame = create("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.fromScale(0.5, 0.5),
-            Size = size,
-            BackgroundColor3 = Theme.Muted,
-            BorderSizePixel = 0,
-            Parent = glyph,
-        })
-        corner(frame, UDim.new(1, 0))
-        return frame
-    end
-    local horizontal = bar(UDim2.fromOffset(10, 2))
-    local vertical = bar(UDim2.fromOffset(2, 0))
-    local reserve = (opts.Icon and 36 or 10) + 30
+    applyIcon(collapseButton, "chevron-down")
     local title = label({
-        Position = UDim2.fromOffset(14, 0),
-        Size = UDim2.new(1, -(14 + reserve), 1, 0),
+        Position = UDim2.fromOffset(titleX, 0),
+        Size = UDim2.new(1, -(titleX + 40), 1, 0),
         Text = opts.Name or "Groupbox",
+        TextSize = 13,
+        FontFace = Fonts.Bold,
+        ZIndex = 2,
         Parent = header,
     })
 
@@ -8081,6 +8222,19 @@ function Tab:Groupbox(opts, icon)
         generation += 1
         local current = generation
         local duration = instant and 0 or 0.32
+        -- Anything open inside the box (a dropdown list, a picker, a focused
+        -- box) closes with it, rather than floating over a folded header.
+        if value then
+            for _, element in ipairs(group._items) do
+                if element._onHide then
+                    element._onHide()
+                end
+                if element.Open and type(element.SetOpen) == "function" then
+                    element:SetOpen(false)
+                end
+            end
+        end
+        window._controlsDirty = true
         local scale = window.Scale.Scale
         if value then
             body.AutomaticSize = Enum.AutomaticSize.None
@@ -8101,26 +8255,46 @@ function Tab:Groupbox(opts, icon)
             end
         end
         local motion = instant and 0 or 0.3
-        tween(rule, { BackgroundTransparency = value and 1 or 0 }, instant and 0 or 0.2)
-        tween(vertical, { Size = UDim2.fromOffset(2, value and 10 or 0) }, motion, Enum.EasingStyle.Back)
-        tween(glyph, { Rotation = value and 90 or 0 }, motion, Enum.EasingStyle.Quint)
+        -- Folded, the strip is the whole box: the hairline under it drops out
+        -- of the layout once the body has closed, so the box ends exactly at
+        -- the strip and both share the same rounded corners.
+        if value then
+            local function fold()
+                if generation == current and collapsed then
+                    rule.Visible = false
+                    headerFill.Visible = false
+                end
+            end
+            if duration > 0 then
+                task.delay(duration, fold)
+            else
+                fold()
+            end
+        else
+            rule.Visible = true
+            headerFill.Visible = true
+        end
+        tween(collapseButton, { Rotation = value and -90 or 0 }, motion, Enum.EasingStyle.Quint)
     end
 
     local function hover(on)
-        tween(collapseButton, { BackgroundTransparency = on and 0.4 or 1 }, on and 0.12 or 0.2)
-        tween(horizontal, { BackgroundColor3 = on and Theme.Text or Theme.Muted }, 0.15)
-        tween(vertical, { BackgroundColor3 = on and Theme.Text or Theme.Muted }, 0.15)
+        local duration = on and 0.15 or 0.25
+        tween(collapseButton, { ImageColor3 = on and Theme.Text or Theme.Muted }, duration)
     end
-    collapseButton.MouseEnter:Connect(function()
+    header.MouseEnter:Connect(function()
         hover(true)
     end)
-    collapseButton.MouseLeave:Connect(function()
+    header.MouseLeave:Connect(function()
         hover(false)
     end)
-    local function flip()
-        setCollapsed(not collapsed)
-    end
-    collapseButton.MouseButton1Click:Connect(flip)
+    local isTap = tapGuard(header, function()
+        return box:FindFirstAncestorWhichIsA("ScrollingFrame")
+    end)
+    header.MouseButton1Click:Connect(function()
+        if isTap() then
+            setCollapsed(not collapsed)
+        end
+    end)
 
     function group:SetCollapsed(value)
         setCollapsed(value)
@@ -8643,8 +8817,8 @@ function Tab:ConfigManager(opts)
 end
 
 local PRESET_ORDER = {
-    "Airflow", "Obsidian", "Nebula", "Synthwave", "Sakura", "Velvet", "Rose", "Crimson", "Sunset", "Amber", "Gold",
-    "Cyber", "Toxic", "Matcha", "Emerald", "Aurora", "Ocean", "Frost", "Midnight", "Abyss", "Mono",
+    "Midnight", "Nebula", "Synthwave", "Sakura", "Velvet", "Rose", "Crimson", "Sunset", "Amber", "Gold",
+    "Cyber", "Toxic", "Matcha", "Emerald", "Aurora", "Ocean", "Frost", "Abyss", "Mono",
     "Halloween", "Haunted", "Christmas", "Valentine", "Lunar", "Tropical", "Dracula", "Coffee",
 }
 
@@ -11137,6 +11311,7 @@ function Tab:SubTab(opts, icon)
         _order = 0,
         _isSubTab = true,
         _index = index,
+        _iconName = opts.Icon,
     }, Tab)
     local frame = create("Frame", {
         Name = sub.Name,
@@ -11566,23 +11741,42 @@ function Window:_fitTitle(tab)
 end
 
 function Window:_buildSearch(content)
+    -- No box: the icon and text sit on a thin baseline. Focus draws an
+    -- accent line out from the middle of it.
     local holder = create("Frame", {
         AnchorPoint = Vector2.new(1, 0),
         Position = UDim2.new(1, -56, 0, 14),
         Size = UDim2.fromOffset(SEARCH_WIDTH, 34),
-        BackgroundColor3 = Theme.Surface,
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ZIndex = 5,
         Parent = content,
     })
     holder:SetAttribute("NoDrag", true)
-    corner(holder, UDim.new(0, 8))
-    local holderStroke = stroke(holder)
-    local _, icon = glowIcon(holder, "search", Theme.Muted, UDim2.new(0, 11, 0.5, 0))
-    icon.Parent.Size = UDim2.fromOffset(14, 14)
+    local baseline = create("Frame", {
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 0, 1, -2),
+        Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        Parent = holder,
+    })
+    local focusLine = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, -1),
+        Size = UDim2.new(0, 0, 0, 2),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        ZIndex = 2,
+        Parent = holder,
+    })
+    corner(focusLine, UDim.new(1, 0))
+    -- Kept for the focus handlers below, which recolour it.
+    local _, icon = glowIcon(holder, "search", Theme.Muted, UDim2.new(0, 2, 0.5, -1))
+    icon.Parent.Size = UDim2.fromOffset(15, 15)
     local box = create("TextBox", {
-        Position = UDim2.fromOffset(33, 0),
-        Size = UDim2.new(1, -41, 1, 0),
+        Position = UDim2.fromOffset(26, 0),
+        Size = UDim2.new(1, -28, 1, -2),
         BackgroundTransparency = 1,
         Text = "",
         PlaceholderText = "Search",
@@ -11595,11 +11789,19 @@ function Window:_buildSearch(content)
         ClearTextOnFocus = false,
         Parent = holder,
     })
+    holder.MouseEnter:Connect(function()
+        if not box:IsFocused() then
+            tween(baseline, { BackgroundColor3 = Theme.StrokeHover }, 0.15)
+        end
+    end)
+    holder.MouseLeave:Connect(function()
+        tween(baseline, { BackgroundColor3 = Theme.Stroke }, 0.25)
+    end)
     self.SearchBox = box
 
     -- Results float over the window under the box, like a dropdown popup.
-    local rowHeight = TOUCH and 46 or 42
-    local maxRows = 7
+    local rowHeight = TOUCH and 40 or 34
+    local maxRows = 8
     local popup = create("Frame", {
         AnchorPoint = Vector2.new(1, 0),
         Size = UDim2.fromOffset(300, 0),
@@ -11792,52 +11994,88 @@ function Window:_buildSearch(content)
                 Parent = list,
             })
             corner(button, UDim.new(0, 7))
-            local image = create("ImageLabel", {
-                AnchorPoint = Vector2.new(0, 0.5),
-                Position = UDim2.new(0, 10, 0.5, 0),
-                Size = UDim2.fromOffset(15, 15),
+            -- One line of breadcrumbs: tab, sub tab and groupbox in muted
+            -- text, each split by a chevron, ending on the match in accent.
+            local crumbs = create("Frame", {
+                Position = UDim2.fromOffset(10, 0),
+                Size = UDim2.new(1, -20, 1, 0),
                 BackgroundTransparency = 1,
-                ImageColor3 = Theme.Muted,
-                ScaleType = Enum.ScaleType.Fit,
+                ClipsDescendants = true,
                 Parent = button,
             })
-            applyIcon(image, result.Icon or Window._searchIcons[result.Kind] or "search")
+            create("UIListLayout", {
+                FillDirection = Enum.FillDirection.Horizontal,
+                VerticalAlignment = Enum.VerticalAlignment.Center,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+                Padding = UDim.new(0, 5),
+                Parent = crumbs,
+            })
+            local part = 0
+            local firstIcon = nil
+            local function crumbIcon(icon)
+                if not icon then
+                    return
+                end
+                part += 1
+                local image = create("ImageLabel", {
+                    Size = UDim2.fromOffset(14, 14),
+                    BackgroundTransparency = 1,
+                    ImageColor3 = Theme.Muted,
+                    ScaleType = Enum.ScaleType.Fit,
+                    LayoutOrder = part,
+                    Parent = crumbs,
+                })
+                applyIcon(image, icon)
+                firstIcon = firstIcon or image
+            end
+            local function crumbText(text, color, rich)
+                part += 1
+                return label({
+                    Size = UDim2.new(0, 0, 1, 0),
+                    AutomaticSize = Enum.AutomaticSize.X,
+                    Text = text,
+                    RichText = rich == true,
+                    TextSize = 13,
+                    FontFace = color and Fonts.Medium or Fonts.Regular,
+                    TextColor3 = color or Theme.Muted,
+                    TextTruncate = Enum.TextTruncate.None,
+                    LayoutOrder = part,
+                    Parent = crumbs,
+                })
+            end
+            local function chevron()
+                crumbText(">")
+            end
+            local tab, sub, group = result.Tab, result.Sub, result.Group
+            local onTab = result.Kind == "Tab"
+            local onSub = result.Kind == "Page"
+            local onGroup = result.Kind == "Groupbox"
+            crumbIcon(tab._iconName or "layout-grid")
+            if not onTab then
+                crumbText(tab.Name)
+                if sub then
+                    chevron()
+                    crumbIcon(sub._iconName or "layers")
+                    if not onSub then
+                        crumbText(sub.Name)
+                    end
+                end
+                if group and not onGroup then
+                    chevron()
+                    crumbText(group.Name)
+                end
+                if not onSub then
+                    chevron()
+                end
+            end
+            -- The match itself: accent, with the typed part in bold.
             local name = result.Name
             local stop = result.At + #query
             local marked = escape(string.sub(name, 1, result.At - 1))
-                .. '<font color="#' .. accent .. '">' .. escape(string.sub(name, result.At, stop - 1)) .. "</font>"
+                .. "<b>" .. escape(string.sub(name, result.At, stop - 1)) .. "</b>"
                 .. escape(string.sub(name, stop))
-            local hasPath = result.Path ~= nil
-            label({
-                Position = UDim2.fromOffset(34, hasPath and 5 or 0),
-                Size = UDim2.new(1, -110, hasPath and 0 or 1, hasPath and 18 or 0),
-                Text = marked,
-                RichText = true,
-                TextSize = 13,
-                Parent = button,
-            })
-            if hasPath then
-                label({
-                    Position = UDim2.fromOffset(34, 23),
-                    Size = UDim2.new(1, -44, 0, 14),
-                    Text = result.Path,
-                    TextSize = 11,
-                    FontFace = Fonts.Regular,
-                    TextColor3 = Theme.Muted,
-                    Parent = button,
-                })
-            end
-            label({
-                AnchorPoint = Vector2.new(1, 0),
-                Position = UDim2.new(1, -10, 0, hasPath and 7 or math.floor((rowHeight - 14) / 2)),
-                Size = UDim2.fromOffset(70, 14),
-                Text = result.Kind,
-                TextSize = 11,
-                FontFace = Fonts.Regular,
-                TextColor3 = Theme.Muted,
-                TextXAlignment = Enum.TextXAlignment.Right,
-                Parent = button,
-            })
+            crumbText(marked, Theme.Accent, true)
+            local image = firstIcon
             local isTap = tapGuard(button, function()
                 return list
             end)
@@ -11876,14 +12114,14 @@ function Window:_buildSearch(content)
     end
 
     box.Focused:Connect(function()
-        tween(holderStroke, { Color = Theme.StrokeHover }, 0.15)
+        tween(focusLine, { Size = UDim2.new(1, 0, 0, 2) }, 0.35, Enum.EasingStyle.Quint)
         tween(icon, { ImageColor3 = Theme.Accent }, 0.15)
         if box.Text ~= "" then
             update()
         end
     end)
     box.FocusLost:Connect(function(enterPressed)
-        tween(holderStroke, { Color = Theme.Stroke }, 0.2)
+        tween(focusLine, { Size = UDim2.new(0, 0, 0, 2) }, 0.3, Enum.EasingStyle.Quint)
         tween(icon, { ImageColor3 = Theme.Muted }, 0.2)
         if enterPressed and open then
             choose(results[selected])
@@ -12008,25 +12246,25 @@ function Window:_buildProfile(sidebar)
     })
     local card = create("TextButton", {
         AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, -6),
-        Size = UDim2.new(1, -10, 0, PROFILE_HEIGHT - 12),
+        Position = UDim2.new(0.5, 0, 1, -8),
+        Size = UDim2.new(1, -16, 0, PROFILE_HEIGHT - 16),
         BackgroundColor3 = Theme.Surface2,
-        BackgroundTransparency = 1,
+        BackgroundTransparency = 0,
         Text = "",
         AutoButtonColor = false,
         Parent = sidebar,
     })
-    corner(card)
-    local cardStroke = stroke(card, Theme.Stroke, 1)
+    corner(card, UDim.new(0, 8))
+    local cardStroke = stroke(card, Theme.Stroke, 0)
     local head = avatar(self, card, {
-        AnchorPoint = Vector2.new(0.5, 0),
-        Position = UDim2.new(0.5, 0, 0, 7),
-        Size = UDim2.fromOffset(40, 40),
-    }, Theme.Accent, 0.55, 1.5)
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 8, 0.5, 0),
+        Size = UDim2.fromOffset(32, 32),
+    })
     local online = create("Frame", {
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, 1, 1, 1),
-        Size = UDim2.fromOffset(11, 11),
+        Size = UDim2.fromOffset(9, 9),
         BackgroundColor3 = Theme.Success,
         BorderSizePixel = 0,
         ZIndex = 2,
@@ -12035,24 +12273,32 @@ function Window:_buildProfile(sidebar)
     corner(online, UDim.new(1, 0))
     stroke(online, Theme.Surface2, 0, 2)
     local name = label({
-        Position = UDim2.fromOffset(4, 52),
-        Size = UDim2.new(1, -8, 0, 15),
+        Position = UDim2.new(0, 48, 0.5, -15),
+        Size = UDim2.new(1, -74, 0, 15),
         TextSize = 12,
         FontFace = Fonts.Bold,
-        TextXAlignment = Enum.TextXAlignment.Center,
         Parent = card,
     })
     self:_trackName(name, "Display")
     local gameLabel = label({
-        Position = UDim2.fromOffset(4, 67),
-        Size = UDim2.new(1, -8, 0, 13),
+        Position = UDim2.new(0, 48, 0.5, 1),
+        Size = UDim2.new(1, -74, 0, 13),
         Text = "…",
         TextSize = 11,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
-        TextXAlignment = Enum.TextXAlignment.Center,
         Parent = card,
     })
+    local chevron = create("ImageLabel", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -8, 0.5, 0),
+        Size = UDim2.fromOffset(14, 14),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = card,
+    })
+    applyIcon(chevron, "chevron-right")
     task.spawn(function()
         gameLabel.Text = detectGameName()
     end)
@@ -12060,12 +12306,12 @@ function Window:_buildProfile(sidebar)
         if usingTouch() then
             return
         end
-        tween(card, { BackgroundTransparency = 0.4 }, 0.12)
-        tween(cardStroke, { Transparency = 0.5 }, 0.12)
+        tween(cardStroke, { Color = Theme.StrokeHover }, 0.12)
+        tween(chevron, { ImageColor3 = Theme.Text, Position = UDim2.new(1, -6, 0.5, 0) }, 0.15)
     end)
     card.MouseLeave:Connect(function()
-        tween(card, { BackgroundTransparency = 1 }, 0.2)
-        tween(cardStroke, { Transparency = 1 }, 0.2)
+        tween(cardStroke, { Color = Theme.Stroke }, 0.2)
+        tween(chevron, { ImageColor3 = Theme.Muted, Position = UDim2.new(1, -8, 0.5, 0) }, 0.2)
     end)
     card.MouseButton1Click:Connect(function()
         if self.Home then
@@ -12158,170 +12404,193 @@ end
 
 -- Home
 
-function Window:_homeProfile(list, opts, order)
-    local panel = panelCard(list, 122, order)
-    avatar(self, panel, {
-        Position = UDim2.fromOffset(20, 21),
-        Size = UDim2.fromOffset(80, 80),
-    }, Theme.Accent, 0.45, 2)
-    label({
-        Position = UDim2.fromOffset(118, 28),
-        Size = UDim2.new(1, -236, 0, 16),
-        Text = opts.Welcome or "Welcome back,",
-        TextSize = 13,
-        FontFace = Fonts.Regular,
+-- Home reads top to bottom: a banner greeting the player, a performance card
+-- with live graphs, the server and links side by side, and a status line.
+
+-- A Home card that grows with its stacked contents.
+function Window:_homeCard(parent, order)
+    local card = panelCard(parent, 0, order)
+    card.AutomaticSize = Enum.AutomaticSize.Y
+    padding(card, 16, 16, 14, 14)
+    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = card })
+    return card
+end
+
+-- A small caps heading at the top of a Home card.
+function Window:_homeCaption(parent, text, order)
+    return label({
+        Size = UDim2.new(1, 0, 0, 22),
+        Text = string.upper(text),
+        TextSize = 10,
         TextColor3 = Theme.Muted,
-        Parent = panel,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        LayoutOrder = order,
+        Parent = parent,
+    })
+end
+
+-- A rounded chip of an icon and short text. Returns the chip, its label and
+-- its icon so callers can recolour them.
+function Window:_homeChip(parent, order, icon, text, color)
+    local chip = create("TextButton", {
+        Size = UDim2.fromOffset(0, 24),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 0.2,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        LayoutOrder = order,
+        Parent = parent,
+    })
+    corner(chip, UDim.new(0, 6))
+    local chipStroke = stroke(chip)
+    padding(chip, 8, 9)
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        Parent = chip,
+    })
+    local image = create("ImageLabel", {
+        Size = UDim2.fromOffset(12, 12),
+        BackgroundTransparency = 1,
+        ImageColor3 = color or Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        LayoutOrder = 1,
+        Parent = chip,
+    })
+    applyIcon(image, icon)
+    local text_ = label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = text,
+        TextSize = 12,
+        TextColor3 = color or Theme.Muted,
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 2,
+        Parent = chip,
+    })
+    return chip, text_, image, chipStroke
+end
+
+-- A chip that flips on press: on, it takes the accent; off, it sits muted.
+function Window:_homeToggleChip(parent, order, icon, text, initial, callback)
+    local chip, text_, image, chipStroke = self:_homeChip(parent, order, icon, text)
+    local on = initial == true
+    local function paint(duration)
+        tween(chip, { BackgroundColor3 = on and Theme.Accent or Theme.Surface3, BackgroundTransparency = on and 0.85 or 0.2 }, duration)
+        tween(chipStroke, { Color = on and Theme.Accent or Theme.Stroke, Transparency = on and 0.6 or 0 }, duration)
+        tween(text_, { TextColor3 = on and Theme.Accent or Theme.Muted }, duration)
+        tween(image, { ImageColor3 = on and Theme.Accent or Theme.Muted }, duration)
+    end
+    paint(0)
+    chip.MouseButton1Click:Connect(function()
+        on = not on
+        paint(0.2)
+        safeCall(callback, on)
+    end)
+    return chip
+end
+
+function Window:_homeProfile(list, opts, order)
+    local banner = panelCard(list, 140, order)
+    banner.ClipsDescendants = true
+
+    -- The avatar bust stands on the banner's right edge and fades in from
+    -- the left, so it reads as part of the card rather than a framed photo.
+    local bust = create("ImageLabel", {
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, -16, 1, 0),
+        Size = UDim2.fromOffset(140, 140),
+        BackgroundTransparency = 1,
+        Image = "rbxthumb://type=AvatarBust&id=" .. tostring(LocalPlayer.UserId) .. "&w=420&h=420",
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = banner,
+    })
+    create("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.45, 0),
+            NumberSequenceKeypoint.new(1, 0),
+        }),
+        Parent = bust,
+    })
+    local bustPlaceholder = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.6, 0.55),
+        Size = UDim2.fromOffset(40, 40),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ImageTransparency = 1,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = bust,
+    })
+    applyIcon(bustPlaceholder, "user")
+    self:_trackAvatar(bust, bustPlaceholder)
+
+    local textWidth = UDim2.new(1, -190, 0, 0)
+    label({
+        Position = UDim2.fromOffset(22, 20),
+        Size = textWidth + UDim2.fromOffset(0, 14),
+        Text = string.upper(opts.Welcome or "Welcome back"),
+        TextSize = 10,
+        TextColor3 = Theme.Muted,
+        Parent = banner,
     })
     local nameLabel = label({
-        Position = UDim2.fromOffset(118, 45),
-        Size = UDim2.new(1, -236, 0, 30),
-        TextSize = 24,
+        Position = UDim2.fromOffset(22, 35),
+        Size = textWidth + UDim2.fromOffset(0, 32),
+        TextSize = 26,
         FontFace = Fonts.Bold,
-        Parent = panel,
+        Parent = banner,
     })
     self:_trackName(nameLabel, "Display")
     local userLabel = label({
-        Position = UDim2.fromOffset(118, 76),
-        Size = UDim2.new(1, -370, 0, 16),
+        Position = UDim2.fromOffset(22, 67),
+        Size = textWidth + UDim2.fromOffset(0, 16),
         TextSize = 13,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
-        Parent = panel,
+        Parent = banner,
     })
     self:_trackName(userLabel, "User")
 
+    -- Chips along the bottom: tier, time left, then the privacy toggles.
+    local chips = create("Frame", {
+        Position = UDim2.new(0, 22, 1, -40),
+        Size = UDim2.new(1, -44, 0, 24),
+        BackgroundTransparency = 1,
+        Parent = banner,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        Parent = chips,
+    })
     local tier = opts.Tier
     if tier == nil then
         tier = "Free"
     end
     if tier then
-        local badge = create("Frame", {
-            AnchorPoint = Vector2.new(1, 0),
-            Position = UDim2.new(1, -16, 0, 16),
-            Size = UDim2.fromOffset(0, 34),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundColor3 = Theme.Accent,
-            BackgroundTransparency = 0.88,
-            BorderSizePixel = 0,
-            Parent = panel,
-        })
-        corner(badge, UDim.new(1, 0))
-        stroke(badge, Theme.Accent, 0.55)
-        padding(badge, 12, 16)
-        create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Horizontal,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 8),
-            Parent = badge,
-        })
-        local badgeIcon = create("ImageLabel", {
-            Size = UDim2.fromOffset(18, 18),
-            BackgroundTransparency = 1,
-            ImageColor3 = Theme.Accent,
-            ScaleType = Enum.ScaleType.Fit,
-            LayoutOrder = 1,
-            Parent = badge,
-        })
-        applyIcon(badgeIcon, opts.TierIcon or self._logoIcon)
-        self.TierLabel = label({
-            Size = UDim2.new(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            Text = tostring(tier),
-            TextSize = 14,
-            TextColor3 = Theme.Accent,
-            TextTruncate = Enum.TextTruncate.None,
-            LayoutOrder = 2,
-            Parent = badge,
-        })
+        local tierChip, tierText, tierIcon = self:_homeChip(chips, 1, opts.TierIcon or self._logoIcon, tostring(tier), Theme.Accent)
+        tierChip.Active = false
+        tierText.FontFace = Fonts.Bold
+        tierIcon.Size = UDim2.fromOffset(13, 13)
+        self.TierLabel = tierText
     end
-    local expiryLabel = label({
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -18, 0, 55),
-        Size = UDim2.fromOffset(160, 14),
-        Text = "",
-        TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = panel,
-    })
-
-    local privacy = create("Frame", {
-        AnchorPoint = Vector2.new(1, 1),
-        Position = UDim2.new(1, -16, 1, -14),
-        Size = UDim2.fromOffset(0, 30),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundColor3 = Theme.Surface,
-        BorderSizePixel = 0,
-        Parent = panel,
-    })
-    corner(privacy, UDim.new(0, 8))
-    stroke(privacy)
-    padding(privacy, 12, 12)
-    create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 10),
-        Parent = privacy,
-    })
-    local function privacySwitch(order_, icon, text, initial, callback)
-        local item = create("Frame", {
-            Size = UDim2.new(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            BackgroundTransparency = 1,
-            LayoutOrder = order_,
-            Parent = privacy,
-        })
-        create("UIListLayout", {
-            FillDirection = Enum.FillDirection.Horizontal,
-            VerticalAlignment = Enum.VerticalAlignment.Center,
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 6),
-            Parent = item,
-        })
-        local image = create("ImageLabel", {
-            Size = UDim2.fromOffset(14, 14),
-            BackgroundTransparency = 1,
-            ImageColor3 = Theme.Muted,
-            ScaleType = Enum.ScaleType.Fit,
-            LayoutOrder = 1,
-            Parent = item,
-        })
-        applyIcon(image, icon)
-        label({
-            Size = UDim2.new(0, 0, 1, 0),
-            AutomaticSize = Enum.AutomaticSize.X,
-            Text = text,
-            TextSize = 12,
-            TextColor3 = Theme.Muted,
-            TextTruncate = Enum.TextTruncate.None,
-            LayoutOrder = 2,
-            Parent = item,
-        })
-        create("Frame", { Size = UDim2.fromOffset(4, 1), BackgroundTransparency = 1, LayoutOrder = 3, Parent = item })
-        miniSwitch(item, initial, 4, callback)
-    end
-    privacySwitch(1, "eye-off", "Name", self._hideName, function(on)
+    local expiryChip, expiryText = self:_homeChip(chips, 2, "clock", "")
+    expiryChip.Active = false
+    expiryChip.Visible = false
+    self:_homeToggleChip(chips, 3, "eye-off", "Name", self._hideName, function(on)
         self:SetHideName(on)
     end)
-    create("Frame", {
-        Size = UDim2.fromOffset(1, 16),
-        BackgroundColor3 = Theme.Stroke,
-        BorderSizePixel = 0,
-        LayoutOrder = 2,
-        Parent = privacy,
-    })
-    privacySwitch(3, "user", "Profile", self._hideAvatar, function(on)
+    self:_homeToggleChip(chips, 4, "user-x", "Avatar", self._hideAvatar, function(on)
         self:SetHideAvatar(on)
     end)
-    local function fitUser()
-        userLabel.Size = UDim2.new(1, -(118 + privacy.AbsoluteSize.X / self.Scale.Scale + 28), 0, 16)
-    end
-    privacy:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitUser)
-    task.defer(fitUser)
 
     return function()
         local value = opts.Expiry
@@ -12331,265 +12600,493 @@ function Window:_homeProfile(list, opts, order)
         end
         if type(value) == "number" then
             local left = value - os.time()
-            expiryLabel.Text = left > 0 and formatDuration(left) or "Expired"
+            expiryText.Text = left > 0 and (formatDuration(left) .. " left") or "Expired"
         elseif value ~= nil then
-            expiryLabel.Text = tostring(value)
+            expiryText.Text = tostring(value)
         end
+        expiryChip.Visible = expiryText.Text ~= ""
     end
 end
 
-function Window:_homeGame(list, order)
-    local panel = panelCard(list, 122, order)
+-- A large live readout with a short bar history under it. Returns the value
+-- label and a push(value, color) that adds a sample.
+function Window:_homeGraph(parent, order, icon, title, ceiling)
+    local cell = create("Frame", {
+        BackgroundTransparency = 1,
+        LayoutOrder = order,
+        Parent = parent,
+    })
+    local holder = glowIcon(cell, icon, Theme.Muted, UDim2.new(0, 0, 0, 7))
+    holder.Size = UDim2.fromOffset(12, 12)
+    label({
+        Position = UDim2.fromOffset(18, 0),
+        Size = UDim2.new(1, -18, 0, 14),
+        Text = string.upper(title),
+        TextSize = 10,
+        TextColor3 = Theme.Muted,
+        Parent = cell,
+    })
+    local value = label({
+        Position = UDim2.fromOffset(0, 16),
+        Size = UDim2.new(1, 0, 0, 28),
+        Text = "…",
+        TextSize = 24,
+        FontFace = Fonts.Bold,
+        RichText = true,
+        Parent = cell,
+    })
+    local track = create("Frame", {
+        Position = UDim2.fromOffset(0, 50),
+        Size = UDim2.new(1, 0, 0, 26),
+        BackgroundTransparency = 1,
+        Parent = cell,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Bottom,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = track,
+    })
+    local COUNT = 24
+    local bars, samples = {}, {}
+    for index = 1, COUNT do
+        local bar = create("Frame", {
+            Size = UDim2.new(1 / COUNT, -2, 0, 2),
+            BackgroundColor3 = Theme.Surface3,
+            BorderSizePixel = 0,
+            LayoutOrder = index,
+            Parent = track,
+        })
+        corner(bar, UDim.new(0, 2))
+        bars[index] = bar
+    end
+    local function push(sample, color)
+        table.insert(samples, sample)
+        if #samples > COUNT then
+            table.remove(samples, 1)
+        end
+        local top = ceiling or 1
+        for _, s in ipairs(samples) do
+            top = math.max(top, s)
+        end
+        local offset = COUNT - #samples
+        for index, bar in ipairs(bars) do
+            local s = samples[index - offset]
+            local latest = index == COUNT
+            local height = s and math.max(s / top, 0.08) or 0
+            tween(bar, {
+                Size = UDim2.new(1 / COUNT, -2, height, s and 0 or 2),
+                BackgroundColor3 = (latest and color) or (s and Theme.Muted or Theme.Surface3),
+                BackgroundTransparency = latest and 0 or (s and 0.6 or 0),
+            }, 0.35, Enum.EasingStyle.Quint)
+        end
+    end
+    return value, push
+end
+
+-- A small figure: value over a caps caption.
+function Window:_homeFigure(parent, order, title)
+    local cell = create("Frame", {
+        BackgroundTransparency = 1,
+        LayoutOrder = order,
+        Parent = parent,
+    })
+    local value = label({
+        Size = UDim2.new(1, -8, 0, 20),
+        Text = "…",
+        TextSize = 15,
+        FontFace = Fonts.Bold,
+        RichText = true,
+        Parent = cell,
+    })
+    label({
+        Position = UDim2.fromOffset(0, 21),
+        Size = UDim2.new(1, -8, 0, 14),
+        Text = string.upper(title),
+        TextSize = 10,
+        TextColor3 = Theme.Muted,
+        Parent = cell,
+    })
+    return value
+end
+
+-- A square tile button: an icon over a short label.
+function Window:_homeAction(parent, order, icon, text, callback)
+    local button = create("TextButton", {
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+        LayoutOrder = order,
+        Parent = parent,
+    })
+    corner(button, UDim.new(0, 8))
+    local buttonStroke = stroke(button)
+    local image = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, 11),
+        Size = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Text,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = button,
+    })
+    applyIcon(image, icon)
+    label({
+        Position = UDim2.new(0, 4, 0, 32),
+        Size = UDim2.new(1, -8, 0, 14),
+        Text = text,
+        TextSize = 11,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        Parent = button,
+    })
+    button.MouseEnter:Connect(function()
+        tween(button, { BackgroundTransparency = 0 }, 0.15, Enum.EasingStyle.Quint)
+        tween(buttonStroke, { Color = Theme.StrokeHover }, 0.15)
+        tween(image, { ImageColor3 = Theme.Accent }, 0.15)
+    end)
+    button.MouseLeave:Connect(function()
+        tween(button, { BackgroundTransparency = 0.5 }, 0.25, Enum.EasingStyle.Quint)
+        tween(buttonStroke, { Color = Theme.Stroke }, 0.25)
+        tween(image, { ImageColor3 = Theme.Text }, 0.25)
+    end)
+    button.MouseButton1Click:Connect(function()
+        ripple(button)
+        safeCall(callback)
+    end)
+    return button
+end
+
+function Window:_homeGame(parent, order)
+    local card = self:_homeCard(parent, order)
+    local head = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 46),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Parent = card,
+    })
     local icon = create("ImageLabel", {
-        Position = UDim2.fromOffset(16, 16),
-        Size = UDim2.fromOffset(60, 60),
+        Size = UDim2.fromOffset(44, 44),
         BackgroundColor3 = Theme.Surface3,
         BorderSizePixel = 0,
         Image = "rbxthumb://type=GameIcon&id=" .. tostring(game.GameId) .. "&w=150&h=150",
-        Parent = panel,
+        Parent = head,
     })
-    corner(icon, UDim.new(0, 12))
+    corner(icon, UDim.new(0, 10))
     stroke(icon)
-    local left = create("Frame", {
-        Position = UDim2.fromOffset(90, 14),
-        Size = UDim2.new(1, -330, 0, 96),
-        BackgroundTransparency = 1,
-        Parent = panel,
+    local gameName = label({
+        Position = UDim2.fromOffset(56, 3),
+        Size = UDim2.new(1, -56, 0, 20),
+        Text = "Loading",
+        TextSize = 15,
+        FontFace = Fonts.Bold,
+        Parent = head,
     })
-    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = left })
-    local function line(order_, props)
-        local defaults = {
-            Size = UDim2.new(1, 0, 0, 16),
-            TextSize = 12,
-            FontFace = Fonts.Regular,
-            TextColor3 = Theme.Muted,
-            LayoutOrder = order_,
-            Parent = left,
-        }
-        for key, value in pairs(props) do
-            defaults[key] = value
-        end
-        return label(defaults)
-    end
-    local gameName = line(1, { Size = UDim2.new(1, 0, 0, 22), Text = "Loading", TextSize = 16, FontFace = Fonts.Bold, TextColor3 = Theme.Text })
-    local creator = line(2, { Text = "" })
-    create("Frame", { Size = UDim2.new(1, 0, 0, 6), BackgroundTransparency = 1, LayoutOrder = 3, Parent = left })
-    line(4, { Text = "Job  " .. shortId(game.JobId) })
-    line(5, { Text = "Place  " .. tostring(game.PlaceId) })
-    line(6, { Text = "Universe  " .. tostring(game.GameId) })
+    local detail = label({
+        Position = UDim2.fromOffset(56, 24),
+        Size = UDim2.new(1, -56, 0, 16),
+        Text = "",
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        Parent = head,
+    })
+    local owner = nil
     task.spawn(function()
         local info = fetchGameInfo()
         gameName.Text = info and info.Name or detectGameName()
-        local owner = info and type(info.Creator) == "table" and info.Creator.Name
-        creator.Text = owner and ("by " .. owner) or ""
+        owner = info and type(info.Creator) == "table" and info.Creator.Name or nil
     end)
 
     local actions = create("Frame", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -14, 0.5, 0),
-        Size = UDim2.fromOffset(216, 96),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
-        Parent = panel,
+        LayoutOrder = 2,
+        Parent = card,
     })
-    local half = UDim2.new(0.5, -3, 0, 28)
-    softButton(actions, "Rejoin", { Size = half }, function()
+    padding(actions, 0, 0, 12, 0)
+    create("UIGridLayout", {
+        CellPadding = UDim2.fromOffset(6, 6),
+        CellSize = UDim2.new(0.25, -5, 0, 54),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = actions,
+    })
+    self:_homeAction(actions, 1, "refresh-cw", "Rejoin", function()
         self:Rejoin()
     end)
-    softButton(actions, "Server Hop", { Position = UDim2.new(0.5, 3, 0, 0), Size = half }, function()
+    self:_homeAction(actions, 2, "shuffle", "Hop", function()
         self:ServerHop()
     end)
-    softButton(actions, "Copy Job ID", { Position = UDim2.fromOffset(0, 34), Size = half }, function()
-        self:CopyToClipboard(game.JobId, "Job ID")
-    end)
-    softButton(actions, "Copy Universe", { Position = UDim2.new(0.5, 3, 0, 34), Size = half }, function()
-        self:CopyToClipboard(game.GameId, "Universe ID")
-    end)
-    softButton(actions, "Join Lowest Server", { Position = UDim2.fromOffset(0, 68), Size = UDim2.new(1, 0, 0, 28) }, function()
+    self:_homeAction(actions, 3, "users", "Lowest", function()
         self:JoinLowestServer()
     end)
+    self:_homeAction(actions, 4, "copy", "Job ID", function()
+        self:CopyToClipboard(game.JobId, "Job ID")
+    end)
 
-    -- Narrow windows move the actions under the details.
-    local stacked = nil
-    local function fit()
-        local width = panel.AbsoluteSize.X / self.Scale.Scale
-        local stack = width < 470
-        if stack == stacked then
-            return
-        end
-        stacked = stack
-        if stack then
-            actions.AnchorPoint = Vector2.new(0, 0)
-            actions.Position = UDim2.fromOffset(16, 122)
-            actions.Size = UDim2.new(1, -32, 0, 96)
-            left.Size = UDim2.new(1, -106, 0, 96)
-            panel.Size = UDim2.new(1, 0, 0, 234)
-        else
-            actions.AnchorPoint = Vector2.new(1, 0.5)
-            actions.Position = UDim2.new(1, -14, 0.5, 0)
-            actions.Size = UDim2.fromOffset(216, 96)
-            left.Size = UDim2.new(1, -330, 0, 96)
-            panel.Size = UDim2.new(1, 0, 0, 122)
-        end
+    label({
+        Size = UDim2.new(1, 0, 0, 26),
+        Text = "Job " .. shortId(game.JobId) .. "  ·  Place " .. tostring(game.PlaceId),
+        TextSize = 11,
+        FontFace = Fonts.Regular,
+        TextColor3 = Theme.Muted,
+        TextYAlignment = Enum.TextYAlignment.Bottom,
+        LayoutOrder = 3,
+        Parent = card,
+    })
+
+    -- The detail line keeps the player count live.
+    return function()
+        local count = #Players:GetPlayers() .. "/" .. Players.MaxPlayers .. " players"
+        detail.Text = owner and ("by " .. owner .. "  ·  " .. count) or count
     end
-    panel:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-    task.defer(fit)
 end
 
-function Window:_homeExecutor(list, opts, order)
-    local panel = panelCard(list, 64, order)
-    local executor, supported, message = executorReport(opts)
-    local tone = supported and Theme.Accent or Theme.Warning
-    local holder = glowIcon(panel, supported and "shield-check" or "shield-alert", tone, UDim2.new(0, 18, 0.5, 0))
-    holder.Size = UDim2.fromOffset(20, 20)
-    label({
-        Position = UDim2.fromOffset(52, 13),
-        Size = UDim2.new(1, -170, 0, 18),
-        Text = executor,
-        TextSize = 14,
-        Parent = panel,
+-- One row of the links card: icon, title and text, and a round icon button.
+function Window:_homeLink(card, order, icon, title, text, buttonIcon, callback)
+    local row = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 46),
+        BackgroundTransparency = 1,
+        LayoutOrder = order,
+        Parent = card,
     })
-    label({
-        Position = UDim2.fromOffset(52, 32),
-        Size = UDim2.new(1, -170, 0, 16),
-        Text = message,
+    create("Frame", {
+        Name = "Rule",
+        Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        Parent = row,
+    })
+    local holder = glowIcon(row, icon, Theme.Accent, UDim2.new(0, 0, 0.5, 0))
+    holder.Size = UDim2.fromOffset(16, 16)
+    local titleLabel = label({
+        Position = UDim2.fromOffset(28, 6),
+        Size = UDim2.new(1, -68, 0, 18),
+        Text = title,
+        TextSize = 13,
+        Parent = row,
+    })
+    local textLabel = label({
+        Position = UDim2.fromOffset(28, 24),
+        Size = UDim2.new(1, -68, 0, 15),
+        Text = text,
         TextSize = 12,
         FontFace = Fonts.Regular,
-        TextColor3 = supported and Theme.Muted or Theme.Warning,
-        Parent = panel,
+        TextColor3 = Theme.Muted,
+        Parent = row,
     })
-
-    local hint = create("Frame", {
+    local button = create("TextButton", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -16, 0.5, 0),
-        Size = UDim2.fromOffset(0, 24),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.fromOffset(30, 30),
+        BackgroundColor3 = Theme.Surface3,
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        Parent = row,
+    })
+    corner(button, UDim.new(0, 8))
+    local buttonStroke = stroke(button)
+    local image = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(14, 14),
         BackgroundTransparency = 1,
-        Parent = panel,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = button,
+    })
+    applyIcon(image, buttonIcon)
+    button.MouseEnter:Connect(function()
+        tween(button, { BackgroundTransparency = 0 }, 0.15, Enum.EasingStyle.Quint)
+        tween(buttonStroke, { Color = Theme.StrokeHover }, 0.15)
+        tween(image, { ImageColor3 = Theme.Accent }, 0.15)
+    end)
+    button.MouseLeave:Connect(function()
+        tween(button, { BackgroundTransparency = 0.5 }, 0.25, Enum.EasingStyle.Quint)
+        tween(buttonStroke, { Color = Theme.Stroke }, 0.25)
+        tween(image, { ImageColor3 = Theme.Muted }, 0.25)
+    end)
+    button.MouseButton1Click:Connect(function()
+        safeCall(callback)
+    end)
+    return row, titleLabel, textLabel
+end
+
+-- Builds the links card into parent, or nothing when there are no links and
+-- the feature list is off. Returns the card (or nil) and the feature refresh.
+function Window:_homeLinks(parent, opts, order)
+    local links = {}
+    if opts.Discord then
+        table.insert(links, {
+            Icon = opts.DiscordIcon or "message-circle",
+            Title = opts.DiscordTitle or "Community",
+            Text = opts.Discord,
+        })
+    end
+    if opts.Website then
+        table.insert(links, {
+            Icon = opts.WebsiteIcon or "globe",
+            Title = opts.WebsiteTitle or "Website",
+            Text = opts.Website,
+        })
+    end
+    for _, link in ipairs(opts.Links or {}) do
+        table.insert(links, link)
+    end
+    local features = opts.Features
+    if #links == 0 and features == false then
+        return nil, function() end
+    end
+    local card = self:_homeCard(parent, order)
+    self:_homeCaption(card, "Links", 0)
+    for index, link in ipairs(links) do
+        local action = type(link.Callback) == "function"
+        self:_homeLink(card, index, link.Icon or "link", link.Title or "", link.Text or "", action and "arrow-up-right" or "copy", function()
+            if action then
+                safeCall(link.Callback)
+            else
+                self:CopyToClipboard(link.Copy or link.Text, link.Title)
+            end
+        end)
+    end
+    local refresh = function() end
+    if features ~= false then
+        if type(features) == "table" then
+            self._featuresTitle = features.Title
+            self._features = features.List or (#features > 0 and features or nil)
+        end
+        local _, _, text_ = self:_homeLink(card, 100,
+            type(features) == "table" and features.Icon or "list-checks",
+            type(features) == "table" and features.Title or "Feature list",
+            "", "chevron-right", function()
+                self:ShowFeatures()
+            end)
+        refresh = function()
+            local desc = type(features) == "table" and features.Desc
+            text_.Text = desc or (self:_featureSummary())
+        end
+        task.defer(refresh)
+    end
+    -- The first row needs no rule above it.
+    local first = nil
+    for _, child in ipairs(card:GetChildren()) do
+        if child:IsA("Frame") and child:FindFirstChild("Rule") and (not first or child.LayoutOrder < first.LayoutOrder) then
+            first = child
+        end
+    end
+    if first then
+        first.Rule.Visible = false
+    end
+    return card, refresh
+end
+
+-- A quiet status line under the cards: executor support on the left, the
+-- hide key on the right.
+function Window:_homeExecutor(list, opts, order)
+    local line = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 26),
+        BackgroundTransparency = 1,
+        LayoutOrder = order,
+        Parent = list,
+    })
+    local executor, supported, message = executorReport(opts)
+    local dot = create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 4, 0.5, 0),
+        Size = UDim2.fromOffset(7, 7),
+        BackgroundColor3 = supported and Theme.Success or Theme.Warning,
+        BorderSizePixel = 0,
+        Parent = line,
+    })
+    corner(dot, UDim.new(1, 0))
+    local left = create("Frame", {
+        Position = UDim2.fromOffset(18, 0),
+        Size = UDim2.new(1, -170, 1, 0),
+        BackgroundTransparency = 1,
+        ClipsDescendants = true,
+        Parent = line,
     })
     create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, 8),
-        Parent = hint,
-    })
-    local chip = create("Frame", {
-        Size = UDim2.fromOffset(0, 24),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundColor3 = Theme.Surface,
-        BorderSizePixel = 0,
-        LayoutOrder = 1,
-        Parent = hint,
-    })
-    corner(chip, UDim.new(0, 6))
-    stroke(chip)
-    padding(chip, 8, 8)
-    self._keyChipLabel = label({
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
-        Text = keyName(self.Keybind),
-        TextSize = 12,
-        TextColor3 = Theme.Muted,
-        TextTruncate = Enum.TextTruncate.None,
-        Parent = chip,
+        Parent = left,
     })
     label({
         Size = UDim2.new(0, 0, 1, 0),
         AutomaticSize = Enum.AutomaticSize.X,
-        Text = TOUCH and "or tap the pill" or "to hide",
+        Text = executor,
+        TextSize = 12,
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 1,
+        Parent = left,
+    })
+    label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = message,
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = supported and Theme.Muted or Theme.Warning,
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 2,
+        Parent = left,
+    })
+
+    local hint = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -2, 0.5, 0),
+        Size = UDim2.fromOffset(0, 22),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundTransparency = 1,
+        Parent = line,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        Parent = hint,
+    })
+    label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = TOUCH and "Tap the pill or" or "Hide with",
         TextSize = 12,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
         TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 1,
+        Parent = hint,
+    })
+    local chip = create("Frame", {
+        Size = UDim2.fromOffset(0, 20),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = Theme.Surface3,
+        BorderSizePixel = 0,
         LayoutOrder = 2,
         Parent = hint,
     })
-end
-
-function Window:_homeLinks(list, opts, order)
-    local links = {}
-    if opts.Discord then
-        table.insert(links, {
-            Icon = opts.DiscordIcon or "message-circle",
-            Title = opts.DiscordTitle or "Join the community",
-            Text = opts.Discord,
-            Button = "Copy Invite",
-        })
-    end
-    if opts.Website then
-        table.insert(links, {
-            Icon = opts.WebsiteIcon or "monitor",
-            Title = opts.WebsiteTitle or "Supported games",
-            Text = opts.Website,
-            Button = "Copy Website",
-        })
-    end
-    for _, link in ipairs(opts.Links or {}) do
-        table.insert(links, link)
-    end
-    if #links == 0 then
-        return
-    end
-    local holder = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        BackgroundTransparency = 1,
-        LayoutOrder = order,
-        Parent = list,
+    corner(chip, UDim.new(0, 5))
+    stroke(chip)
+    padding(chip, 6, 6)
+    self._keyChipLabel = label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = keyName(self.Keybind),
+        TextSize = 11,
+        FontFace = Fonts.Bold,
+        TextTruncate = Enum.TextTruncate.None,
+        Parent = chip,
     })
-    local grid = create("UIGridLayout", {
-        CellPadding = UDim2.fromOffset(8, 8),
-        CellSize = UDim2.new(1, 0, 0, 64),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = holder,
-    })
-    local function fit()
-        local width = holder.AbsoluteSize.X / self.Scale.Scale
-        local columns = (#links > 1 and width >= 470) and 2 or 1
-        grid.CellSize = UDim2.new(1 / columns, columns > 1 and -4 or 0, 0, 64)
-    end
-    holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-    task.defer(fit)
-    for index, link in ipairs(links) do
-        local panel = panelCard(holder, 64, index)
-        local iconHolder = glowIcon(panel, link.Icon or "link", Theme.Accent, UDim2.new(0, 16, 0.5, 0))
-        iconHolder.Size = UDim2.fromOffset(18, 18)
-        local button = softButton(panel, link.Button or "Copy", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -14, 0.5, 0),
-            Size = UDim2.fromOffset(0, 30),
-            AutomaticSize = Enum.AutomaticSize.X,
-        }, function()
-            if type(link.Callback) == "function" then
-                safeCall(link.Callback)
-            else
-                self:CopyToClipboard(link.Copy or link.Text, link.Title)
-            end
-        end)
-        local title = label({
-            Position = UDim2.fromOffset(46, 13),
-            Size = UDim2.new(1, -150, 0, 18),
-            Text = link.Title or "",
-            TextSize = 14,
-            Parent = panel,
-        })
-        local text_ = label({
-            Position = UDim2.fromOffset(46, 32),
-            Size = UDim2.new(1, -150, 0, 16),
-            Text = link.Text or "",
-            TextSize = 12,
-            FontFace = Fonts.Regular,
-            TextColor3 = Theme.Muted,
-            Parent = panel,
-        })
-        local function reserve()
-            local width = button.AbsoluteSize.X / self.Scale.Scale + 14 + 58
-            title.Size = UDim2.new(1, -width, 0, 18)
-            text_.Size = UDim2.new(1, -width, 0, 16)
-        end
-        button:GetPropertyChangedSignal("AbsoluteSize"):Connect(reserve)
-        task.defer(reserve)
-    end
 end
 
 -- Feature list: every control the script adds, grouped by tab, or a list the
@@ -12711,57 +13208,6 @@ function Window:_featureSummary()
         text ..= " across " .. #groups .. (#groups == 1 and " tab" or " tabs")
     end
     return text, groups, count
-end
-
-function Window:_homeFeatures(list, opts, order)
-    local features = opts.Features
-    if features == false then
-        return function() end
-    end
-    if type(features) == "table" then
-        self._featuresTitle = features.Title
-        self._features = features.List or (#features > 0 and features or nil)
-    end
-    local panel = panelCard(list, 64, order)
-    local iconHolder = glowIcon(panel, type(features) == "table" and features.Icon or "list-checks", Theme.Accent, UDim2.new(0, 16, 0.5, 0))
-    iconHolder.Size = UDim2.fromOffset(18, 18)
-    local button = softButton(panel, type(features) == "table" and features.Button or "View Features", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -14, 0.5, 0),
-        Size = UDim2.fromOffset(0, 30),
-        AutomaticSize = Enum.AutomaticSize.X,
-    }, function()
-        self:ShowFeatures()
-    end)
-    local title = label({
-        Position = UDim2.fromOffset(46, 13),
-        Size = UDim2.new(1, -150, 0, 18),
-        Text = type(features) == "table" and features.Title or "Feature list",
-        TextSize = 14,
-        Parent = panel,
-    })
-    local text_ = label({
-        Position = UDim2.fromOffset(46, 32),
-        Size = UDim2.new(1, -150, 0, 16),
-        Text = "",
-        TextSize = 12,
-        FontFace = Fonts.Regular,
-        TextColor3 = Theme.Muted,
-        Parent = panel,
-    })
-    local function reserve()
-        local width = button.AbsoluteSize.X / self.Scale.Scale + 14 + 58
-        title.Size = UDim2.new(1, -width, 0, 18)
-        text_.Size = UDim2.new(1, -width, 0, 16)
-    end
-    button:GetPropertyChangedSignal("AbsoluteSize"):Connect(reserve)
-    task.defer(reserve)
-    local function refresh()
-        local desc = type(features) == "table" and features.Desc
-        text_.Text = desc or (self:_featureSummary())
-    end
-    task.defer(refresh)
-    return refresh
 end
 
 -- Opens the feature list over the window. Search filters it; picking an item
@@ -13137,36 +13583,70 @@ function Window:ShowFeatures()
 end
 
 function Window:_homeStats(list, opts, order, tab)
-    local show = opts.Stats or { "Players", "Friends", "Execs", "Session", "FPS", "Ping" }
-    local holder = create("Frame", {
+    local show = opts.Stats or { "Players", "Execs", "Session", "FPS", "Ping" }
+    -- FPS and ping get large readouts with a bar history; every other stat
+    -- is a small figure in the row under them.
+    local card = self:_homeCard(list, order)
+    local graphs = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 76),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+        Parent = card,
+    })
+    create("UIGridLayout", {
+        CellPadding = UDim2.fromOffset(24, 0),
+        CellSize = UDim2.new(0.5, -12, 0, 76),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = graphs,
+    })
+    local rule = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        LayoutOrder = 2,
+        Parent = card,
+    })
+    local figures = create("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
-        LayoutOrder = order,
-        Parent = list,
+        LayoutOrder = 3,
+        Parent = card,
     })
-    local grid = create("UIGridLayout", {
-        CellPadding = UDim2.fromOffset(8, 8),
-        CellSize = UDim2.new(1 / 6, -7, 0, 64),
+    padding(figures, 0, 0, 12, 0)
+    local figureGrid = create("UIGridLayout", {
+        CellPadding = UDim2.fromOffset(0, 8),
+        CellSize = UDim2.new(0.25, 0, 0, 36),
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = holder,
+        Parent = figures,
     })
-    local values = {}
-    local count = 0
-    for _, name in ipairs(show) do
+    local values, sparks = {}, {}
+    local graphCount, figureCount = 0, 0
+    for index, name in ipairs(show) do
         local kind = STAT_TYPES[name]
         if kind and not values[name] then
-            count += 1
-            values[name] = statTile(holder, count, kind[1], kind[2])
+            if name == "FPS" or name == "Ping" then
+                graphCount += 1
+                values[name], sparks[name] = self:_homeGraph(graphs, index, kind[1], kind[2], name == "FPS" and 60 or 100)
+            else
+                figureCount += 1
+                values[name] = self:_homeFigure(figures, index, kind[2])
+            end
         end
     end
-    local function fit()
-        local width = holder.AbsoluteSize.X / self.Scale.Scale
-        local columns = math.max(math.min(count, width >= 520 and 6 or 3), 1)
-        grid.CellSize = UDim2.new(1 / columns, -math.ceil(8 * (columns - 1) / columns), 0, 64)
+    graphs.Visible = graphCount > 0
+    figures.Visible = figureCount > 0
+    rule.Visible = graphCount > 0 and figureCount > 0
+    if graphCount == 0 then
+        padding(figures, 0, 0, 0, 0)
     end
-    holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-    task.defer(fit)
+    local function fitFigures()
+        local width = figures.AbsoluteSize.X / self.Scale.Scale
+        local columns = math.clamp(figureCount, 1, width >= 440 and 5 or 3)
+        figureGrid.CellSize = UDim2.new(1 / columns, 0, 0, 36)
+    end
+    figures:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitFigures)
+    task.defer(fitFigures)
 
     if values.Executor then
         values.Executor.Text = detectExecutor()
@@ -13235,6 +13715,7 @@ function Window:_homeStats(list, opts, order, tab)
         if values.FPS then
             values.FPS.Text = tostring(frames)
             tint(values.FPS, Library._healthColor(frames, 50, 30))
+            sparks.FPS(frames, Library._healthColor(frames, 50, 30))
         end
         frames = 0
         if values.Ping then
@@ -13244,6 +13725,7 @@ function Window:_homeStats(list, opts, order, tab)
             ping = ok and ping or 0
             values.Ping.Text = ping .. "ms"
             tint(values.Ping, Library._healthColor(ping, 90, 180, true))
+            sparks.Ping(ping, Library._healthColor(ping, 90, 180, true))
         end
         if values.Players then
             values.Players.Text = #Players:GetPlayers() .. "/" .. Players.MaxPlayers
@@ -13369,7 +13851,7 @@ function Window:_buildHome(opts)
         Name = opts.Name or "Home",
         Desc = opts.Desc,
         Icon = opts.Icon or "house",
-        PageTitle = opts.Title or ("Welcome to " .. self.Title .. "!"),
+        PageTitle = opts.Title or "Home",
     })
     tab._order = 100
     self.Home = tab
@@ -13385,10 +13867,50 @@ function Window:_buildHome(opts)
 
     local refreshExpiry = self:_homeProfile(list, opts, 1)
     local refreshStats, resetStats = self:_homeStats(list, opts, 2, tab)
-    self:_homeGame(list, 3)
+
+    -- Server and links side by side, stacked when narrow.
+    local split = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        LayoutOrder = 3,
+        Parent = list,
+    })
+    local splitLayout = create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10),
+        Parent = split,
+    })
+    local function column(order_)
+        local frame = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            LayoutOrder = order_,
+            Parent = split,
+        })
+        create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Parent = frame })
+        return frame
+    end
+    local leftColumn, rightColumn = column(1), column(2)
+    local refreshGame = self:_homeGame(leftColumn, 1)
+    local linksCard, refreshFeatures = self:_homeLinks(rightColumn, opts, 1)
+    if not linksCard then
+        rightColumn:Destroy()
+    end
+    local function fitSplit()
+        local wide = linksCard ~= nil and split.AbsoluteSize.X / self.Scale.Scale >= 540
+        splitLayout.FillDirection = wide and Enum.FillDirection.Horizontal or Enum.FillDirection.Vertical
+        local size = wide and UDim2.new(0.5, -5, 0, 0) or UDim2.new(1, 0, 0, 0)
+        leftColumn.Size = size
+        if linksCard then
+            rightColumn.Size = size
+        end
+    end
+    split:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitSplit)
+    task.defer(fitSplit)
+
     self:_homeExecutor(list, opts, 4)
-    self:_homeLinks(list, opts, 5)
-    local refreshFeatures = self:_homeFeatures(list, opts, 6)
 
     if type(pages) == "table" then
         for _, page in ipairs(pages) do
@@ -13398,12 +13920,14 @@ function Window:_buildHome(opts)
 
     refreshExpiry()
     refreshStats()
+    refreshGame()
     task.spawn(function()
         while not self._destroyed and tab._page.Parent do
             task.wait(1)
             if self.Open and self.CurrentTab == tab then
                 refreshStats()
                 refreshExpiry()
+                refreshGame()
                 refreshFeatures()
             else
                 resetStats()
@@ -13426,23 +13950,24 @@ function Window:Tab(opts, icon)
 
     local button = create("TextButton", {
         Size = UDim2.new(1, 0, 0, TAB_TILE_HEIGHT),
-        BackgroundColor3 = Theme.Surface2,
+        BackgroundColor3 = Theme.Surface3,
         BackgroundTransparency = 1,
         Text = "",
         AutoButtonColor = false,
         LayoutOrder = #self.Tabs + 1,
         Parent = self._tabStack,
     })
-    corner(button, UDim.new(0, 10))
+    corner(button, UDim.new(0, 7))
     local buttonStroke = stroke(button, Theme.Stroke, 1)
+    buttonStroke.Enabled = false
     tab._button = button
 
     local hasIcon = opts.Icon ~= nil
     if hasIcon then
         local iconImage = create("ImageLabel", {
-            AnchorPoint = Vector2.new(0.5, 0),
-            Position = UDim2.new(0.5, 0, 0, 9),
-            Size = UDim2.fromOffset(18, 18),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0, 20, 0.5, 0),
+            Size = UDim2.fromOffset(16, 16),
             BackgroundTransparency = 1,
             ImageColor3 = Theme.Muted,
             ScaleType = Enum.ScaleType.Fit,
@@ -13455,12 +13980,11 @@ function Window:Tab(opts, icon)
         tab._icon = iconImage
     end
     tab._label = label({
-        Position = UDim2.fromOffset(2, hasIcon and 31 or 0),
-        Size = UDim2.new(1, -4, hasIcon and 0 or 1, hasIcon and 14 or 0),
+        Position = UDim2.fromOffset(hasIcon and 38 or 14, 0),
+        Size = UDim2.new(1, hasIcon and -46 or -22, 1, 0),
         Text = tab.Name,
-        TextSize = 12,
+        TextSize = 13,
         TextColor3 = Theme.Muted,
-        TextXAlignment = Enum.TextXAlignment.Center,
         Parent = button,
     })
 
@@ -13504,23 +14028,29 @@ function Window:Tab(opts, icon)
 
     local pressScale = create("UIScale", { Parent = button })
     local function release()
-        tween(pressScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+        tween(pressScale, { Scale = 1 }, 0.3, Enum.EasingStyle.Quint)
     end
     button.MouseEnter:Connect(function()
         if self.CurrentTab ~= tab and not usingTouch() then
-            tween(button, { BackgroundTransparency = 0.4 }, 0.12)
-            tween(buttonStroke, { Transparency = 0.5 }, 0.12)
+            tween(button, { BackgroundTransparency = 0.75 }, 0.2, Enum.EasingStyle.Quint)
+            tween(tab._label, { TextColor3 = Theme.Text }, 0.2)
+            if tab._icon then
+                tintIcon(tab._icon, Theme.Text, true, 0.2)
+            end
         end
     end)
     button.MouseLeave:Connect(function()
         release()
         if self.CurrentTab ~= tab then
-            tween(button, { BackgroundTransparency = 1 }, 0.2)
-            tween(buttonStroke, { Transparency = 1 }, 0.2)
+            tween(button, { BackgroundTransparency = 1 }, 0.3, Enum.EasingStyle.Quint)
+            tween(tab._label, { TextColor3 = Theme.Muted }, 0.3)
+            if tab._icon then
+                tintIcon(tab._icon, Theme.Muted, false, 0.3)
+            end
         end
     end)
     button.MouseButton1Down:Connect(function()
-        tween(pressScale, { Scale = 0.94 }, 0.12)
+        tween(pressScale, { Scale = 0.97 }, 0.15, Enum.EasingStyle.Quint)
     end)
     button.MouseButton1Up:Connect(release)
     local isTap = tapGuard(button, function()
@@ -15805,58 +16335,12 @@ Window.CreateCloudConfigs = Window.CloudConfigs
 Window.CloudConfig = Window.CloudConfigs
 Window.CreateCloudConfig = Window.CloudConfigs
 
--- A small accent badge on the tab's sidebar tile: a number or short text, or
--- true for a plain dot. nil, false, 0 or "" hides it.
-function Tab:SetBadge(value)
-    local show = value ~= nil and value ~= false and value ~= 0 and value ~= ""
-    local badge = self._badge
-    if not badge then
-        if not show then
-            return
-        end
-        badge = label({
-            AnchorPoint = Vector2.new(1, 0),
-            Position = UDim2.new(1, -6, 0, 5),
-            BackgroundColor3 = Theme.Accent,
-            BackgroundTransparency = 0,
-            TextColor3 = Theme.AccentDark,
-            TextSize = 10,
-            FontFace = Fonts.Bold,
-            TextXAlignment = Enum.TextXAlignment.Center,
-            TextTruncate = Enum.TextTruncate.None,
-            ZIndex = 3,
-            Parent = self._button,
-        })
-        corner(badge, UDim.new(1, 0))
-        padding(badge, 4, 4, 0, 0)
-        self._badgeScale = create("UIScale", { Parent = badge })
-        self._badge = badge
-    end
-    local wasShown = badge.Visible and self._badgeShown
-    self._badgeShown = show
-    badge.Visible = show
-    if not show then
-        return
-    end
-    if value == true then
-        badge.AutomaticSize = Enum.AutomaticSize.None
-        badge.Size = UDim2.fromOffset(8, 8)
-        badge.Position = UDim2.new(1, -10, 0, 8)
-        badge.Text = ""
-    else
-        badge.AutomaticSize = Enum.AutomaticSize.X
-        badge.Size = UDim2.fromOffset(16, 16)
-        badge.Position = UDim2.new(1, -6, 0, 5)
-        badge.Text = tostring(value)
-    end
-    if not wasShown then
-        self._badgeScale.Scale = 0.4
-        tween(self._badgeScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
-    end
-end
+-- Tab badges were removed. These stay as no-ops so older scripts that call
+-- them keep running.
+function Tab:SetBadge() end
 
 function Tab:GetBadge()
-    return self._badgeShown and (self._badge.Text ~= "" and self._badge.Text or true) or nil
+    return nil
 end
 
 function Window:Dialog(opts)
@@ -16106,17 +16590,9 @@ function Window:_placeIndicator(tab)
         indicator.Visible = true
         indicator.Position = UDim2.fromOffset(8, targetY)
         indicator.BackgroundTransparency = 1
-        tween(indicator, { BackgroundTransparency = 0.35 }, 0.25)
+        tween(indicator, { BackgroundTransparency = 0.35 }, 0.3)
     end
-    tween(indicator, { Position = UDim2.fromOffset(8, targetY) }, 0.4, Enum.EasingStyle.Quint)
-    -- The pill stretches while it travels and settles back when it lands.
-    local pill = self._indicatorPill
-    if pill then
-        tween(pill, { Size = UDim2.fromOffset(3, 30) }, 0.16, Enum.EasingStyle.Quad)
-        task.delay(0.16, function()
-            tween(pill, { Size = UDim2.fromOffset(3, 20) }, 0.35, Enum.EasingStyle.Back)
-        end)
-    end
+    tween(indicator, { Position = UDim2.fromOffset(8, targetY) }, 0.45, Enum.EasingStyle.Quint)
 end
 
 -- While a tab list or sub tab strip runs past an end, that end gets a fade
@@ -16383,9 +16859,9 @@ function Window:SelectTab(tab)
     self._transitionGeneration = generation
 
     if previous then
-        tween(previous._label, { TextColor3 = Theme.Muted }, 0.2)
+        tween(previous._label, { TextColor3 = Theme.Muted }, 0.3)
         if previous._icon then
-            tintIcon(previous._icon, Theme.Muted, false, 0.2)
+            tintIcon(previous._icon, Theme.Muted, false, 0.3)
         end
         local outLayer = self._outLayer
         previous._page.Parent = outLayer
@@ -16393,7 +16869,7 @@ function Window:SelectTab(tab)
         outLayer.GroupTransparency = 0
         outLayer.Position = UDim2.fromOffset(0, 0)
         outLayer.Visible = true
-        tween(outLayer, { GroupTransparency = 1, Position = UDim2.fromOffset(0, -10) }, 0.18)
+        tween(outLayer, { GroupTransparency = 1, Position = UDim2.fromOffset(0, -6) }, 0.2, Enum.EasingStyle.Quint)
         task.delay(0.18, function()
             if self._transitionGeneration == generation then
                 self:_settleOut()
@@ -16403,11 +16879,9 @@ function Window:SelectTab(tab)
 
     tween(tab._button, { BackgroundTransparency = 1 }, 0.2)
     tween(tab._stroke, { Transparency = 1 }, 0.2)
-    tween(tab._label, { TextColor3 = Theme.Text }, 0.2)
+    tween(tab._label, { TextColor3 = Theme.Text }, 0.3)
     if tab._icon then
-        tintIcon(tab._icon, Theme.Accent, true, 0.2)
-        tab._icon.Size = UDim2.fromOffset(14, 14)
-        tween(tab._icon, { Size = UDim2.fromOffset(18, 18) }, 0.4, Enum.EasingStyle.Back)
+        tintIcon(tab._icon, Theme.Text, true, 0.3)
     end
 
     self:_placeIndicator(tab)
@@ -16987,8 +17461,9 @@ end
 
 -- Minimize: the window folds into a Dynamic Island style pill hanging from
 -- the top of the screen. Compact, it shows the logo and a live meter of
--- running toggles. Hovering springs it open into a card with the tab, the
--- running count, pinned statuses and the key that reopens the window. A
+-- running toggles. Hovering springs it open into a session card: the
+-- player, the game and session time, frame rate and ping meters, the server
+-- and running counts, and the key that reopens the window. A
 -- notification while minimized opens it briefly to show it. Click or tap
 -- restores.
 
@@ -17154,8 +17629,7 @@ function Window:_buildMiniBar()
         Parent = meter,
     })
 
-    -- Expanded, on hover: the tab, how many are running, pinned statuses and
-    -- the key that reopens the window.
+    -- Expanded, on hover: the player's session.
     local expanded = layer("Expanded")
     local expandedList = create("Frame", {
         Position = UDim2.fromOffset(16, 14),
@@ -17169,74 +17643,200 @@ function Window:_buildMiniBar()
         Padding = UDim.new(0, 8),
         Parent = expandedList,
     })
+    -- The open card is the player's session, like a now-playing card: who
+    -- and where on top with the session clock, two wide meters for frame
+    -- rate and ping, then chips for the server and what's running.
     local top = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 38),
+        Size = UDim2.new(1, 0, 0, 48),
         BackgroundTransparency = 1,
         LayoutOrder = 1,
         Parent = expandedList,
     })
-    local chip = create("Frame", {
-        Size = UDim2.fromOffset(38, 38),
-        BackgroundColor3 = Theme.Accent,
-        BackgroundTransparency = 0.85,
+    local face = create("ImageLabel", {
+        Size = UDim2.fromOffset(48, 48),
+        BackgroundColor3 = Color3.fromRGB(38, 38, 41),
         BorderSizePixel = 0,
+        Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=150&h=150",
         Parent = top,
     })
-    corner(chip, UDim.new(0, 12))
-    local chipLogo = create("ImageLabel", {
+    corner(face, UDim.new(0, 12))
+    local facePlaceholder = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(20, 20),
         BackgroundTransparency = 1,
-        ImageColor3 = Theme.Accent,
+        ImageColor3 = Theme.Muted,
+        ImageTransparency = 1,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = chip,
+        Parent = face,
     })
-    applyIcon(chipLogo, self._logoIcon, true)
-    label({
-        Position = UDim2.fromOffset(50, 1),
-        Size = UDim2.new(1, -120, 0, 18),
-        Text = self.Title,
+    applyIcon(facePlaceholder, "user")
+    self:_trackAvatar(face, facePlaceholder)
+    local nameLabel = label({
+        Position = UDim2.fromOffset(60, 5),
+        Size = UDim2.new(1, -150, 0, 20),
         TextSize = 15,
         FontFace = Fonts.Bold,
+        TextColor3 = Color3.fromRGB(244, 244, 246),
         Parent = top,
     })
+    self:_trackName(nameLabel, "Display")
     local tabLabel = label({
-        Position = UDim2.fromOffset(50, 20),
-        Size = UDim2.new(1, -120, 0, 15),
+        Position = UDim2.fromOffset(60, 26),
+        Size = UDim2.new(1, -150, 0, 15),
+        Text = "",
         TextSize = 12,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
         Parent = top,
     })
-    local bigCount = label({
+    task.spawn(function()
+        tabLabel.Text = detectGameName()
+    end)
+    local sessionLabel = label({
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, 0, 0, -2),
-        Size = UDim2.fromOffset(64, 24),
-        Text = "0",
-        TextSize = 22,
+        Position = UDim2.new(1, 0, 0, 3),
+        Size = UDim2.fromOffset(90, 24),
+        Text = "0s",
+        TextSize = 20,
         FontFace = Fonts.Bold,
-        TextColor3 = Theme.Accent,
+        TextColor3 = Color3.fromRGB(244, 244, 246),
         TextXAlignment = Enum.TextXAlignment.Right,
         Parent = top,
     })
     label({
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, 0, 0, 22),
-        Size = UDim2.fromOffset(64, 14),
-        Text = "running",
+        Position = UDim2.new(1, 0, 0, 27),
+        Size = UDim2.fromOffset(90, 14),
+        Text = "session",
         TextSize = 11,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
         TextXAlignment = Enum.TextXAlignment.Right,
         Parent = top,
     })
+
+    -- Two readouts: a large number with its unit, a caption, and a thin
+    -- line under them that fills and tints with how healthy it is.
+    local meters = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 42),
+        BackgroundTransparency = 1,
+        LayoutOrder = 2,
+        Parent = expandedList,
+    })
+    local function meterPill(position, caption)
+        local cell = create("Frame", {
+            Position = position,
+            Size = UDim2.new(0.5, -10, 1, 0),
+            BackgroundTransparency = 1,
+            Parent = meters,
+        })
+        local value = label({
+            Size = UDim2.new(1, -70, 0, 24),
+            Text = "",
+            TextSize = 20,
+            FontFace = Fonts.Bold,
+            TextColor3 = Color3.fromRGB(244, 244, 246),
+            RichText = true,
+            Parent = cell,
+        })
+        label({
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, 0, 0, 6),
+            Size = UDim2.fromOffset(70, 14),
+            Text = caption,
+            TextSize = 10,
+            TextColor3 = Theme.Muted,
+            TextXAlignment = Enum.TextXAlignment.Right,
+            Parent = cell,
+        })
+        local track = create("Frame", {
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, 0, 1, -4),
+            Size = UDim2.new(1, 0, 0, 3),
+            BackgroundColor3 = Color3.fromRGB(38, 38, 42),
+            BorderSizePixel = 0,
+            Parent = cell,
+        })
+        corner(track, UDim.new(1, 0))
+        local fill = create("Frame", {
+            Size = UDim2.fromScale(0, 1),
+            BackgroundColor3 = Theme.Success,
+            BorderSizePixel = 0,
+            Parent = track,
+        })
+        corner(fill, UDim.new(1, 0))
+        return fill, value
+    end
+    local fpsFill, fpsValue = meterPill(UDim2.fromScale(0, 0), "FRAME RATE")
+    local pingFill, pingValue = meterPill(UDim2.new(0.5, 10, 0, 0), "PING")
+
+    -- Chips: a muted name and a bold value, the running count in accent.
+    local chips = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundTransparency = 1,
+        LayoutOrder = 3,
+        Parent = expandedList,
+    })
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+        Parent = chips,
+    })
+    local function chipOf(order, name, color)
+        local chipFrame = create("Frame", {
+            Size = UDim2.fromOffset(0, 30),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundColor3 = Color3.fromRGB(32, 32, 35),
+            BorderSizePixel = 0,
+            LayoutOrder = order,
+            Parent = chips,
+        })
+        corner(chipFrame, UDim.new(1, 0))
+        padding(chipFrame, 14, 14)
+        create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 7),
+            Parent = chipFrame,
+        })
+        label({
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Text = name,
+            TextSize = 12,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextTruncate = Enum.TextTruncate.None,
+            LayoutOrder = 1,
+            Parent = chipFrame,
+        })
+        return label({
+            Size = UDim2.new(0, 0, 1, 0),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Text = "",
+            TextSize = 12,
+            FontFace = Fonts.Bold,
+            TextColor3 = color or Color3.fromRGB(244, 244, 246),
+            TextTruncate = Enum.TextTruncate.None,
+            LayoutOrder = 2,
+            Parent = chipFrame,
+        })
+    end
+    local playersValue = chipOf(1, "Players")
+    local bigCount = chipOf(2, "Running", Theme.Accent)
+    local tabValue = chipOf(3, "Tab")
+
+    -- Pinned statuses are no longer shown here; the holder stays so the
+    -- refresh below has somewhere to keep its rows.
     local rowsHolder = create("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
         Visible = false,
-        LayoutOrder = 2,
+        LayoutOrder = 4,
         Parent = expandedList,
     })
     create("UIListLayout", {
@@ -17249,9 +17849,52 @@ function Window:_buildMiniBar()
         TextSize = 11,
         FontFace = Fonts.Regular,
         TextColor3 = Theme.Muted,
-        LayoutOrder = 3,
+        LayoutOrder = 5,
         Parent = expandedList,
     })
+
+    -- Frame rate is counted every frame; the card's values refresh twice a
+    -- second while it's open.
+    local sessionStart = self._sessionStart or os.clock()
+    local frames, frameClock, fps = 0, os.clock(), 60
+    self:_listen("Render", function()
+        frames += 1
+        local now = os.clock()
+        if now - frameClock >= 0.5 then
+            fps = math.floor(frames / (now - frameClock) + 0.5)
+            frames, frameClock = 0, now
+        end
+    end)
+    local function refreshSession()
+        sessionLabel.Text = formatDuration(os.clock() - sessionStart)
+        local unit = '<font size="12" color="#8A8A93"> %s</font>'
+        fpsValue.Text = fps .. string.format(unit, "fps")
+        tween(fpsFill, {
+            Size = UDim2.fromScale(math.clamp(fps / 60, 0.05, 1), 1),
+            BackgroundColor3 = Library._healthColor(fps, 50, 30),
+        }, 0.4, Enum.EasingStyle.Quint)
+        local okPing, ping = pcall(function()
+            return math.floor(LocalPlayer:GetNetworkPing() * 1000)
+        end)
+        ping = okPing and ping or 0
+        pingValue.Text = ping .. string.format(unit, "ms")
+        -- Lower ping fills more: 40ms or less is full, 400ms and up is low.
+        tween(pingFill, {
+            Size = UDim2.fromScale(math.clamp(1 - (ping - 40) / 360, 0.05, 1), 1),
+            BackgroundColor3 = Library._healthColor(ping, 90, 180, true),
+        }, 0.4, Enum.EasingStyle.Quint)
+        playersValue.Text = #Players:GetPlayers() .. "/" .. Players.MaxPlayers
+        local tab = self.CurrentTab
+        tabValue.Text = tab and tab.Name or "-"
+    end
+    task.spawn(function()
+        while island.Parent do
+            if island.Visible and self.Minimized then
+                refreshSession()
+            end
+            task.wait(0.5)
+        end
+    end)
 
     -- Activity: a notification that arrives while minimized drops in here.
     local activity = layer("Activity")
@@ -17760,8 +18403,6 @@ function Window:_buildMiniBar()
             pinValue.TextColor3 = pinnedLead._shownColor and pinnedLead._shownColor() or Theme.Text
         end
         setSplit(running > 0 and pinnedLead ~= nil)
-        local tab = self.CurrentTab
-        tabLabel.Text = tab and tab.Name or ""
         local key = typeof(self.Keybind) == "EnumItem" and keyName(self.Keybind)
         hint.Text = TOUCH and "Tap to open" or (key and ("Click or press " .. key .. " to open") or "Click to open")
 
@@ -17771,7 +18412,7 @@ function Window:_buildMiniBar()
                 table.insert(list, handle)
             end
         end
-        rowsHolder.Visible = #list > 0
+        rowsHolder.Visible = false
         for index = 1, math.max(#list, #cardRows) do
             local handle = list[index]
             local row = cardRows[index]
@@ -18433,424 +19074,367 @@ end
 return Library
 end)()
 
-local Airflow = Library
+--[[
+    Example script
 
-Airflow:LoadFont({ Name = "ValleySans" }) -- downloads the font once into workspace/AirFlowFonts and uses it everywhere
-Airflow:SetDefaultTheme("Obsidian") -- starting theme: any preset name or a colour table. A default the player sets in the theme manager wins
+    A reference build that shows every part of the library in a realistic
+    layout. Each section is self-contained: copy the parts you need.
 
-local Window = Airflow:CreateWindow({
-    Name = "Airflow Hub",
-    LoadingSubtitle = "Example",
-    -- Icon = 132608042600488, -- leave out for the built-in OuroFlow mark (theme tinted); any asset id (number or "rbxassetid://..."), shown in its own colours
-    ToggleUIKeybind = "RightControl", -- key that hides and shows the window
-    -- examples: "RightShift", "RightControl", "LeftAlt", "Insert", "Home", "F1", "Backquote"
-    -- Enum.KeyCode values also work: ToggleUIKeybind = Enum.KeyCode.RightShift
-    ConfigurationSaving = { Enabled = true, FolderName = "AirflowExample" },
-    ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- square button that minimizes / restores. "Both" shows it on PC too
-    Backdrop = { Weather = "Snow", Tint = 0.45 }, -- black tint + weather behind the open window: "Snow", "Rain", "Hell Fire", "Sakura", "Fireflies", "Matrix" or "None". false turns it off
-    -- UIScale = 1, -- 0.6 to 1.5 on top of the automatic fit to small screens. Players can change it in the theme manager
-    -- Density = "Default", -- "Compact", "Default" or "Comfortable": spacing between cards, groupboxes and rows
-    -- Disclaimer = { Title = "Before you start", Text = "Use at your own risk.", Id = "risk-v1" }, -- card the player accepts before the window opens. A list shows several in a row
+    Structure
+      Window      the main frame, Home tab and global options
+      Main        a typical feature tab: sub tabs, groupboxes and controls
+      Status      live readouts: statuses, status lists and dependent controls
+      Elements    one of every element as a full-width card
+      Popups      notifications, confirms and dialogs
+      Cloud       a shared config browser backed by an in-memory store
+      Settings    interface options, config manager and theme manager
+]]
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+Library:LoadFont({ Name = "ValleySans" }) -- downloaded once and used everywhere
+-- Library:SetDefaultTheme("Nebula") -- any preset name or a colour table; a theme the player picks wins
+
+--------------------------------------------------------------------------------
+-- Window
+--------------------------------------------------------------------------------
+
+local Window = Library:CreateWindow({
+    Name = "Example",
+    LoadingSubtitle = "Loading",
+    ToggleUIKeybind = "RightControl", -- a KeyCode name or Enum.KeyCode
+    ConfigurationSaving = { Enabled = true, FolderName = "Example" },
+    ToggleButton = { Platform = "Mobile", Icon = "layout-grid" }, -- "Both" also shows it on PC
+    Backdrop = { Weather = "None", Tint = 0.45 }, -- "Snow", "Rain", "Hell Fire", "Sakura", "Fireflies", "Matrix" or "None"
+    -- UIScale = 1,           -- 0.6 to 1.5, on top of the automatic fit
+    -- Density = "Default",   -- "Compact", "Default" or "Comfortable"
+    -- SidebarWidth = 188,    -- starting sidebar width; players can drag the divider
+    -- Disclaimer = { Title = "Terms", Text = "By continuing you accept the terms.", Id = "terms-v1" },
     Home = {
         Tier = "Free",
-        Expiry = os.time() + 12 * 3600, -- countdown under the tier badge. A string or a function also works
-        Discord = "dsc.gg/airflowscript",
-        Website = "airflowscript.com",
-        Stats = { "Players", "Friends", "Execs", "Session", "FPS", "Ping" },
-        -- Feature list card: automatic by default (every control, grouped by tab). Write your own with
-        -- Features = { List = { { Name = "Combat", Items = { "Auto Parry", { Name = "Kill Aura", Tag = "New" } } } } }
+        Expiry = os.time() + 30 * 86400, -- a timestamp, a string, or a function returning either
+        Discord = "discord.gg/example",
+        Website = "example.com",
+        Stats = { "Players", "Execs", "Session", "FPS", "Ping" },
+        -- Features = { List = { { Name = "Main", Items = { "Automation", { Name = "Targeting", Tag = "New" } } } } },
     },
 })
 
--- Tabs hold sub tabs, sub tabs hold groupboxes, groupboxes hold elements.
+--------------------------------------------------------------------------------
+-- Main: tabs hold sub tabs, sub tabs hold groupboxes, groupboxes hold elements
+--------------------------------------------------------------------------------
 
-local Farm = Window:CreateTab({ Name = "Farm", Icon = "swords" })
-Farm:SetBadge("New") -- a number, short text, or true for a dot. nil hides it
+local Main = Window:CreateTab({ Name = "Main", Icon = "zap" })
 
-local MobFarm = Farm:CreateSubTab({ Name = "Mob Farm" })
+local General = Main:CreateSubTab({ Name = "General" })
 
-local Mobs = MobFarm:AddLeftGroupbox({ Name = "Mob Farm", Icon = "crosshair" })
+local Automation = General:AddLeftGroupbox({ Name = "Automation", Icon = "repeat" })
 
-Mobs:CreateToggle({
-    Name = "Auto Farm Mobs",
+Automation:CreateToggle({
+    Name = "Enabled",
+    Desc = "Runs the selected tasks on a loop",
     CurrentValue = false,
-    Flag = "AutoFarmMobs",
+    Flag = "AutomationEnabled",
     Callback = function(Value)
-        print("auto farm", Value)
+        print("[Example] automation", Value)
     end,
 })
 
-Mobs:CreateDropdown({
-    Name = "Mobs",
-    Options = { "Bandit", "Wolf", "Demon", "Oni", "Ghoul", "Slayer", "Hashira" },
+Automation:CreateDropdown({
+    Name = "Tasks",
+    Options = { "Collect", "Upgrade", "Sell", "Claim Rewards" },
     MultipleOptions = true,
-    CurrentOption = {},
-    Flag = "Mobs",
+    CurrentOption = { "Collect" },
+    Flag = "AutomationTasks",
     Callback = function(Options)
-        print("mobs", table.concat(Options, ", "))
+        print("[Example] tasks", table.concat(Options, ", "))
     end,
 })
 
-Mobs:CreateToggle({
-    Name = "Farm Nearest Mob",
-    CurrentValue = false,
-    Flag = "FarmNearest",
-    Callback = function(Value)
-        print("nearest", Value)
-    end,
-})
-
-Mobs:CreateSlider({
-    Name = "Attack Distance",
-    Range = { 0, 30 },
+Automation:CreateSlider({
+    Name = "Interval",
+    Range = { 1, 60 },
     Increment = 1,
-    Suffix = " studs",
-    CurrentValue = 8,
-    Flag = "AttackDistance",
+    Suffix = "s",
+    CurrentValue = 5,
+    Flag = "AutomationInterval",
     Callback = function(Value)
-        print("distance", Value)
+        print("[Example] interval", Value)
     end,
 })
 
-local Other = MobFarm:AddRightGroupbox({ Name = "Other Features", Icon = "sparkles" })
+local Targeting = General:AddRightGroupbox({ Name = "Targeting", Icon = "crosshair" })
 
-Other:CreateToggle({
-    Name = "Auto Loot Drops",
-    CurrentValue = false,
-    Flag = "AutoLoot",
-    Callback = function(Value)
-        print("loot", Value)
+Targeting:CreateDropdown({
+    Name = "Mode",
+    Options = { "Nearest", "Lowest Health", "Highest Value" },
+    CurrentOption = "Nearest",
+    Flag = "TargetMode",
+    Callback = function(Option)
+        print("[Example] target mode", Option)
     end,
 })
 
-Other:CreateToggle({
-    Name = "Auto Chests",
-    CurrentValue = false,
-    Flag = "AutoChests",
-    Callback = function(Value)
-        print("chests", Value)
-    end,
-})
-
-Other:CreateSlider({
-    Name = "Loot Range",
+Targeting:CreateSlider({
+    Name = "Range",
     Range = { 0, 500 },
     Increment = 10,
-    CurrentValue = 250,
-    Flag = "LootRange",
+    Suffix = " studs",
+    CurrentValue = 150,
+    Flag = "TargetRange",
     Callback = function(Value)
-        print("loot range", Value)
+        print("[Example] range", Value)
     end,
 })
 
-local Movement = MobFarm:AddRightGroupbox({ Name = "Movement", Icon = "move", Collapsed = true })
+Targeting:CreateToggle({
+    Name = "Ignore Friends",
+    CurrentValue = true,
+    Flag = "IgnoreFriends",
+    Callback = function(Value)
+        print("[Example] ignore friends", Value)
+    end,
+})
 
-Movement:CreateStepper({
-    Name = "Tween Speed",
+local Controls = General:AddRightGroupbox({ Name = "Controls", Icon = "sliders-horizontal", Collapsed = true })
+
+Controls:CreateStepper({
+    Name = "Speed",
     Range = { 1, 10 },
     Increment = 1,
     CurrentValue = 5,
-    Flag = "TweenSpeed",
+    Flag = "Speed",
     Callback = function(Value)
-        print("speed", Value)
+        print("[Example] speed", Value)
     end,
 })
 
-Movement:CreateKeybind({
-    Name = "Stop Farming",
+Controls:CreateKeybind({
+    Name = "Stop",
     CurrentKeybind = "X",
     Flag = "StopKey",
     Callback = function()
-        print("stop")
+        print("[Example] stop")
     end,
 })
 
-local BossFarm = Farm:CreateSubTab({ Name = "Boss Farm" })
+local Advanced = Main:CreateSubTab({ Name = "Advanced" })
 
-local Bosses = BossFarm:AddLeftGroupbox({ Name = "Bosses", Icon = "skull" })
+local Profiles = Advanced:AddLeftGroupbox({ Name = "Profile", Icon = "user-cog" })
 
-Bosses:CreateDropdown({
-    Name = "Boss",
-    Options = { "Rui", "Akaza", "Doma", "Kokushibo" },
-    CurrentOption = "Rui",
-    Flag = "Boss",
-    Callback = function(Option)
-        print("boss", Option)
-    end,
-})
-
-Bosses:CreateToggle({
-    Name = "Auto Farm Boss",
-    CurrentValue = false,
-    Flag = "AutoBoss",
-    Callback = function(Value)
-        print("boss farm", Value)
-    end,
-})
-
-Bosses:CreateLabel("Status: idle")
-
-local BossSettings = BossFarm:AddRightGroupbox({ Name = "Settings", Icon = "settings-2" })
-
-BossSettings:CreateInput({
-    Name = "Webhook",
+Profiles:CreateInput({
+    Name = "Webhook URL",
     PlaceholderText = "https://",
-    Flag = "BossWebhook",
+    Flag = "WebhookUrl",
     Callback = function(Text)
-        print("webhook", Text)
+        print("[Example] webhook", Text)
     end,
 })
 
-BossSettings:CreateColorPicker({
-    Name = "Highlight",
-    Color = Color3.fromRGB(235, 199, 246),
-    Flag = "BossColor",
+Profiles:CreateColorPicker({
+    Name = "Highlight Color",
+    Color = Color3.fromRGB(128, 160, 246),
+    Flag = "HighlightColor",
     Callback = function(Color)
-        print("color", Color)
+        print("[Example] color", Color)
     end,
 })
 
--- Order lists: always open. Drag a row (by its grip on touch) or tap the arrows.
-local Priority = BossFarm:AddLeftGroupbox({ Name = "Priority", Icon = "list-ordered" })
-Priority:CreateOrderList({
-    Name = "Boss Order",
-    Desc = "Top boss is farmed first",
-    Items = { "Rui", "Akaza", "Doma", "Kokushibo" },
-    Flag = "BossOrder",
-    Callback = function(Order)
-        print("boss order", table.concat(Order, " > "))
+Profiles:CreateButton({
+    Name = "Apply",
+    Style = "Primary",
+    Callback = function()
+        print("[Example] applied")
     end,
 })
-local quests = {}
-for index = 1, 14 do
-    quests[index] = "Quest " .. index
+
+-- Order lists are always open: drag a row (by its grip on touch) or use the arrows.
+local Priority = Advanced:AddRightGroupbox({ Name = "Priority", Icon = "list-ordered" })
+
+Priority:CreateOrderList({
+    Name = "Task Order",
+    Desc = "The top task runs first",
+    Items = { "Collect", "Upgrade", "Sell", "Claim Rewards" },
+    Flag = "TaskOrder",
+    Callback = function(Order)
+        print("[Example] order", table.concat(Order, " > "))
+    end,
+})
+
+local Steps = {}
+for Index = 1, 12 do
+    Steps[Index] = "Step " .. Index
 end
 Priority:CreateOrderList({
-    Name = "Quest Order",
-    Items = quests,
-    MaxRows = 5, -- 14 rows with MaxRows = 5, so the list scrolls
-    Flag = "QuestOrder",
-    Callback = function(Order)
-        print("first quest", Order[1])
-    end,
+    Name = "Steps",
+    Items = Steps,
+    MaxRows = 5, -- more rows than MaxRows scroll inside the list
+    Flag = "StepOrder",
 })
 
--- Status labels in every style. Pin = true also shows one on the minimized island.
-local Run = Farm:CreateSubTab({ Name = "Run" })
+Main:CreateSubTab({ Name = "Queue" }) -- an empty sub tab shows the empty state
 
-local RunInfo = Run:AddLeftGroupbox({ Name = "Run Info", Icon = "activity" })
-local floor = 0
-RunInfo:CreateStatuses({
-    { Name = "Floor", Pin = true, Update = function()
-        floor += 1
-        return floor
+--------------------------------------------------------------------------------
+-- Status: live readouts. Pin = true also shows a value on the minimized island
+--------------------------------------------------------------------------------
+
+local Status = Window:CreateTab({ Name = "Status", Icon = "activity" })
+
+local Session = Status:AddLeftGroupbox({ Name = "Session", Icon = "timer" })
+local Cycles = 0
+Session:CreateStatuses({
+    { Name = "Cycles", Pin = true, Update = function()
+        Cycles += 1
+        return Cycles
     end },
-    { Name = "Points", Value = "-" },
-    { Name = "Hearts", Value = 3 },
-    { Name = "EnemiesLeft", Value = "-" },
-    { Name = "Map", Value = "Forest" },
+    { Name = "Collected", Value = 0 },
+    { Name = "Errors", Value = 0 },
+    { Name = "Region", Value = "-" },
 }, { Style = "Plain" })
 
-local Progress = Run:AddRightGroupbox({ Name = "Progress", Icon = "trending-up" })
-Progress:CreateStatus({ Name = "Level", Value = 179, Style = "Stat" })
-Progress:CreateStatus({ Name = "Exp", Value = "7859/10740", Style = "Bar" })
-Progress:CreateStatus({ Name = "Wen", Value = 270070, Style = "Row", Pin = true })
-Progress:CreateStatus({ Name = "Quests done", Value = 0, Style = "Row" })
+local Progress = Status:AddRightGroupbox({ Name = "Progress", Icon = "trending-up" })
+Progress:CreateStatus({ Name = "Level", Value = 42, Style = "Stat" })
+Progress:CreateStatus({ Name = "Experience", Value = "6200/10000", Style = "Bar" })
+Progress:CreateStatus({ Name = "Balance", Value = 125000, Style = "Row", Pin = true })
 
-local Live = Run:AddLeftGroupbox({ Name = "Live", Icon = "radio" })
-local states = { { "Farming", "Success" }, { "Walking", "Warning" }, { "Stuck", "Error" } }
-Live:CreateStatus({ Name = "Bot", Style = "Dot", Update = function()
-    local state = states[math.floor(os.clock() / 3) % #states + 1]
-    return state[1], state[2] -- a second string return sets the tone
+local Health = Status:AddLeftGroupbox({ Name = "Health", Icon = "heart-pulse" })
+local States = { { "Running", "Success" }, { "Waiting", "Warning" }, { "Stopped", "Error" } }
+Health:CreateStatus({ Name = "State", Style = "Dot", Update = function()
+    local State = States[math.floor(os.clock() / 3) % #States + 1]
+    return State[1], State[2] -- a second string return sets the tone
 end })
-Live:CreateStatus({ Name = "Server", Value = "Healthy", Style = "Badge", Tone = "Success" })
-Live:CreateStatus({ Name = "Rank", Style = "Bar", Tone = "Warning", Update = function()
-    return (os.clock() * 100) % 7000, 7000 -- a number second return sets the max
-end, UpdateRate = 0.5 })
-
--- Coloured text: theme tags follow the theme, Colorize wraps any colour,
--- and Color paints a whole value.
-Live:CreateStatus({ Name = "Ping", Style = "Row", Pin = true, Update = function()
-    local ms = math.floor(game:GetService("Players").LocalPlayer:GetNetworkPing() * 1000)
-    local tone = ms < 90 and "Success" or ms < 180 and "Warning" or "Error"
-    return Airflow.Colorize(ms .. " ms", tone)
+Health:CreateStatus({ Name = "Service", Value = "Online", Style = "Badge", Tone = "Success" })
+Health:CreateStatus({ Name = "Load", Style = "Bar", Tone = "Warning", UpdateRate = 0.5, Update = function()
+    return (os.clock() * 100) % 100, 100 -- a number second return sets the max
 end })
-Live:CreateStatus({ Name = "Loot", Style = "Row", Value = "<Accent>2</Accent> legendary · <Muted>14 common</Muted>" })
-Live:CreateStatus({ Name = "Mode", Style = "Row", Value = "Aggressive", Color = "Warning" })
-Live:CreateStatus({ Name = "Shield", Style = "Badge", Value = "Up", Tone = Color3.fromRGB(120, 180, 255) })
+-- Coloured text: theme tags follow the theme, Colorize wraps any colour.
+Health:CreateStatus({ Name = "Ping", Style = "Row", Pin = true, Update = function()
+    local Ms = math.floor(LocalPlayer:GetNetworkPing() * 1000)
+    local Tone = Ms < 90 and "Success" or Ms < 180 and "Warning" or "Error"
+    return Library.Colorize(Ms .. " ms", Tone)
+end })
+Health:CreateStatus({ Name = "Summary", Style = "Row", Value = "<Accent>3</Accent> active · <Muted>9 idle</Muted>" })
 
--- Status list: grows with its rows up to MaxRows, then scrolls inside itself.
-local Hotbar = Run:AddRightGroupbox({ Name = "Hotbar", Icon = "zap" })
-local skills = {
-    "Z", "X", "C", "V", "B", "N", "M", "F",
-}
-Hotbar:CreateStatusList({
-    Name = "Skills",
+-- Status lists grow with their rows up to MaxRows, then scroll inside.
+local Jobs = Status:AddRightGroupbox({ Name = "Jobs", Icon = "list-checks" })
+Jobs:CreateStatusList({
+    Name = "Queue",
     MaxRows = 5,
-    EmptyText = "no skills on the hotbar yet",
+    EmptyText = "Nothing queued",
     UpdateRate = 0.5,
     Update = function()
-        local rows = { "Z Compound Eye Hexagon (on target, up to 3s)" } -- a plain string is one wrapped line
-        for index = 2, #skills do
-            local cooldown = math.floor((os.clock() + index * 3) % 15)
-            rows[index] = {
-                Text = skills[index] .. " Skill " .. index,
-                Value = cooldown == 0 and "ready" or ("cooldown " .. cooldown .. "s"),
-                Tone = cooldown == 0 and "Success" or (cooldown > 10 and "Warning" or nil),
+        local Rows = {}
+        for Index = 1, 8 do
+            local Remaining = math.floor((os.clock() + Index * 3) % 15)
+            Rows[Index] = {
+                Text = "Job " .. Index,
+                Value = Remaining == 0 and "done" or (Remaining .. "s left"),
+                Tone = Remaining == 0 and "Success" or nil,
             }
         end
-        return rows -- 8 rows with MaxRows = 5, so the list scrolls
+        return Rows
     end,
 })
 
 -- Dependent controls: the slider only shows while the toggle is on.
-local Charge -- declared first so the toggle's callback can reach it
-Hotbar:CreateToggle({
-    Name = "Hold Skills",
+local Limit -- declared first so the toggle's callback can reach it
+Jobs:CreateToggle({
+    Name = "Limit Jobs",
     CurrentValue = false,
-    Flag = "HoldSkills",
+    Flag = "LimitJobs",
     Callback = function(Value)
-        Charge:SetVisible(Value)
+        Limit:SetVisible(Value)
     end,
 })
-Charge = Hotbar:CreateSlider({
-    Name = "Charge Distance",
-    Range = { 5, 60 },
+Limit = Jobs:CreateSlider({
+    Name = "Max Jobs",
+    Range = { 1, 20 },
     Increment = 1,
-    CurrentValue = 20,
-    Visible = false, -- starts hidden, still saves and loads with the config
-    Flag = "ChargeDistance",
+    CurrentValue = 5,
+    Visible = false, -- hidden at start, still saved with the config
+    Flag = "MaxJobs",
 })
 
-Farm:CreateSubTab({ Name = "Quests" }) -- an empty sub tab shows the empty state
+--------------------------------------------------------------------------------
+-- Elements: added straight to a tab, every element is a full-width card
+--------------------------------------------------------------------------------
 
-local Shop = Window:CreateTab({ Name = "Shop", Icon = "store" })
+local Elements = Window:CreateTab({ Name = "Elements", Desc = "Every element, full width", Icon = "layout-grid" })
 
-local Weapons = Shop:AddLeftGroupbox({ Name = "Weapons", Icon = "sword" })
-
-Weapons:CreateDropdown({
-    Name = "Weapon",
-    Options = { "Fancy Katana", "Nichirin Blade", "Kusarigama" },
-    CurrentOption = "Fancy Katana",
-    Flag = "Weapon",
-    Callback = function(Option)
-        print("weapon", Option)
-    end,
-})
-
-Weapons:CreateLabel("Price: 1500 wen (owned)")
-Weapons:CreateLabel("Seller: Raze")
-
-Weapons:CreateButton({
-    Name = "Buy Weapon",
-    Callback = function()
-        print("buy weapon")
-    end,
-})
-
-local Items = Shop:AddRightGroupbox({ Name = "Items", Icon = "shopping-bag" })
-
-Items:CreateToggle({
-    Name = "Auto Buy",
-    CurrentValue = false,
-    Flag = "AutoBuy",
-    Callback = function(Value)
-        print("auto buy", Value)
-    end,
-})
-
-Items:CreateButton({
-    Name = "Buy Selected",
-    Style = "Primary",
-    Callback = function()
-        print("buy selected")
-    end,
-})
-
-local Elements = Window:CreateTab({ Name = "Elements", Desc = "One of everything, full width", Icon = "layout-grid" })
-
-Elements:CreateSection("Elements added straight to a tab stack as full width cards")
+Elements:CreateSection("Controls")
 
 Elements:CreateButton({
-    Name = "Example button",
-    Desc = "Example description",
+    Name = "Button",
+    Desc = "With a description and a tooltip",
     Icon = "mouse-pointer-click",
-    Tooltip = "Hover any element built with Tooltip to see one of these", -- a string, or { Title, Text, Icon }
+    Tooltip = "Any element accepts a Tooltip", -- a string, or { Title, Text, Icon }
     Callback = function()
-        print("button")
+        print("[Example] button")
     end,
 })
 
 Elements:CreateToggle({
-    Name = "Example toggle",
-    Desc = "Example description",
-    Tooltip = { Title = "Example toggle", Text = "Tooltips can carry a title and an icon too.", Icon = "info" },
+    Name = "Toggle",
+    Desc = "Tooltips can carry a title and an icon",
+    Tooltip = { Title = "Toggle", Text = "Saved with the config through its Flag.", Icon = "info" },
     CurrentValue = false,
-    Flag = "ExampleToggle",
-    Callback = function(Value)
-        print("toggle", Value)
-    end,
+    Flag = "ElementToggle",
 })
 
 Elements:CreateSlider({
-    Name = "Example slider",
+    Name = "Slider",
     Range = { 0, 100 },
     Increment = 1,
     Suffix = "%",
     CurrentValue = 50,
-    Flag = "ExampleSlider",
-    Callback = function(Value)
-        print("slider", Value)
-    end,
+    Flag = "ElementSlider",
 })
 
-Elements:CreateProgress({
-    Name = "Example progress",
-    CurrentValue = 0.65,
-})
+Elements:CreateProgress({ Name = "Progress", CurrentValue = 0.65 })
 
 Elements:CreateParagraph({
-    Title = "Example paragraph",
-    Content = "Longer text that wraps across several lines.",
+    Title = "Paragraph",
+    Content = "Longer text wraps across as many lines as it needs.",
 })
 
 Elements:CreateSection("Media and tables")
 
 Elements:CreateImage({
-    Name = "Example image",
-    Image = "Deep Violet", -- asset id, rbxassetid:// or rbxthumb:// link, web link, a file in <folder>/backgrounds, a background preset, or "Avatar"
+    Name = "Image",
+    Image = "Deep Violet", -- an asset id, rbxassetid:// or rbxthumb:// link, a web link, a background preset or "Avatar"
     Height = 140,
-    Caption = "Images fade in once they load",
+    Caption = "Images fade in once loaded",
 })
 
 Elements:CreateViewport({
-    Name = "Example viewport",
-    Desc = "Drag it to spin it",
-    Model = "Avatar", -- any Model or part (it's copied), a Player, or "Avatar" for your own character
+    Name = "Viewport",
+    Desc = "Drag to rotate",
+    Model = "Avatar", -- any Model or part (copied), a Player, or "Avatar"
     Height = 200,
     SpinSpeed = 25,
 })
 
 do
     local Board = Elements:CreateTable({
-        Name = "Example leaderboard",
-        Rank = true, -- # column with medals for the top three
+        Name = "Leaderboard",
+        Rank = true, -- a # column with medals for the top three
         Columns = {
             "Player",
-            { Name = "Kills", Align = "Right", Width = 0.2 },
-            { Name = "Cash", Align = "Right", Width = 0.25, Format = function(Value) return "$" .. Value end },
+            { Name = "Score", Align = "Right", Width = 0.2 },
+            { Name = "Balance", Align = "Right", Width = 0.25, Format = function(Value) return "$" .. Value end },
         },
         Rows = {
-            { "Builderman", 42, 12500 },
-            { "Roblox", 57, 9800 },
-            { game:GetService("Players").LocalPlayer.DisplayName, 31, 15200, Highlight = true }, -- Highlight marks a row
-            { "Guest", 12, 300 },
-            { "Noob", 5, 150 },
+            { "Player One", 42, 12500 },
+            { "Player Two", 57, 9800 },
+            { LocalPlayer.DisplayName, 31, 15200, Highlight = true },
+            { "Player Four", 12, 300 },
+            { "Player Five", 5, 150 },
         },
-        SortBy = "Kills", -- click a header to sort; again to flip; a third time for the given order
+        SortBy = "Score", -- click a header to sort, again to flip, a third time to reset
         MaxRows = 6,
         Callback = function(Row, Index)
-            print("clicked", Row[1], Index)
+            print("[Example] row", Row[1], Index)
         end,
     })
     task.spawn(function()
@@ -18864,66 +19448,73 @@ do
     end)
 end
 
+--------------------------------------------------------------------------------
+-- Popups
+--------------------------------------------------------------------------------
+
 local Popups = Window:CreateTab({ Name = "Popups", Desc = "Notifications and dialogs", Icon = "bell" })
 
-local Toasts = Popups:AddLeftGroupbox({ Name = "Toasts", Icon = "bell" })
+local Notifications = Popups:AddLeftGroupbox({ Name = "Notifications", Icon = "bell" })
 
-Toasts:CreateButton({
-    Name = "Example notification",
-    Callback = function()
-        Airflow:Notify({
-            Title = "Example",
-            Content = "Example notification",
-            Icon = "bell",
-            Type = "Success",
-            Duration = 3,
-        })
-    end,
-})
+for _, Kind in ipairs({ "Success", "Warning", "Error" }) do
+    Notifications:CreateButton({
+        Name = Kind,
+        Callback = function()
+            Library:Notify({
+                Title = Kind,
+                Content = "This is a " .. Kind:lower() .. " notification.",
+                Type = Kind,
+                Duration = 3,
+            })
+        end,
+    })
+end
 
 local Dialogs = Popups:AddRightGroupbox({ Name = "Dialogs", Icon = "message-square" })
 
 Dialogs:CreateButton({
-    Name = "Example confirm",
+    Name = "Confirm",
     Callback = function()
-        Airflow:Confirm({
-            Title = "Example confirm",
-            Content = "Are you sure?",
-            ConfirmText = "Yes",
-            CancelText = "No",
+        Library:Confirm({
+            Title = "Reset progress?",
+            Content = "This cannot be undone.",
+            ConfirmText = "Reset",
+            CancelText = "Cancel",
             Callback = function()
-                print("confirmed")
+                print("[Example] confirmed")
             end,
         })
     end,
 })
 
 Dialogs:CreateButton({
-    Name = "Example dialog",
+    Name = "Dialog",
     Callback = function()
-        Airflow:Dialog({
-            Title = "Example dialog",
-            Content = "Pick one.",
+        Library:Dialog({
+            Title = "Choose a mode",
+            Content = "You can change this later in Settings.",
             Buttons = {
-                { Title = "One", Callback = function() print("one") end },
-                { Title = "Two", Callback = function() print("two") end },
-                { Title = "Three", Variant = "Primary", Callback = function() print("three") end },
+                { Title = "Basic", Callback = function() print("[Example] basic") end },
+                { Title = "Balanced", Callback = function() print("[Example] balanced") end },
+                { Title = "Full", Variant = "Primary", Callback = function() print("[Example] full") end },
             },
         })
     end,
 })
 
--- Cloud configs: browse, preview, install and publish shared configs. The
--- library draws it and your script is the backend. This demo keeps
--- the "cloud" in a table; a real one would call your API in each callback.
+--------------------------------------------------------------------------------
+-- Cloud: the library draws the browser, your script is the backend. This
+-- keeps the store in a table; a real one would call an API in each callback.
+--------------------------------------------------------------------------------
+
 do
-    local Starter = Window:ExportConfig() -- the current settings, as a code
+    local Current = Window:ExportConfig() -- the current settings as a code
     local Hour, Day = 3600, 86400
     local Store = {
-        { Id = "1", Name = "Boss Rush", Author = "Kaiju", Description = "Farms every boss in order with safe timings. Turn on Auto Farm after installing.", Tags = { "Farming", "Boss" }, Installs = 12840, Likes = 3110, Updated = os.time() - 5 * Hour, Code = Starter },
-        { Id = "2", Name = "Legit PvP", Author = "Mira", Description = "Low-key settings that look human.", Tags = { "PvP", "Safe" }, Installs = 5420, Likes = 1987, Updated = os.time() - 2 * Day, Code = Starter },
-        { Id = "3", Name = "AFK Overnight", Author = "Toast", Description = "Slow and steady, won't get you kicked.", Tags = { "Farming", "Safe" }, Installs = 22100, Likes = 4203, Updated = os.time() - 9 * Day, Code = Starter },
-        { Id = "4", Name = "Pretty ESP", Author = "Lune", Description = "", Tags = { "Visuals" }, Installs = 870, Likes = 402, Updated = os.time() - 30 * 60, Code = Starter },
+        { Id = "1", Name = "Balanced", Author = "Example", Description = "Sensible defaults for most players.", Tags = { "General" }, Installs = 12840, Likes = 3110, Updated = os.time() - 5 * Hour, Code = Current },
+        { Id = "2", Name = "Performance", Author = "Example", Description = "Lower intervals for faster runs.", Tags = { "Speed" }, Installs = 5420, Likes = 1987, Updated = os.time() - 2 * Day, Code = Current },
+        { Id = "3", Name = "Overnight", Author = "Example", Description = "Slow and steady for long sessions.", Tags = { "General", "Safe" }, Installs = 22100, Likes = 4203, Updated = os.time() - 9 * Day, Code = Current },
+        { Id = "4", Name = "Minimal", Author = "Example", Description = "", Tags = { "Safe" }, Installs = 870, Likes = 402, Updated = os.time() - 30 * 60, Code = Current },
     }
     local function Find(Id)
         for Index, Config in ipairs(Store) do
@@ -18935,10 +19526,10 @@ do
 
     Window:CreateCloudConfigs({
         Name = "Cloud",
-        Tags = { "Farming", "Boss", "PvP", "Safe", "Visuals" },
+        Tags = { "General", "Speed", "Safe" },
         PageSize = 10,
         OnFetch = function(Query) -- { Search, Sort, Filter, Tag, Page, PageSize, Folder, UserId }
-            task.wait(0.4) -- pretend network
+            task.wait(0.4) -- simulated request
             local Result = {}
             for _, Config in ipairs(Store) do
                 local Match = Query.Search == "" or Config.Name:lower():find(Query.Search:lower(), 1, true) ~= nil
@@ -18962,7 +19553,7 @@ do
             end)
             local First = (Query.Page - 1) * Query.PageSize
             return { table.unpack(Result, First + 1, math.min(First + Query.PageSize, #Result)) }, First + Query.PageSize < #Result
-            -- on failure: return nil, "Server is down"
+            -- on failure: return nil, "reason"
         end,
         OnPublish = function(Config) -- { Name, Description, Tags, Code, Count, Folder, Author, AuthorId, OwnerId, Streamer }
             task.wait(0.3)
@@ -18986,14 +19577,18 @@ do
             local Config = Find(Record.Id)
             Config.Likes += Liked and 1 or -1
         end,
-        OnInstall = function(Record, SavedAs)
+        OnInstall = function(Record)
             Find(Record.Id).Installs += 1
         end,
         OnReport = function(Record, Reason)
-            print("reported", Record.Name, Reason)
+            print("[Example] reported", Record.Name, Reason)
         end,
     })
 end
+
+--------------------------------------------------------------------------------
+-- Settings
+--------------------------------------------------------------------------------
 
 local Settings = Window:CreateTab({ Name = "Settings", Icon = "settings" })
 
@@ -19008,7 +19603,7 @@ Interface:CreateKeybind({
 })
 
 Interface:CreateDropdown({
-    Name = "Toggle button",
+    Name = "Toggle Button",
     Options = { "Mobile only", "Mobile & PC" },
     CurrentOption = "Mobile only",
     AllowNone = false,
@@ -19039,24 +19634,12 @@ Interface:CreateSlider({
     end,
 })
 
-Interface:CreateSlider({
-    Name = "Weather Density",
-    Range = { 25, 200 },
-    Increment = 25,
-    Suffix = "%",
-    CurrentValue = 100,
-    Flag = "WeatherDensity",
-    Callback = function(Value)
-        Window:SetWeatherDensity(Value / 100)
-    end,
-})
-
 Interface:CreateButton({
     Name = "Unload",
     Icon = "power",
     Callback = function()
-        Airflow:Confirm({
-            Title = "Unload?",
+        Library:Confirm({
+            Title = "Unload Example?",
             ConfirmText = "Unload",
             Callback = function()
                 Window:Destroy()
@@ -19068,4 +19651,4 @@ Interface:CreateButton({
 Settings:CreateConfigManager({ Name = "Configs", Side = "Left" }) -- builds its own groupbox
 Settings:CreateThemeManager({ Name = "Themes", Side = "Right" })
 
-Window:LoadAutoload() -- loads the config marked with Set Autoload, if there is one
+Window:LoadAutoload() -- loads the config marked as autoload, if any
