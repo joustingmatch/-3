@@ -141,7 +141,8 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Transparent` | boolean | `false` | See-through window body and sidebar. |
 | `Background` | string | — | Background image behind the window content. Same sources as `SetBackground`. |
 | `BackgroundTransparency` | number | `0.35` | How much of the theme background colour shows through the image, 0 to 1. |
-| `DragSkeleton` | boolean | `true` | While dragging, an accent outline follows the pointer and the window glides into it on release. `false` drags the window itself. |
+| `DragStyle` | string | `"Outline"` | What follows the pointer while dragging; the window glides into it on release. `"Outline"`, `"Brackets"`, `"Ghost"`, `"Frame"`, or `"Off"` to drag the window itself. `DragSkeleton = false` still means `"Off"`. |
+| `CornerRadius` | number | `10` | The window's corner radius in pixels, 0 to 20. Every other rounded corner scales with it. |
 | `OpenButton` | boolean \| table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
 | `ToggleButton.Platform` | string | `"Mobile"` | `"Mobile"` shows it on touch devices only, `"Both"` on PC and mobile. |
@@ -208,7 +209,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetWeatherDensity(n)` / `SetWeatherSpeed(n)` | Particle count and speed multipliers. |
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
-| `SetDragSkeleton(enabled)` | Turn the drag outline on or off. |
+| `SetDragStyle(style)` / `GetDragStyle()` | Set or read the drag style (see `DragStyle`). `SetDragSkeleton(enabled)` still works as an on/off switch. |
 | `SetTransparent(enabled)` / `.Transparent` | See-through window on or off. |
 | `SetBackground(source)` / `.Background` | Background image. `source` is a preset name (`Library.BackgroundPresets`: Deep Violet, Blood Red, Cyanic, Amber Glow, Bloomings, Lavender Pink), an image asset id or `rbxassetid://` link (an Image id, not a Decal id), an http(s) image link (downloaded once to `<FolderName>/backgrounds/cache`, needs `writefile` and `getcustomasset`), or an image file dropped into `<FolderName>/backgrounds`. `nil` or `"None"` removes it. Yields while a link downloads; returns `ok, err`. |
 | `SetBackgroundTransparency(value)` / `ListBackgrounds()` | Image transparency, 0 to 1; presets plus the files in the backgrounds folder. |
@@ -216,6 +217,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetHideName(hidden)` / `SetHideAvatar(hidden)` | Hide the player's name or headshot everywhere, same as the home switches. |
 | `SetUIScale(n)` / `GetUIScale()` / `.UIScale` | Window size, `0.6` to `1.5`. Eases to the new size and nudges the window back on screen. |
 | `SetDensity(mode)` / `GetDensity()` | `"Compact"`, `"Default"` or `"Comfortable"`. Respaces every window live; same as `Airflow:SetDensity(mode)`. Returns the mode it applied. |
+| `Airflow:SetCornerRadius(pixels)` / `GetCornerRadius()` | The window's corner radius, 0 to 20 px (default 10); every rounded corner scales with it and eases to the new size. Returns the radius it applied. |
 | `SelectTab(tab)` | Switch tabs from code. |
 | `CreateTab(opts)` | See [Tab](#tab). |
 | `Rejoin()` / `ServerHop()` / `JoinLowestServer()` | Teleport to this server, a random open one, or the emptiest one. |
@@ -1654,7 +1656,7 @@ Airflow.Assets.Shadow = "rbxassetid://6014261993"
 
 Presets: `Midnight` (default), `Nebula`, `Synthwave`, `Sakura`, `Velvet`, `Rose`, `Crimson`, `Sunset`, `Amber`, `Gold`, `Cyber`, `Toxic`, `Matcha`, `Emerald`, `Aurora`, `Ocean`, `Frost`, `Abyss`, `Mono`, and the themed set `Halloween`, `Haunted`, `Christmas`, `Valentine`, `Lunar`, `Tropical`, `Dracula`, `Coffee`. `SetTheme` takes a preset name or a table of any keys below, as `Color3`, `"#RRGGBB"` or `{ r, g, b }`. Pass `true` as the second argument to skip the fade.
 
-The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim**, **Transparent** and **Drag Skeleton** switches, an **Adaptive Size** switch (on by default; scales the window with the screen resolution), a **UI Scale** slider (applied when you let go of it) and a **Density** picker, a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
+The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weather Mode** pickers, **Dim** and **Transparent** switches, a **Drag Style** picker, an **Adaptive Size** switch (on by default; scales the window with the screen resolution), a **UI Scale** slider (applied when you let go of it), a **Density** picker, a **Corner Radius** slider (0 to 20 px; every corner eases to the new radius), a name box and **Create** to save the current colours, a **Theme** picker for saved themes, **Save** / **Load**, **Delete** / **Set Default**, the current default, and colour pickers for the main colours (`Customize = false` hides them). On start the window applies the player's default (set with **Set Default**, a preset or a saved theme); without one it applies the script's default from `Airflow:SetDefaultTheme` or the `Theme` window option. Themes are saved in `<config folder>/themes`.
 
 ### Properties
 
@@ -1683,7 +1685,7 @@ The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` and `DragSkeleton` (`false` hides those toggles), `AdaptiveSize` (`false` hides the adaptive size switch), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag skeleton, adaptive size, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` (`false` hides the toggle), `DragStyle` (`false` hides the drag style picker), `CornerRadius` (`false` hides the corner radius slider), `AdaptiveSize` (`false` hides the adaptive size switch), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag style, corner radius, adaptive size, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
 

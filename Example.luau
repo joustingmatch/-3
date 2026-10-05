@@ -658,11 +658,36 @@ local function create(className, props, children)
     return inst
 end
 
+-- Corners in pixels follow the player's corner radius setting: each one
+-- remembers the radius it was drawn at, and Library:SetCornerRadius rescales
+-- them all. Scale corners (pills, circles) stay as they are.
+Library.Roundness = 1
+-- A strong table: weak keys would drop the Lua handles for corners nothing
+-- else in Lua holds, and those corners would never rescale. Destroyed ones
+-- are pruned whenever the radius changes.
+Library._cornerBases = {}
+
 local function corner(parent, radius)
-    return create("UICorner", {
-        CornerRadius = radius or UDim.new(0, 8),
+    radius = radius or UDim.new(0, 8)
+    local object = create("UICorner", {
+        CornerRadius = radius.Scale == 0 and UDim.new(0, math.floor(radius.Offset * Library.Roundness + 0.5)) or radius,
         Parent = parent,
     })
+    if radius.Scale == 0 then
+        Library._cornerBases[object] = radius.Offset
+    end
+    return object
+end
+
+-- A corner that ignores the setting, for shapes that animate their own
+-- radius (the minimized island, the morph panels).
+function Library._fixedCorner(parent, radius)
+    return create("UICorner", { CornerRadius = radius, Parent = parent })
+end
+
+-- The radius the window's own corners are drawn at right now.
+function Library._radius(pixels)
+    return math.floor(pixels * Library.Roundness + 0.5)
 end
 
 local function stroke(parent, color, transparency, thickness)
@@ -4353,6 +4378,9 @@ function Library.Window(_, opts)
     if opts.Density ~= nil then
         Library:SetDensity(opts.Density)
     end
+    if opts.CornerRadius ~= nil then
+        Library:SetCornerRadius(opts.CornerRadius, true)
+    end
     local function dispatch(kind)
         return function(...)
             for _, handler in ipairs(self._inputListeners[kind]) do
@@ -4462,7 +4490,7 @@ function Library.Window(_, opts)
     -- square, and nothing overlaps, so it fades evenly when see-through.
     local sidebarFill = create("Frame", {
         Name = "Fill",
-        Size = UDim2.new(1, 12, 1, 0),
+        Size = UDim2.new(1, 24, 1, 0),
         BackgroundColor3 = Theme.Surface,
         BorderSizePixel = 0,
         ZIndex = 0,
@@ -4679,7 +4707,7 @@ function Library.Window(_, opts)
         self._controlsDirty = true
     end))
 
-    self.DragSkeleton = opts.DragSkeleton ~= false
+    self:SetDragStyle(opts.DragStyle or (opts.DragSkeleton == false and "Off" or "Outline"))
     if opts.Transparent then
         self:SetTransparent(true)
     end
@@ -5194,49 +5222,76 @@ function Window:_attachTooltip(element, frame)
     end)())
 end
 
--- With the drag skeleton on, an outline follows the pointer while the window
--- stays put, and the window glides into the outline's spot on release.
+-- While dragging, a stand-in follows the pointer while the window stays put,
+-- and the window glides into its spot on release. The look is the player's
+-- Drag Style; "Off" drags the window itself.
+Library.DragStyles = { "Outline", "Brackets", "Ghost", "Frame", "Off" }
+
 local function makeSkeleton(window)
     local root = window.Root
+    local style = window.DragStyle or "Outline"
     local skeleton = create("Frame", {
         AnchorPoint = root.AnchorPoint,
         Position = root.Position,
         Size = UDim2.fromOffset(root.AbsoluteSize.X, root.AbsoluteSize.Y),
-        BackgroundColor3 = Theme.Accent,
+        BackgroundColor3 = style == "Ghost" and Theme.Background or Theme.Accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ZIndex = 40,
         Parent = window.Gui,
     })
     corner(skeleton, UDim.new(0, 10))
-    local outline = stroke(skeleton, Theme.Accent, 1, 1.5)
-    local brackets = {}
-    for _, spot in ipairs({ Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) }) do
-        local inset = UDim2.new(spot.X, spot.X == 0 and 6 or -6, spot.Y, spot.Y == 0 and 6 or -6)
-        for _, size in ipairs({ UDim2.fromOffset(16, 2), UDim2.fromOffset(2, 16) }) do
-            table.insert(brackets, create("Frame", {
-                AnchorPoint = spot,
-                Position = inset,
-                Size = size,
-                BackgroundColor3 = Theme.Accent,
-                BackgroundTransparency = 1,
-                BorderSizePixel = 0,
-                Parent = skeleton,
-            }))
+    -- Each part fades from hidden to its shown values, and back on release.
+    local parts = {}
+    local function part(object, shown)
+        local hidden = {}
+        for key in pairs(shown) do
+            hidden[key] = 1
+        end
+        table.insert(parts, { Object = object, Shown = shown, Hidden = hidden })
+    end
+    local function brackets(length, inset)
+        for _, spot in ipairs({ Vector2.new(0, 0), Vector2.new(1, 0), Vector2.new(0, 1), Vector2.new(1, 1) }) do
+            local at = UDim2.new(spot.X, spot.X == 0 and inset or -inset, spot.Y, spot.Y == 0 and inset or -inset)
+            for _, size in ipairs({ UDim2.fromOffset(length, 2), UDim2.fromOffset(2, length) }) do
+                local bracket = create("Frame", {
+                    AnchorPoint = spot,
+                    Position = at,
+                    Size = size,
+                    BackgroundColor3 = Theme.Accent,
+                    BackgroundTransparency = 1,
+                    BorderSizePixel = 0,
+                    Parent = skeleton,
+                })
+                corner(bracket, UDim.new(1, 0))
+                part(bracket, { BackgroundTransparency = 0 })
+            end
         end
     end
-    local scale = create("UIScale", { Scale = 1.02, Parent = skeleton })
-    tween(skeleton, { BackgroundTransparency = 0.92 }, 0.15, Enum.EasingStyle.Quad)
-    tween(outline, { Transparency = 0.2 }, 0.15, Enum.EasingStyle.Quad)
-    tween(scale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
-    for _, bracket in ipairs(brackets) do
-        tween(bracket, { BackgroundTransparency = 0 }, 0.15, Enum.EasingStyle.Quad)
+    if style == "Brackets" then
+        -- Just the four corners of the window, a little longer.
+        brackets(22, 0)
+    elseif style == "Ghost" then
+        -- A see-through copy of the window's panel.
+        part(skeleton, { BackgroundTransparency = 0.35 })
+        part(stroke(skeleton, Theme.Stroke, 1, 1), { Transparency = 0 })
+    elseif style == "Frame" then
+        -- A single quiet line, nothing else.
+        part(stroke(skeleton, Theme.StrokeHover, 1, 1), { Transparency = 0 })
+    else
+        -- Outline: a faint accent wash, an outline and corner brackets.
+        part(skeleton, { BackgroundTransparency = 0.92 })
+        part(stroke(skeleton, Theme.Accent, 1, 1.5), { Transparency = 0.2 })
+        brackets(16, 6)
     end
+    local scale = create("UIScale", { Scale = 1.02, Parent = skeleton })
+    for _, item in ipairs(parts) do
+        tween(item.Object, item.Shown, 0.15, Enum.EasingStyle.Quad)
+    end
+    tween(scale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
     local function fade()
-        tween(skeleton, { BackgroundTransparency = 1 }, 0.2, Enum.EasingStyle.Quad)
-        tween(outline, { Transparency = 1 }, 0.2, Enum.EasingStyle.Quad)
-        for _, bracket in ipairs(brackets) do
-            tween(bracket, { BackgroundTransparency = 1 }, 0.2, Enum.EasingStyle.Quad)
+        for _, item in ipairs(parts) do
+            tween(item.Object, item.Hidden, 0.2, Enum.EasingStyle.Quad)
         end
         task.delay(0.22, function()
             skeleton:Destroy()
@@ -5343,8 +5398,27 @@ function Window:_enableDrag()
     end)
 end
 
+-- One of Library.DragStyles; anything else falls back to "Outline".
+-- Returns the style it settled on.
+function Window:SetDragStyle(style)
+    style = table.find(Library.DragStyles, style) and style or "Outline"
+    self.DragStyle = style
+    self.DragSkeleton = style ~= "Off"
+    return style
+end
+
+function Window:GetDragStyle()
+    return self.DragStyle
+end
+
+-- The older on/off switch: off is the "Off" style, on brings back the
+-- default style if it was off.
 function Window:SetDragSkeleton(enabled)
-    self.DragSkeleton = enabled ~= false
+    if enabled == false then
+        self:SetDragStyle("Off")
+    elseif self.DragStyle == "Off" or not self.DragStyle then
+        self:SetDragStyle("Outline")
+    end
 end
 
 -- The sidebar's divider is a grab strip: dragging it sets the rail's width,
@@ -5780,7 +5854,7 @@ function Window:_showLoader(opts)
             Size = UDim2.fromOffset(target.X.Offset * fit, target.Y.Offset * fit),
             Position = UDim2.fromScale(0.5, 0.5),
         }, 0.5, Enum.EasingStyle.Quint)
-        tween(loaderCorner, { CornerRadius = UDim.new(0, 10) }, 0.5, Enum.EasingStyle.Quint)
+        tween(loaderCorner, { CornerRadius = UDim.new(0, Library._radius(10)) }, 0.5, Enum.EasingStyle.Quint)
         tween(loaderScale, { Scale = 1 }, 0.5, Enum.EasingStyle.Quint)
 
         task.delay(0.28, function()
@@ -7389,6 +7463,31 @@ function Library.Colorize(...)
     return '<font color="' .. hexOf(resolved) .. '">' .. text .. "</font>"
 end
 
+-- The window's corner radius in pixels, 0 (square) to 20; every other
+-- rounded corner scales with it. The default is 10. Corners ease to the new
+-- radius instead of jumping. Returns the radius it settled on.
+function Library:SetCornerRadius(pixels, instant)
+    pixels = math.clamp(math.floor((tonumber(pixels) or 10) + 0.5), 0, 20)
+    Library.Roundness = pixels / 10
+    for object, base in pairs(Library._cornerBases) do
+        if not object.Parent then
+            Library._cornerBases[object] = nil
+        else
+            local radius = UDim.new(0, math.floor(base * Library.Roundness + 0.5))
+            if instant then
+                object.CornerRadius = radius
+            else
+                tween(object, { CornerRadius = radius }, 0.25, Enum.EasingStyle.Quint)
+            end
+        end
+    end
+    return pixels
+end
+
+function Library:GetCornerRadius()
+    return math.floor(Library.Roundness * 10 + 0.5)
+end
+
 function Library:SetTheme(theme, instant)
     if type(theme) == "string" then
         local found = Library.ThemePresets[theme]
@@ -8851,7 +8950,7 @@ function Tab:ThemeManager(opts)
     local themes, status, defaultRow, presets
     local weather, weatherMode, dim, transparent, dragSkeleton
     local background, backgroundInput, backgroundOpacity, backgroundLabel
-    local uiScale, density, adaptive
+    local uiScale, density, adaptive, cornerRadius
 
     local function notify(ok, title, detail)
         window:Notify({ Title = title, Content = detail, Type = ok and "Success" or "Error", Duration = 3 })
@@ -8931,19 +9030,22 @@ function Tab:ThemeManager(opts)
             end,
         })
     end
-    if opts.DragSkeleton ~= false then
-        dragSkeleton = host:Toggle({
-            Name = "Drag Skeleton",
-            Default = window.DragSkeleton,
-            Callback = function(value)
-                window:SetDragSkeleton(value)
+    if opts.DragSkeleton ~= false and opts.DragStyle ~= false then
+        dragSkeleton = host:Dropdown({
+            Name = "Drag Style",
+            Options = Library.DragStyles,
+            Default = window.DragStyle,
+            AllowNone = false,
+            Callback = function(style)
+                if style then
+                    window:SetDragStyle(style)
+                end
             end,
         })
     end
     if opts.AdaptiveSize ~= false then
         adaptive = host:Toggle({
             Name = "Adaptive Size",
-            Tooltip = "Scales the window to your screen resolution, bigger on large monitors. UI Scale applies on top.",
             Default = window:GetAdaptiveSize(),
             Callback = function(value)
                 window:SetAdaptiveSize(value)
@@ -8980,6 +9082,19 @@ function Tab:ThemeManager(opts)
                 if mode then
                     Library:SetDensity(mode)
                 end
+            end,
+        })
+    end
+    if opts.CornerRadius ~= false then
+        cornerRadius = host:Slider({
+            Name = "Corner Radius",
+            Min = 0,
+            Max = 20,
+            Increment = 1,
+            Default = Library:GetCornerRadius(),
+            Suffix = "px",
+            Callback = function(value)
+                Library:SetCornerRadius(value)
             end,
         })
     end
@@ -9200,7 +9315,8 @@ function Tab:ThemeManager(opts)
                 -- if-expressions, not and/or: a switched-off value is false, not nil.
                 Dim = if dim then window._backdropDim == true else nil,
                 Transparent = if transparent then window.Transparent == true else nil,
-                DragSkeleton = if dragSkeleton then window.DragSkeleton == true else nil,
+                DragStyle = dragSkeleton and window.DragStyle or nil,
+                CornerRadius = cornerRadius and Library:GetCornerRadius() or nil,
                 UIScale = uiScale and window:GetUIScale() or nil,
                 AdaptiveSize = if adaptive then window:GetAdaptiveSize() else nil,
                 Density = density and Library.Density or nil,
@@ -9245,9 +9361,15 @@ function Tab:ThemeManager(opts)
                 window:SetTransparent(value.Transparent)
                 transparent:Set(value.Transparent, true)
             end
-            if dragSkeleton and type(value.DragSkeleton) == "boolean" then
+            if dragSkeleton and type(value.DragStyle) == "string" then
+                dragSkeleton:Set(window:SetDragStyle(value.DragStyle), true)
+            elseif dragSkeleton and type(value.DragSkeleton) == "boolean" then
+                -- Configs saved before drag styles.
                 window:SetDragSkeleton(value.DragSkeleton)
-                dragSkeleton:Set(value.DragSkeleton, true)
+                dragSkeleton:Set(window.DragStyle, true)
+            end
+            if cornerRadius and tonumber(value.CornerRadius) then
+                cornerRadius:Set(Library:SetCornerRadius(value.CornerRadius), true)
             end
             if adaptive and type(value.AdaptiveSize) == "boolean" then
                 window:SetAdaptiveSize(value.AdaptiveSize)
@@ -17497,7 +17619,7 @@ local function makeGhost(window, position, size, radius)
         ZIndex = 29,
         Parent = window.Gui,
     })
-    local ghostCorner = corner(ghost, UDim.new(0, radius))
+    local ghostCorner = Library._fixedCorner(ghost, UDim.new(0, radius))
     local ghostStroke = stroke(ghost, Theme.Stroke, 1)
     window._ghost = ghost
     return ghost, ghostStroke, ghostCorner
@@ -17542,7 +17664,7 @@ function Window:_buildMiniBar()
         ZIndex = 30,
         Parent = gui,
     })
-    local islandCorner = corner(island, UDim.new(0, Mini.Height / 2))
+    local islandCorner = Library._fixedCorner(island, UDim.new(0, Mini.Height / 2))
     local islandScale = create("UIScale", { Parent = island })
     self._miniScale = islandScale
     -- How far the split bubble is out of the pill: drawn back in while the
@@ -18503,7 +18625,7 @@ function Window:Minimize()
     end
 
     -- 1. The ghost fades in over the window while it eases back a touch.
-    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, 10)
+    local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition, fromSize, Library._radius(10))
     ghost.BackgroundTransparency = fromAlpha
     ghostStroke.Transparency = fromAlpha
     tween(ghost, { BackgroundTransparency = 0 }, 0.11, Enum.EasingStyle.Quad)
@@ -18588,7 +18710,7 @@ function Window:Restore()
     ghostStroke.Transparency = fromAlpha
     tween(ghost, { BackgroundTransparency = 0 }, 0.1, Enum.EasingStyle.Quad)
     tween(ghostStroke, { Transparency = 0 }, 0.1, Enum.EasingStyle.Quad)
-    morphGhost(ghost, ghostCorner, target, size, 10, 0.4)
+    morphGhost(ghost, ghostCorner, target, size, Library._radius(10), 0.4)
     tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.45)
 
     -- Shown under the ghost a little early so its first frames are drawn
@@ -18666,12 +18788,12 @@ function Window:Toggle(open)
         fromAlpha = self._ghost.BackgroundTransparency
     end
     if open then
-        local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition or centre - shrunk / 2, fromSize or shrunk, 10)
+        local ghost, ghostStroke, ghostCorner = makeGhost(self, fromPosition or centre - shrunk / 2, fromSize or shrunk, Library._radius(10))
         ghost.BackgroundTransparency = fromAlpha or 1
         ghostStroke.Transparency = fromAlpha or 1
         tween(ghost, { BackgroundTransparency = 0 }, 0.12, Enum.EasingStyle.Quad)
         tween(ghostStroke, { Transparency = 0 }, 0.12, Enum.EasingStyle.Quad)
-        morphGhost(ghost, ghostCorner, centre - size / 2, size, 10, 0.3)
+        morphGhost(ghost, ghostCorner, centre - size / 2, size, Library._radius(10), 0.3)
         tween(self.Shadow, { ImageTransparency = self._shadowRest }, 0.3)
         -- Shown under the ghost once it covers the spot, then revealed.
         task.delay(0.2, function()
@@ -18691,7 +18813,7 @@ function Window:Toggle(open)
         self:_closePopups()
         local position = fromPosition or self.Root.AbsolutePosition - gui.AbsolutePosition
         local current = fromSize or self.Root.AbsoluteSize
-        local ghost, ghostStroke, ghostCorner = makeGhost(self, position, current, 10)
+        local ghost, ghostStroke, ghostCorner = makeGhost(self, position, current, Library._radius(10))
         ghost.BackgroundTransparency = fromAlpha or 1
         ghostStroke.Transparency = fromAlpha or 1
         tween(ghost, { BackgroundTransparency = 0 }, 0.08, Enum.EasingStyle.Quad)
@@ -18702,7 +18824,7 @@ function Window:Toggle(open)
                 return
             end
             self.Root.Visible = false
-            morphGhost(ghost, ghostCorner, centre - shrunk / 2, shrunk, 10, 0.2)
+            morphGhost(ghost, ghostCorner, centre - shrunk / 2, shrunk, Library._radius(10), 0.2)
             dissolve(self, ghost, ghostStroke, 0.16)
         end)
     end
