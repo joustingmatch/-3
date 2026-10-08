@@ -142,6 +142,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `Background` | string | — | Background image behind the window content. Same sources as `SetBackground`. |
 | `BackgroundTransparency` | number | `0.35` | How much of the theme background colour shows through the image, 0 to 1. |
 | `DragStyle` | string | `"Outline"` | What follows the pointer while dragging; the window glides into it on release. `"Outline"`, `"Brackets"`, `"Ghost"`, `"Frame"`, or `"Off"` to drag the window itself. `DragSkeleton = false` still means `"Off"`. |
+| `IslandStyle` | string | `"Show on Hover"` | How the minimized island shows the session card: `"Show on Hover"` or `"Always Show"` (kept open while minimized). |
 | `CornerRadius` | number | `10` | The window's corner radius in pixels, 0 to 20. Every other rounded corner scales with it. |
 | `OpenButton` | boolean \| table | touch-only devices without a toggle button | Floating pill that reopens the window. `true` / `false` to force, `{ Title, Icon }` to customise. |
 | `ToggleButton` | boolean \| table | `{ Platform = "Mobile" }` | Square button that minimizes and restores the window. `false` removes it. |
@@ -210,6 +211,7 @@ The sidebar is an inset rounded rail: the logo on top, then one tile per tab wit
 | `SetKeybind(keyCode)` | Change the hide key. Updates the chip on the home tab. |
 | `SetKeepOnScreen(enabled)` | Turn the viewport clamp on or off. |
 | `SetDragStyle(style)` / `GetDragStyle()` | Set or read the drag style (see `DragStyle`). `SetDragSkeleton(enabled)` still works as an on/off switch. |
+| `SetIslandStyle(style)` / `GetIslandStyle()` | Set or read the island style (see `IslandStyle`). |
 | `SetTransparent(enabled)` / `.Transparent` | See-through window on or off. |
 | `SetBackground(source)` / `.Background` | Background image. `source` is a preset name (`Library.BackgroundPresets`: Deep Violet, Blood Red, Cyanic, Amber Glow, Bloomings, Lavender Pink), an image asset id or `rbxassetid://` link (an Image id, not a Decal id), an http(s) image link (downloaded once to `<FolderName>/backgrounds/cache`, needs `writefile` and `getcustomasset`), or an image file dropped into `<FolderName>/backgrounds`. `nil` or `"None"` removes it. Yields while a link downloads; returns `ok, err`. |
 | `SetBackgroundTransparency(value)` / `ListBackgrounds()` | Image transparency, 0 to 1; presets plus the files in the backgrounds folder. |
@@ -398,7 +400,7 @@ Mobs:CreateLabel("Status: idle")
 Auto:Expand()
 ```
 
-Inside a groupbox, elements are compact rows without their own card. Dropdowns and inputs take the same share of the row so their boxes line up, and buttons fill the width. Click the `−` on the header to collapse it. Without `Side`, each new groupbox goes to the column with fewer boxes.
+Inside a groupbox, elements are compact rows without their own card. Dropdowns and inputs take the same share of the row so their boxes line up, and buttons fill the width. Click the header to collapse it. The pop-out button beside the chevron lifts the groupbox into a floating panel you can drag anywhere by its header; it keeps working while you switch tabs or minimize, and a slot in its column (or the same button) docks it back. Without `Side`, each new groupbox goes to the column with fewer boxes.
 
 ### Properties
 
@@ -408,6 +410,8 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | `Icon` | string \| number \| table | — | Accent icon on the right of the header. |
 | `Side` | `"Left"` \| `"Right"` \| 1 \| 2 | balanced | Column. |
 | `Collapsed` | boolean | `false` | Start collapsed. |
+| `PopOut` | boolean | `true` | Show the pop-out button. |
+| `PoppedOut` | boolean | `false` | Start popped out. |
 | `Visible` | boolean | `true` | Start hidden. |
 
 ### Handle
@@ -417,6 +421,7 @@ Inside a groupbox, elements are compact rows without their own card. Dropdowns a
 | every element constructor | Adds a row to the groupbox. |
 | `Collapse()` / `Expand()` / `SetCollapsed(bool)` | Animate closed or open. |
 | `IsCollapsed()` | Current state. |
+| `PopOut()` / `Dock()` / `IsPoppedOut()` | Float the groupbox in its own draggable panel, or fly it back to its column. |
 | `SetTitle(text)` | Rename the header. |
 | `SetVisible(bool)` / `IsVisible()` | Hide or show the whole card. Its column closes the gap. |
 | `Destroy()` | Remove the groupbox and its elements. |
@@ -1685,7 +1690,7 @@ The theme manager is a groupbox with a **Preset** picker, **Weather** and **Weat
 | `Airflow.ThemePresets` | The presets, by name. Add your own. |
 | `Window:SaveTheme(name)` / `LoadTheme(name)` / `DeleteTheme(name)` / `ListThemes()` | Saved themes. `LoadTheme` also accepts a preset name. |
 | `Window:SetDefaultTheme(name?)` / `GetDefaultTheme()` | The player's saved default, applied on start. Wins over the script default. |
-| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` (`false` hides the toggle), `DragStyle` (`false` hides the drag style picker), `CornerRadius` (`false` hides the corner radius slider), `AdaptiveSize` (`false` hides the adaptive size switch), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag style, corner radius, adaptive size, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
+| `Tab:CreateThemeManager(opts)` | `Name`, `Icon`, `Side`, `Customize`, `Colors = { { key, label } }`, `Weather` (`false` hides the weather dropdown), `Dim` (`false` hides the dim toggle), `Transparent` (`false` hides the toggle), `DragStyle` (`false` hides the drag style picker), `IslandStyle` (`false` hides the Dynamic Island picker), `CornerRadius` (`false` hides the corner radius slider), `AdaptiveSize` (`false` hides the adaptive size switch), `Scale` and `Density` (`false` hides the UI scale slider or the density picker), `Background` (`false` hides the background image dropdown, id/link box and opacity slider). The weather dropdowns cover the weather and its mode, screen-wide or inside the window. Configs save the theme (palette, preset or theme name, weather, dim, transparent, drag style, island style, corner radius, adaptive size, UI scale, density, background image and opacity) under one hidden flag, `__Theme` by default; `Flag` renames it, `Flag = false` leaves the theme out of configs. |
 
 `Airflow.Touch` is `true` on touch-only devices; cards, chips and hit areas are larger there automatically.
 

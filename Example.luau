@@ -2336,8 +2336,9 @@ function Tab:Dropdown(opts)
         local scale = window.Scale.Scale
         -- Shrink the list to whichever side of the chip has more room, so the
         -- popup never runs off a short window (phones in landscape).
-        local bodyHeight = window.Body.AbsoluteSize.Y / scale
-        local chipTop = (chip.AbsolutePosition.Y - window.Body.AbsolutePosition.Y) / scale
+        local host = window:_popupHost(frame)
+        local bodyHeight = host.AbsoluteSize.Y / scale
+        local chipTop = (chip.AbsolutePosition.Y - host.AbsolutePosition.Y) / scale
         local room = math.max(bodyHeight - (chipTop + chip.AbsoluteSize.Y / scale) - 14, chipTop - 14) - top - 16
         if room >= ROW then
             listHeight = math.min(listHeight, room)
@@ -2345,7 +2346,7 @@ function Tab:Dropdown(opts)
         list.Position = UDim2.fromOffset(0, top)
         list.Size = UDim2.new(1, 0, 0, listHeight)
         local width = math.max(math.floor(chip.AbsoluteSize.X / scale), opts.PopupWidth or 210)
-        local bodyWidth = window.Body.AbsoluteSize.X / scale
+        local bodyWidth = host.AbsoluteSize.X / scale
         width = math.min(width, math.max(bodyWidth - 16, 120))
         targetSize = Vector2.new(width, top + listHeight + 16)
         inner.Size = UDim2.new(1, 0, 0, targetSize.Y)
@@ -2371,7 +2372,7 @@ function Tab:Dropdown(opts)
 
     local scroller = nil
     local function place()
-        local body = window.Body
+        local body = window:_popupHost(frame)
         local scale = window.Scale.Scale
         if scroller then
             local centre = chip.AbsolutePosition + chip.AbsoluteSize / 2
@@ -2445,6 +2446,8 @@ function Tab:Dropdown(opts)
                 lockedScroller = scroller
                 scroller.ScrollingEnabled = false
             end
+            -- Drawn over a floating panel when the dropdown lives in one.
+            popup.Parent = window:_popupHost(frame)
             filter = ""
             searchBox.Text = ""
             searchBox.PlaceholderText = opts.SearchPlaceholder or (#options > 6 and ("Search " .. #options .. " options") or "Search")
@@ -4708,6 +4711,7 @@ function Library.Window(_, opts)
     end))
 
     self:SetDragStyle(opts.DragStyle or (opts.DragSkeleton == false and "Off" or "Outline"))
+    self:SetIslandStyle(opts.IslandStyle)
     if opts.Transparent then
         self:SetTransparent(true)
     end
@@ -4935,7 +4939,7 @@ function Window:_refreshControls()
 end
 
 function Window:_overControl(point)
-    if self._dialog then
+    if self._dialog or self:_overPopout(point) then
         return true
     end
     if self._controlsDirty then
@@ -5409,6 +5413,25 @@ end
 
 function Window:GetDragStyle()
     return self.DragStyle
+end
+
+-- How the minimized island shows the session card: opening it while
+-- hovered, or keeping it open the whole time it's minimized.
+Library.IslandStyles = { "Show on Hover", "Always Show" }
+
+-- One of Library.IslandStyles; anything else falls back to "Show on Hover".
+-- Returns the style it settled on.
+function Window:SetIslandStyle(style)
+    style = table.find(Library.IslandStyles, style) and style or "Show on Hover"
+    self.IslandStyle = style
+    if self._islandSettle then
+        self._islandSettle()
+    end
+    return style
+end
+
+function Window:GetIslandStyle()
+    return self.IslandStyle
 end
 
 -- The older on/off switch: off is the "Off" style, on brings back the
@@ -8258,9 +8281,40 @@ function Tab:Groupbox(opts, icon)
         Parent = header,
     })
     applyIcon(collapseButton, "chevron-down")
+    -- Beside the chevron, a button that pops the box out into a floating
+    -- panel (and docks it back once it's out). PopOut = false leaves it off.
+    local canPop = opts.PopOut ~= false
+    local popButton, popIcon
+    if canPop then
+        popButton = create("TextButton", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -34, 0.5, 0),
+            Size = UDim2.fromOffset(24, 24),
+            BackgroundColor3 = Theme.Surface2,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            ZIndex = 3,
+            Parent = header,
+        })
+        corner(popButton, UDim.new(0, 6))
+        popIcon = create("ImageLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(13, 13),
+            BackgroundTransparency = 1,
+            ImageColor3 = Theme.Muted,
+            ImageTransparency = TOUCH and 0 or 0.45,
+            ScaleType = Enum.ScaleType.Fit,
+            ZIndex = 3,
+            Parent = popButton,
+        })
+        applyIcon(popIcon, "picture-in-picture-2")
+    end
     local title = label({
         Position = UDim2.fromOffset(titleX, 0),
-        Size = UDim2.new(1, -(titleX + 40), 1, 0),
+        Size = UDim2.new(1, -(titleX + (canPop and 66 or 40)), 1, 0),
         Text = opts.Name or "Groupbox",
         TextSize = 13,
         FontFace = Fonts.Bold,
@@ -8379,6 +8433,9 @@ function Tab:Groupbox(opts, icon)
     local function hover(on)
         local duration = on and 0.15 or 0.25
         tween(collapseButton, { ImageColor3 = on and Theme.Text or Theme.Muted }, duration)
+        if popIcon and not TOUCH then
+            tween(popIcon, { ImageTransparency = on and 0 or 0.45 }, duration)
+        end
     end
     header.MouseEnter:Connect(function()
         hover(true)
@@ -8389,12 +8446,329 @@ function Tab:Groupbox(opts, icon)
     local isTap = tapGuard(header, function()
         return box:FindFirstAncestorWhichIsA("ScrollingFrame")
     end)
+    -- Popping out: the box itself is lifted out of its column into a panel
+    -- on the window's pop-out layer, and a slot holds its place in the column
+    -- (pressing the slot docks it back). The header drags the panel; a drop
+    -- is clamped on screen and the spot is remembered for the next pop-out.
+    local popped, popGeneration = false, 0
+    local panel, panelScale, panelShadow, slot, stopPanel
+    local dragStart, dragOrigin, dragMoved, suppressClick = nil, nil, false, false
+    local animating = false
+
+    local function layerScale()
+        return math.max(window.Scale.Scale, 0.05)
+    end
+    local function toLayer(point)
+        return (point - window._popLayer.AbsolutePosition) / layerScale()
+    end
+    -- Keeps a panel's top-centre spot on screen, header always reachable.
+    local function clampSpot(spot, width, height)
+        local view = window._popLayer.AbsoluteSize / layerScale()
+        local margin = 8
+        local x = math.clamp(spot.X, width / 2 + margin, math.max(view.X - width / 2 - margin, width / 2 + margin))
+        local y = math.clamp(spot.Y, margin, math.max(view.Y - math.min(height, 120) - margin, margin))
+        return Vector2.new(x, y)
+    end
+    local function closeInner()
+        for _, element in ipairs(group._items) do
+            if element._onHide then
+                element._onHide()
+            end
+            if element.Open and type(element.SetOpen) == "function" then
+                element:SetOpen(false)
+            end
+        end
+    end
+    local function setPopIcon(out)
+        if popIcon then
+            applyIcon(popIcon, out and "minimize-2" or "picture-in-picture-2")
+        end
+    end
+
+    local function popOut()
+        if popped or not canPop or not box.Parent or group._destroyed then
+            return
+        end
+        -- A dock still in flight lands first, so the box is back in its column.
+        if group._settleDock then
+            group._settleDock()
+        end
+        local layer = window:_popoutLayer()
+        popped = true
+        group._popped = true
+        popGeneration += 1
+        local current = popGeneration
+        closeInner()
+        window:_closePopups()
+        local scale = layerScale()
+        local column = box.Parent
+        local from = toLayer(box.AbsolutePosition)
+        local width = box.AbsoluteSize.X / scale
+        local height = box.AbsoluteSize.Y / scale
+
+        -- The slot left behind: starts at the box's height so nothing below
+        -- jumps, then eases down to a slim bar.
+        slot = create("TextButton", {
+            Size = UDim2.new(1, 0, 0, height),
+            BackgroundColor3 = Theme.Surface2,
+            BackgroundTransparency = 0.6,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            ClipsDescendants = true,
+            LayoutOrder = box.LayoutOrder,
+            Parent = column,
+        })
+        slot:SetAttribute("NoDrag", true)
+        corner(slot, UDim.new(0, 10))
+        stroke(slot, Theme.Stroke, 1).Transparency = 0.3
+        local slotLabel = label({
+            Size = UDim2.new(1, -24, 0, 40),
+            Position = UDim2.fromOffset(12, 0),
+            Text = Library._rich(group.Name) .. '<font transparency="0.4">  ·  popped out, click to dock</font>',
+            TextSize = 12,
+            FontFace = Fonts.Regular,
+            TextColor3 = Theme.Muted,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            RichText = true,
+            TextTransparency = 1,
+            Parent = slot,
+        })
+        local thisSlot = slot
+        slot.MouseEnter:Connect(function()
+            tween(thisSlot, { BackgroundTransparency = 0.35 }, 0.15)
+        end)
+        slot.MouseLeave:Connect(function()
+            tween(thisSlot, { BackgroundTransparency = 0.6 }, 0.25)
+        end)
+        slot.MouseButton1Click:Connect(function()
+            if slot == thisSlot then
+                group:Dock()
+            end
+        end)
+        tween(slot, { Size = UDim2.new(1, 0, 0, 40) }, 0.42, Enum.EasingStyle.Quint)
+        tween(slotLabel, { TextTransparency = 0 }, 0.3)
+        slot.Visible = box.Visible
+
+        panel = create("Frame", {
+            Name = "PopOut",
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.fromOffset(from.X + width / 2, from.Y),
+            Size = UDim2.fromOffset(width, height),
+            BackgroundTransparency = 1,
+            Parent = layer,
+        })
+        panel:SetAttribute("NoDrag", true)
+        panelScale = create("UIScale", { Parent = panel })
+        panelShadow = create("ImageLabel", {
+            Position = UDim2.fromOffset(-24, -18),
+            Size = UDim2.new(1, 48, 1, 44),
+            BackgroundTransparency = 1,
+            Image = Assets.Shadow,
+            ImageColor3 = Color3.new(0, 0, 0),
+            ImageTransparency = 1,
+            ScaleType = Enum.ScaleType.Slice,
+            SliceCenter = Rect.new(49, 49, 450, 450),
+            ZIndex = 0,
+            Parent = panel,
+        })
+        table.insert(window._popPanels, panel)
+        box.Parent = panel
+        window._controlsDirty = true
+        setPopIcon(true)
+
+        -- Lifts off the column: a spring up and out to its float spot, with
+        -- the shadow deepening under it.
+        local spot = clampSpot(group._popSpot or Vector2.new(from.X + width / 2 + 22, from.Y - 14), width, height)
+        animating = true
+        panelScale.Scale = 0.97
+        tween(panel, { Position = UDim2.fromOffset(spot.X, spot.Y) }, 0.5, Enum.EasingStyle.Quint)
+        tween(panelScale, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
+        tween(panelShadow, { ImageTransparency = 0.35 }, 0.4)
+        task.delay(0.5, function()
+            if popGeneration == current then
+                animating = false
+            end
+        end)
+
+        -- Each frame: the panel follows the box's height (folding, rows
+        -- coming and going), mirrors its visibility, and stays on screen.
+        local thisPanel = panel
+        stopPanel = window:_listen("Render", function()
+            if panel ~= thisPanel or not thisPanel.Parent then
+                return
+            end
+            local boxHeight = box.AbsoluteSize.Y / layerScale()
+            if math.abs(thisPanel.Size.Y.Offset - boxHeight) > 0.5 then
+                thisPanel.Size = UDim2.fromOffset(thisPanel.Size.X.Offset, boxHeight)
+            end
+            thisPanel.Visible = box.Visible
+            if slot then
+                slot.Visible = box.Visible
+            end
+            if not animating and not dragStart then
+                local position = Vector2.new(thisPanel.Position.X.Offset, thisPanel.Position.Y.Offset)
+                local clamped = clampSpot(position, thisPanel.Size.X.Offset, boxHeight)
+                if (clamped - position).Magnitude > 0.5 then
+                    thisPanel.Position = UDim2.fromOffset(clamped.X, clamped.Y)
+                end
+            end
+        end)
+    end
+
+    local function dock(instant)
+        if not popped then
+            return
+        end
+        popped = false
+        group._popped = false
+        popGeneration += 1
+        dragStart, dragMoved, suppressClick = nil, false, false
+        closeInner()
+        window:_closePopups()
+        local oldPanel, oldSlot, oldStop, oldScale, oldShadow = panel, slot, stopPanel, panelScale, panelShadow
+        panel, slot, stopPanel = nil, nil, nil
+        setPopIcon(false)
+        group._popSpot = Vector2.new(oldPanel.Position.X.Offset, oldPanel.Position.Y.Offset)
+        local settled = false
+        local function settle()
+            if settled then
+                return
+            end
+            settled = true
+            if group._settleDock == settle then
+                group._settleDock = nil
+            end
+            if oldStop then
+                oldStop()
+            end
+            local index = table.find(window._popPanels, oldPanel)
+            if index then
+                table.remove(window._popPanels, index)
+            end
+            -- Back into the column, unless it was popped again meanwhile.
+            if box.Parent == oldPanel then
+                if oldSlot and oldSlot.Parent and not group._destroyed then
+                    box.Parent = oldSlot.Parent
+                    box.LayoutOrder = oldSlot.LayoutOrder
+                end
+            end
+            if oldSlot then
+                oldSlot:Destroy()
+            end
+            if box.Parent ~= oldPanel then
+                oldPanel:Destroy()
+            end
+            animating = false
+            window._controlsDirty = true
+        end
+        group._settleDock = settle
+        -- Flies home only when its slot is on screen; otherwise (another tab,
+        -- the window hidden) it just drops back into place.
+        local canFly = not instant and oldSlot and oldSlot.Parent and window.Root.Visible and box.Visible
+            and oldSlot.AbsoluteSize.X > 0 and isShown(oldSlot, window.Body, oldSlot.AbsolutePosition + oldSlot.AbsoluteSize / 2)
+        if not canFly then
+            settle()
+            return
+        end
+        animating = true
+        local scale = layerScale()
+        local height = box.AbsoluteSize.Y / scale
+        local width = oldSlot.AbsoluteSize.X / scale
+        tween(oldSlot, { Size = UDim2.new(1, 0, 0, height) }, 0.36, Enum.EasingStyle.Quint)
+        local oldLabel = oldSlot:FindFirstChildWhichIsA("TextLabel")
+        if oldLabel then
+            tween(oldLabel, { TextTransparency = 1 }, 0.12)
+        end
+        -- The slot's top stays put as it grows, so its spot is the landing.
+        local target = toLayer(oldSlot.AbsolutePosition)
+        tween(oldPanel, {
+            Position = UDim2.fromOffset(target.X + width / 2, target.Y),
+            Size = UDim2.fromOffset(width, height),
+        }, 0.36, Enum.EasingStyle.Quint)
+        tween(oldScale, { Scale = 1 }, 0.2)
+        tween(oldShadow, { ImageTransparency = 1 }, 0.3)
+        task.delay(0.37, settle)
+    end
+
+    -- Dragging the floating panel by its header.
+    header.InputBegan:Connect(function(input)
+        if not popped or not isPress(input) or not panel then
+            return
+        end
+        dragStart = Vector2.new(input.Position.X, input.Position.Y)
+        dragOrigin = Vector2.new(panel.Position.X.Offset, panel.Position.Y.Offset)
+        dragMoved = false
+        suppressClick = false
+    end)
+    window:_listen("Changed", function(input)
+        if not dragStart or not panel or not isMove(input) then
+            return
+        end
+        local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStart
+        if not dragMoved then
+            if delta.Magnitude < (TOUCH and 8 or 5) then
+                return
+            end
+            dragMoved, suppressClick = true, true
+            animating = false
+            closeInner()
+            window:_closePopups()
+            tween(panelScale, { Scale = 1.025 }, 0.18, Enum.EasingStyle.Quint)
+            tween(panelShadow, { ImageTransparency = 0.15 }, 0.18)
+        end
+        local spot = clampSpot(dragOrigin + delta / layerScale(), panel.Size.X.Offset, panel.Size.Y.Offset)
+        panel.Position = UDim2.fromOffset(spot.X, spot.Y)
+    end, group)
+    window:_listen("Ended", function(input)
+        if not dragStart or not isPress(input) then
+            return
+        end
+        dragStart = nil
+        if dragMoved and panel then
+            dragMoved = false
+            tween(panelScale, { Scale = 1 }, 0.4, Enum.EasingStyle.Back)
+            tween(panelShadow, { ImageTransparency = 0.35 }, 0.3)
+            group._popSpot = Vector2.new(panel.Position.X.Offset, panel.Position.Y.Offset)
+        end
+    end, group)
+    if popButton then
+        popButton.MouseEnter:Connect(function()
+            tween(popButton, { BackgroundTransparency = 0 }, 0.15)
+            tween(popIcon, { ImageColor3 = Theme.Text }, 0.15)
+        end)
+        popButton.MouseLeave:Connect(function()
+            tween(popButton, { BackgroundTransparency = 1 }, 0.25)
+            tween(popIcon, { ImageColor3 = Theme.Muted }, 0.25)
+        end)
+        popButton.MouseButton1Click:Connect(function()
+            if popped then
+                dock()
+            else
+                popOut()
+            end
+        end)
+    end
+
     header.MouseButton1Click:Connect(function()
+        if suppressClick then
+            suppressClick = false
+            return
+        end
         if isTap() then
             setCollapsed(not collapsed)
         end
     end)
 
+    function group:PopOut()
+        popOut()
+    end
+    function group:Dock()
+        dock()
+    end
+    function group:IsPoppedOut()
+        return popped
+    end
     function group:SetCollapsed(value)
         setCollapsed(value)
     end
@@ -8450,12 +8824,17 @@ function Tab:Groupbox(opts, icon)
             table.remove(owner._groupboxes, index)
         end
         set.Counts[side] = math.max(set.Counts[side] - 1, 0)
+        dock(true)
+        group._destroyed = true
         window._controlsDirty = true
         box:Destroy()
     end
 
     if opts.Collapsed then
         setCollapsed(true, true)
+    end
+    if opts.PoppedOut then
+        task.defer(popOut)
     end
     return group
 end
@@ -8948,7 +9327,7 @@ function Tab:ThemeManager(opts)
     local window = self.Window
     local manager = {}
     local themes, status, defaultRow, presets
-    local weather, weatherMode, dim, transparent, dragSkeleton
+    local weather, weatherMode, dim, transparent, dragSkeleton, islandStyle
     local background, backgroundInput, backgroundOpacity, backgroundLabel
     local uiScale, density, adaptive, cornerRadius
 
@@ -9039,6 +9418,19 @@ function Tab:ThemeManager(opts)
             Callback = function(style)
                 if style then
                     window:SetDragStyle(style)
+                end
+            end,
+        })
+    end
+    if opts.IslandStyle ~= false then
+        islandStyle = host:Dropdown({
+            Name = "Dynamic Island",
+            Options = Library.IslandStyles,
+            Default = window.IslandStyle,
+            AllowNone = false,
+            Callback = function(style)
+                if style then
+                    window:SetIslandStyle(style)
                 end
             end,
         })
@@ -9316,6 +9708,7 @@ function Tab:ThemeManager(opts)
                 Dim = if dim then window._backdropDim == true else nil,
                 Transparent = if transparent then window.Transparent == true else nil,
                 DragStyle = dragSkeleton and window.DragStyle or nil,
+                IslandStyle = islandStyle and window.IslandStyle or nil,
                 CornerRadius = cornerRadius and Library:GetCornerRadius() or nil,
                 UIScale = uiScale and window:GetUIScale() or nil,
                 AdaptiveSize = if adaptive then window:GetAdaptiveSize() else nil,
@@ -9367,6 +9760,9 @@ function Tab:ThemeManager(opts)
                 -- Configs saved before drag styles.
                 window:SetDragSkeleton(value.DragSkeleton)
                 dragSkeleton:Set(window.DragStyle, true)
+            end
+            if islandStyle and type(value.IslandStyle) == "string" then
+                islandStyle:Set(window:SetIslandStyle(value.IslandStyle), true)
             end
             if cornerRadius and tonumber(value.CornerRadius) then
                 cornerRadius:Set(Library:SetCornerRadius(value.CornerRadius), true)
@@ -16946,6 +17342,59 @@ function Window:_closePopups()
     end
 end
 
+-- Popped-out groupboxes float on one screen-wide layer above the window. It
+-- carries the window's scale, so a panel keeps the size it had in its column,
+-- and it shows while the window is open (minimized included).
+function Window:_popoutLayer()
+    if self._popLayer then
+        return self._popLayer
+    end
+    local layer = create("Frame", {
+        Name = "PopOuts",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        ZIndex = 20,
+        Parent = self.Gui,
+    })
+    local layerScale = create("UIScale", { Parent = layer })
+    self._popLayer = layer
+    self._popPanels = {}
+    self:_listen("Render", function()
+        local scale = math.max(self.Scale.Scale, 0.05)
+        if math.abs(layerScale.Scale - scale) > 1e-4 then
+            layerScale.Scale = scale
+            layer.Size = UDim2.fromScale(1 / scale, 1 / scale)
+        end
+        layer.Visible = self.Open == true and not self._destroyed
+    end)
+    return layer
+end
+
+-- Where a control's popup is drawn: the pop-out layer for one inside a
+-- floating panel, otherwise the window body.
+function Window:_popupHost(object)
+    local layer = self._popLayer
+    if layer and object and object:IsDescendantOf(layer) then
+        return layer
+    end
+    return self.Body
+end
+
+-- A floating panel under the point counts as a control, so pressing it never
+-- starts a window drag.
+function Window:_overPopout(point)
+    local layer = self._popLayer
+    if not layer or not layer.Visible then
+        return false
+    end
+    for _, panel in ipairs(self._popPanels) do
+        if panel.Parent and panel.Visible and pointInside(point, panel) then
+            return true
+        end
+    end
+    return false
+end
+
 -- Fades the whole body by lending it to the fader CanvasGroup, then hands it
 -- back to the root once fully shown so it renders directly again.
 function Window:_fade(target, duration)
@@ -17966,6 +18415,18 @@ function Window:_buildMiniBar()
         Padding = UDim.new(0, 2),
         Parent = rowsHolder,
     })
+    -- What's running, by name, so the count above has something behind it.
+    local runningNames = label({
+        Size = UDim2.new(1, 0, 0, 15),
+        Text = "",
+        TextSize = 12,
+        FontFace = Fonts.Regular,
+        TextColor3 = Color3.fromRGB(200, 200, 206),
+        RichText = true,
+        Visible = false,
+        LayoutOrder = 4,
+        Parent = expandedList,
+    })
     local hint = label({
         Size = UDim2.new(1, 0, 0, 14),
         TextSize = 11,
@@ -18093,6 +18554,7 @@ function Window:_buildMiniBar()
     local modeToken = 0
     local sizeTween, cornerTween
     local hovered, pressed = false, false
+    local hoverToken = 0
     local dragFrom, dragAnchor, dragging, dragged = nil, nil, false, false
     local activityToken = 0
     local activityLive = false
@@ -18195,6 +18657,16 @@ function Window:_buildMiniBar()
             end
         end
         if not changed and not instant then
+            -- A refit (same shape, new height) bumps the token, which cancels
+            -- a fade-in still waiting from the morph; finish it here or the
+            -- card stays black until the next hover.
+            local target = layers[name]
+            if target.GroupTransparency > 0 then
+                tween(target, { GroupTransparency = 0 }, 0.22, Enum.EasingStyle.Quad)
+            end
+            if target ~= compact and target.Position ~= UDim2.fromScale(0.5, 0) then
+                tween(target, { Position = UDim2.fromScale(0.5, 0) }, 0.32, Enum.EasingStyle.Quint)
+            end
             return
         end
         for key, group in pairs(layers) do
@@ -18205,10 +18677,19 @@ function Window:_buildMiniBar()
         local target = layers[name]
         if instant then
             target.GroupTransparency = 0
+            target.Position = UDim2.fromScale(0.5, 0)
         else
+            -- The new layer rises a few pixels into place as it fades in, so
+            -- the content reads as arriving with the shape, not popping in.
+            if target ~= compact then
+                target.Position = UDim2.new(0.5, 0, 0, 6)
+            end
             task.delay(0.1, function()
                 if modeToken == token then
                     tween(target, { GroupTransparency = 0 }, 0.22, Enum.EasingStyle.Quad)
+                    if target ~= compact then
+                        tween(target, { Position = UDim2.fromScale(0.5, 0) }, 0.32, Enum.EasingStyle.Quint)
+                    end
                 end
             end)
         end
@@ -18219,8 +18700,18 @@ function Window:_buildMiniBar()
             setMode("Expanded")
         elseif activityLive then
             setMode("Activity")
+        elseif self.IslandStyle == "Always Show" and not dragging then
+            self:_refreshMini()
+            refreshSession()
+            setMode("Expanded")
         else
             setMode("Compact")
+        end
+    end
+
+    self._islandSettle = function()
+        if self.Minimized and island.Visible and not dragging then
+            settleMode()
         end
     end
 
@@ -18241,20 +18732,36 @@ function Window:_buildMiniBar()
             return
         end
         hovered = true
-        self:_refreshMini()
-        task.defer(function()
-            if hovered and self.Minimized and not dragging then
+        hoverToken += 1
+        local token = hoverToken
+        -- Already open (the pointer left and came back within the grace):
+        -- just stay. Otherwise lean in a touch, and only open once the
+        -- pointer rests, so sweeping past the island doesn't burst it open.
+        if mode == "Expanded" then
+            return
+        end
+        if not pressed then
+            tween(islandScale, { Scale = 1.04 }, 0.18, Enum.EasingStyle.Quint)
+        end
+        task.delay(0.12, function()
+            if hoverToken == token and hovered and self.Minimized and not dragging then
+                self:_refreshMini()
+                refreshSession()
                 setMode("Expanded")
             end
         end)
     end)
     hit.MouseLeave:Connect(function()
         hovered = false
+        hoverToken += 1
+        local token = hoverToken
         if not pressed then
             tween(islandScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Quint)
         end
-        task.delay(0.1, function()
-            if not hovered and self.Minimized then
+        -- A grace period: the card shifts while it morphs and clamps on
+        -- screen, so a pointer grazing its edge shouldn't snap it shut.
+        task.delay(mode == "Expanded" and 0.28 or 0.1, function()
+            if hoverToken == token and not hovered and self.Minimized then
                 settleMode()
             end
         end)
@@ -18513,6 +19020,21 @@ function Window:_buildMiniBar()
             end
         end
         bigCount.Text = tostring(count)
+        local names = {}
+        for _, element in pairs(Library.Flags) do
+            if element._type == "Toggle" and element.Value == true and element._searchName ~= "" then
+                table.insert(names, element._searchName)
+            end
+        end
+        table.sort(names)
+        local shownNames = {}
+        for index = 1, math.min(#names, 3) do
+            shownNames[index] = Library._rich(names[index])
+        end
+        local extra = #names - #shownNames
+        runningNames.Text = '<font color="#8A8A93">Running </font>' .. table.concat(shownNames, '<font color="#8A8A93"> · </font>')
+            .. (extra > 0 and string.format('<font color="#8A8A93">  +%d</font>', extra) or "")
+        runningNames.Visible = #names > 0
         pinnedLead = nil
         for _, handle in ipairs(self._pinned) do
             if not handle._isShown or handle:_isShown() then
@@ -18582,9 +19104,9 @@ function Window:_buildMiniBar()
             end
         end
         -- Rows coming and going change the expanded height.
-        if mode == "Expanded" and hovered then
+        if mode == "Expanded" and (hovered or self.IslandStyle == "Always Show") then
             task.defer(function()
-                if mode == "Expanded" and hovered and self.Minimized then
+                if mode == "Expanded" and (hovered or self.IslandStyle == "Always Show") and self.Minimized then
                     local size = shapeFor("Expanded")
                     if math.abs(size.Y - island.Size.Y.Offset) > 1 then
                         setMode("Expanded")
@@ -18654,6 +19176,14 @@ function Window:Minimize()
             tween(self._miniScale, { Scale = 1 }, 0.3, Enum.EasingStyle.Quint)
             tween(bar, { GroupTransparency = 0 }, 0.18, Enum.EasingStyle.Quad)
             dissolve(self, ghost, ghostStroke, 0.2)
+            -- Always Show: once landed as the pill, swell open into the card.
+            if self.IslandStyle == "Always Show" then
+                task.delay(0.22, function()
+                    if self._minimizeGeneration == generation and self._islandSettle then
+                        self._islandSettle()
+                    end
+                end)
+            end
         end)
     end)
 
