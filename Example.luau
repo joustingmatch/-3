@@ -5965,7 +5965,6 @@ function Window:_showLoader(opts)
         })
         local body = label({
             Size = UDim2.new(1, -8, 0, 0),
-            AutomaticSize = Enum.AutomaticSize.Y,
             Text = tostring(info.Text),
             TextSize = 13,
             FontFace = Fonts.Regular,
@@ -6134,8 +6133,22 @@ function Window:_showLoader(opts)
         -- height can land a few frames late (font loading, the scroller's
         -- layout), so the card refits whenever it changes.
         local laidOut = false
+        -- TextBounds of wrapped text stops at the label's current height, so
+        -- the card would fit to its own clipped text; the full wrapped height
+        -- is measured at the body's width instead.
+        local function measure()
+            local ok, size = pcall(function()
+                local params = Instance.new("GetTextBoundsParams")
+                params.Text = body.Text
+                params.Font = body.FontFace
+                params.Size = body.TextSize
+                params.Width = WIDTH - PAD * 2 - 8
+                return game:GetService("TextService"):GetTextBoundsAsync(params)
+            end)
+            return ok and size and math.ceil(size.Y) + 2 or body.TextBounds.Y
+        end
         local function fit(duration)
-            local textHeight = math.max(body.TextBounds.Y, 16)
+            local textHeight = math.max(measure(), 16)
             local bodyHeight = math.min(textHeight, MAX_BODY)
             body.Size = UDim2.new(1, -8, 0, textHeight)
             scroller.Size = UDim2.new(1, -PAD * 2, 0, bodyHeight)
