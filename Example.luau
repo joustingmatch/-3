@@ -18056,7 +18056,7 @@ local Mini = {
     -- Sized after the iPhone 18 island: a slimmer, shorter pill sitting close
     -- to the top edge, opening into a wide card with deep rounded corners.
     Top = 8, -- gap from the top of the screen
-    Width = TOUCH and 132 or 124, -- compact
+    Width = TOUCH and 176 or 168, -- compact
     Height = TOUCH and 36 or 32,
     Wide = 340, -- expanded and activity
     Radius = 34, -- corner of the expanded and activity cards
@@ -18150,22 +18150,52 @@ function Window:_buildMiniBar()
     end
 
     -- Compact: the logo leading, a live meter of running toggles trailing.
+    -- A graphite surface, lit from the top, so the pill isn't a flat black
+    -- slab; it fades with the layer, leaving the open card black.
     local compact = create("CanvasGroup", {
         Name = "Compact",
         Size = UDim2.fromScale(1, 1),
-        BackgroundTransparency = 1,
+        BackgroundColor3 = Color3.fromRGB(30, 30, 34),
+        BorderSizePixel = 0,
         Parent = island,
     })
-    local logo = create("ImageLabel", {
+    create("UIGradient", {
+        Rotation = 90,
+        Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 120, 120)),
+        Parent = compact,
+    })
+    -- The logo sits in a soft accent disc, like an app glyph.
+    local logoDisc = create("Frame", {
         AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 13, 0.5, 0),
-        Size = UDim2.fromOffset(18, 18),
+        Position = UDim2.new(0, 5, 0.5, 0),
+        Size = UDim2.fromOffset(Mini.Height - 10, Mini.Height - 10),
+        BackgroundColor3 = Theme.Accent,
+        BackgroundTransparency = 0.82,
+        BorderSizePixel = 0,
+        Parent = compact,
+    })
+    corner(logoDisc, UDim.new(1, 0))
+    local logo = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(16, 16),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = compact,
+        Parent = logoDisc,
     })
     applyIcon(logo, self._logoIcon, true)
+    -- The script's name beside the logo, so the pill reads at a glance.
+    local miniTitle = label({
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, Mini.Height + 2, 0.5, 0),
+        Size = UDim2.new(1, -Mini.Height - 2 - 72, 0, 18),
+        Text = self.Title,
+        TextSize = 13,
+        FontFace = Fonts.Bold,
+        TextColor3 = Color3.fromRGB(244, 244, 246),
+        Parent = compact,
+    })
     local meter = create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -14, 0.5, 0),
@@ -18185,6 +18215,7 @@ function Window:_buildMiniBar()
     local barsHolder = create("Frame", {
         Size = UDim2.fromOffset(Mini.Bars * 3 + (Mini.Bars - 1) * 2, 16),
         BackgroundTransparency = 1,
+        Visible = false,
         LayoutOrder = 1,
         Parent = meter,
     })
@@ -18210,6 +18241,27 @@ function Window:_buildMiniBar()
         TextTruncate = Enum.TextTruncate.None,
         Visible = false,
         LayoutOrder = 2,
+        Parent = meter,
+    })
+    -- Idle (nothing running): a health dot tinted by frame rate and the
+    -- session clock, so the pill never sits empty.
+    local idleDot = create("Frame", {
+        Size = UDim2.fromOffset(6, 6),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        LayoutOrder = -1,
+        Parent = meter,
+    })
+    corner(idleDot, UDim.new(1, 0))
+    local idleLabel = label({
+        Size = UDim2.fromOffset(0, 18),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = "0s",
+        TextSize = 12,
+        FontFace = Fonts.Bold,
+        TextColor3 = Color3.fromRGB(220, 220, 224),
+        TextTruncate = Enum.TextTruncate.None,
+        LayoutOrder = 0,
         Parent = meter,
     })
 
@@ -18463,6 +18515,8 @@ function Window:_buildMiniBar()
     end)
     local function refreshSession()
         sessionLabel.Text = formatDuration(os.clock() - sessionStart)
+        idleLabel.Text = sessionLabel.Text
+        tween(idleDot, { BackgroundColor3 = Library._healthColor(fps, 50, 30) }, 0.4)
         local unit = '<font size="12" color="#8A8A93"> %s</font>'
         fpsValue.Text = fps .. string.format(unit, "fps")
         tween(fpsFill, {
@@ -18690,7 +18744,11 @@ function Window:_buildMiniBar()
         local target = layers[name]
         if instant then
             target.GroupTransparency = 0
-            target.Position = UDim2.fromScale(0.5, 0)
+            -- Compact fills the island from its corner; only the wide
+            -- layers hang from the centre.
+            if target ~= compact then
+                target.Position = UDim2.fromScale(0.5, 0)
+            end
         else
             -- The new layer rises a few pixels into place as it fades in, so
             -- the content reads as arriving with the shape, not popping in.
@@ -18945,7 +19003,7 @@ function Window:_buildMiniBar()
         Name = "IslandBubble",
         AnchorPoint = Vector2.new(0.5, 0.5),
         Size = UDim2.fromOffset(0, 0),
-        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(26, 26, 30),
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
@@ -19019,7 +19077,6 @@ function Window:_buildMiniBar()
             local rising = count > running
             running = count
             countLabel.Text = tostring(count)
-            countLabel.Visible = count > 0
             for _, bar in ipairs(bars) do
                 tween(bar, { BackgroundColor3 = count > 0 and Theme.Accent or Theme.Muted }, 0.25)
                 if count == 0 then
@@ -19056,10 +19113,28 @@ function Window:_buildMiniBar()
             end
         end
         if pinnedLead then
-            pinValue.Text = pinnedLead:Text()
-            pinValue.TextColor3 = pinnedLead._shownColor and pinnedLead._shownColor() or Theme.Text
+            local text = tostring(pinnedLead:Text() or "")
+            -- A status with nothing to show yet doesn't take the pill.
+            if text:gsub("<[^>]*>", ""):match("%S") then
+                pinValue.Text = text
+                local color = pinnedLead._shownColor and pinnedLead._shownColor() or Theme.Text
+                -- Too dark to read on the black pill: fall back to text colour.
+                local _, _, value = color:ToHSV()
+                pinValue.TextColor3 = value < 0.35 and Theme.Text or color
+            else
+                pinnedLead = nil
+            end
         end
         setSplit(running > 0 and pinnedLead ~= nil)
+        -- The pill's own meter: the clock when idle or when the bars budded
+        -- off without a status to keep, the bars and count otherwise.
+        local barsHere = running > 0 and not splitOn
+        idleDot.Visible = not barsHere
+        idleLabel.Visible = not barsHere
+        countLabel.Visible = barsHere
+        barsHolder.Visible = running > 0
+        meter.Visible = not splitOn
+        miniTitle.Visible = not splitOn
         local key = typeof(self.Keybind) == "EnumItem" and keyName(self.Keybind)
         hint.Text = TOUCH and "Tap to open" or (key and ("Click or press " .. key .. " to open") or "Click to open")
 
