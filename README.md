@@ -1635,7 +1635,7 @@ Airflow:LoadFont({ Name = "ValleySans" })
 
 Airflow:LoadFont({
     Name = "MyFont",
-    Folder = "AirFlowFonts",
+    Folder = "OuroFlowFonts",
     Weights = {
         Regular = "https://example.com/MyFont-Regular.ttf",
         Medium = "https://example.com/MyFont-Medium.ttf",
@@ -1651,7 +1651,7 @@ Call it before `CreateWindow`. The TTFs are saved to the folder on first run and
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `Name` | string | — | Family name. `"ValleySans"` uses the built-in URLs. |
-| `Folder` | string | `"AirFlowFonts"` | Where the TTFs and family file are saved. |
+| `Folder` | string | `"OuroFlowFonts"` | Where the TTFs and family file are saved. |
 | `Weights` | table | preset | `Regular`, `Medium`, `SemiBold`, `Bold` → TTF URL. |
 
 ---

@@ -276,7 +276,7 @@ local function loadLucide()
         lucideSet = result
     else
         lucideSet = false
-        warn("[AirFlow] lucide icons unavailable: " .. tostring(result))
+        warn("[OuroFlow] lucide icons unavailable: " .. tostring(result))
     end
     return lucideSet
 end
@@ -299,16 +299,16 @@ local FONT_WEIGHTS = {
 function Library:LoadFont(opts)
     opts = normalize(opts, {})
     if type(writefile) ~= "function" or type(isfile) ~= "function" or typeof(getcustomasset) ~= "function" then
-        warn("[AirFlow] custom fonts need writefile, isfile and getcustomasset")
+        warn("[OuroFlow] custom fonts need writefile, isfile and getcustomasset")
         return false
     end
     local name = opts.Name or "CustomFont"
     local weights = opts.Weights or FONT_PRESETS[name]
     if type(weights) ~= "table" then
-        warn("[AirFlow] no font weights for " .. name)
+        warn("[OuroFlow] no font weights for " .. name)
         return false
     end
-    local folder = opts.Folder or "AirFlowFonts"
+    local folder = opts.Folder or "OuroFlowFonts"
     pcall(function()
         if type(isfolder) == "function" and type(makefolder) == "function" and not isfolder(folder) then
             makefolder(folder)
@@ -328,7 +328,7 @@ function Library:LoadFont(opts)
             if ok then
                 table.insert(faces, { name = weightName, weight = info[1], style = "normal", assetId = getcustomasset(path) })
             else
-                warn("[AirFlow] could not download " .. weightName .. " weight of " .. name)
+                warn("[OuroFlow] could not download " .. weightName .. " weight of " .. name)
             end
         end
     end
@@ -406,7 +406,7 @@ local function resolveIcon(icon)
     elseif type(entry) == "string" then
         return entry
     end
-    warn("[AirFlow] unknown lucide icon: " .. name)
+    warn("[OuroFlow] unknown lucide icon: " .. name)
     return nil
 end
 
@@ -1075,7 +1075,7 @@ local function safeCall(callback, ...)
     end
     local ok, err = pcall(callback, ...)
     if not ok then
-        warn("[AirFlow] callback error: " .. tostring(err))
+        warn("[OuroFlow] callback error: " .. tostring(err))
     end
 end
 
@@ -1369,7 +1369,7 @@ function Tab:Label(opts)
                 if ok and value ~= nil then
                     text_.Text = Library._rich(value)
                 elseif not ok then
-                    warn("[AirFlow] label update error: " .. tostring(value))
+                    warn("[OuroFlow] label update error: " .. tostring(value))
                 end
                 task.wait(rate)
             end
@@ -11454,7 +11454,7 @@ function Tab:Status(opts)
                     end
                     render(true)
                 else
-                    warn("[AirFlow] status update error: " .. tostring(value))
+                    warn("[OuroFlow] status update error: " .. tostring(value))
                 end
                 task.wait(rate)
             end
@@ -11810,7 +11810,7 @@ function Tab:StatusList(opts)
                             handle:Set(result)
                         end
                     else
-                        warn("[AirFlow] status list update error: " .. tostring(result))
+                        warn("[OuroFlow] status list update error: " .. tostring(result))
                     end
                 end
                 task.wait(rate)
@@ -11985,7 +11985,7 @@ function Tab:Image(opts)
             return false, "replaced by a newer image"
         end
         if not asset then
-            warn("[AirFlow] image: " .. tostring(err))
+            warn("[OuroFlow] image: " .. tostring(err))
             return false, err
         end
         image.ImageTransparency = 1
@@ -16798,8 +16798,13 @@ end
 Window.CreateTab = Window.Tab
 
 -- Tab badges were removed. These stay as no-ops so older scripts that call
--- them keep running.
-function Tab:SetBadge() end
+-- them keep running, with a single warning so the call isn't silently lost.
+function Tab:SetBadge()
+    if not Library._badgeWarned then
+        Library._badgeWarned = true
+        warn("[OuroFlow] Tab:SetBadge was removed and does nothing")
+    end
+end
 
 function Tab:GetBadge()
     return nil
@@ -19635,7 +19640,7 @@ function Window:Destroy()
         end
     end)
     if not ok then
-        warn("[AirFlow] unload animation failed, removing the window directly: " .. tostring(err))
+        warn("[OuroFlow] unload animation failed, removing the window directly: " .. tostring(err))
         remove()
         return
     end
@@ -19697,10 +19702,18 @@ end)
 local function runTrusted(fn, ...)
     local args = table.pack(...)
     local result = nil
+    local timedOut = false
     table.insert(trustedQueue, function()
-        result = table.pack(pcall(fn, table.unpack(args, 1, args.n)))
+        if not timedOut then
+            result = table.pack(pcall(fn, table.unpack(args, 1, args.n)))
+        end
     end)
+    local deadline = os.clock() + 5
     while result == nil do
+        if os.clock() > deadline then
+            timedOut = true
+            error("[OuroFlow] trusted call timed out", 0)
+        end
         task.wait()
     end
     if not result[1] then
