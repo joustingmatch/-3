@@ -1,6 +1,6 @@
 # Airflow UI (OuroFlow)
 
-> Airflow UI is a single-file Luau UI library for Roblox executor scripts: a window with a sidebar of tabs, sub tabs, two-column collapsible groupboxes and fourteen elements (toggles, sliders, dropdowns, statuses, tables and more), plus configs, cloud configs, live themes, coloured text, window-wide search and a draggable Dynamic Island minimize. This file is a guide for language models writing scripts with it. Follow it exactly; the README holds every option.
+> Airflow UI is a single-file Luau UI library for Roblox executor scripts: a window with a sidebar of tabs, sub tabs, two-column collapsible groupboxes and fourteen elements (toggles, sliders, dropdowns, statuses, tables and more), plus configs, live themes, coloured text, window-wide search and a draggable Dynamic Island minimize. This file is a guide for language models writing scripts with it. Follow it exactly; the README holds every option.
 
 Load it once, build the window, add tabs, put groupboxes on tabs (or sub tabs), and put elements in groupboxes. Every element with a `Flag` is saved by configs. Everything returns a handle with `Set` / `Get` (where it has a value), `SetVisible`, `IsVisible`, `SetDisabled`, `SetDependsOn`, `SetTooltip` and `Destroy`.
 
@@ -132,7 +132,6 @@ Minimizing folds the window into a Dynamic Island at the top of the screen. Play
 
 ## Optional
 
-- [README: Cloud Configs](README.md#cloud-configs): a browse / install / publish tab driven by your backend's `OnFetch` and `OnPublish`.
 - [README: Home](README.md#home): profile card, live stats (FPS, ping and memory tinted by health), game and executor cards, feature list, changelog pages.
 - [README: Configs](README.md#configs): file format, share codes, autoload per account.
 - [README: Icons](README.md#icons) and [Fonts](README.md#fonts).

@@ -4,7 +4,7 @@
 
 **A Roblox UI library with eased motion and a live theme engine.**
 
-Windows, tabs, sub tabs, collapsible groupboxes and fourteen elements, all with lucide icons, plus configs, cloud configs, weather backdrops and a Dynamic Island minimize.
+Windows, tabs, sub tabs, collapsible groupboxes and fourteen elements, all with lucide icons, plus configs, weather backdrops and a Dynamic Island minimize.
 
 ![Luau](https://img.shields.io/badge/Luau-00A2FF?style=flat-square&logo=lua&logoColor=white)
 ![Roblox](https://img.shields.io/badge/Roblox-executor-E2231A?style=flat-square&logo=roblox&logoColor=white)
@@ -47,7 +47,7 @@ Settings:CreateThemeManager({ Side = "Right" })
 - **Adaptive size.** The window scales with the screen, so it looks the same on 1080p, 1440p and 4K. Touch devices get larger hit areas automatically.
 - **Coloured text.** `<Success>`, `<Warning>` and the other theme tags work in statuses, tables, progress bars and labels, and repaint when the theme changes.
 - **Window-wide search.** Jumps to any control in any tab and lights it up.
-- **Configs that just work.** Flags, autoload, share codes, a config manager and a cloud configs browser your backend can drive.
+- **Configs that just work.** Flags, autoload, share codes and a config manager.
 
 ### Contents
 
@@ -55,9 +55,9 @@ Settings:CreateThemeManager({ Side = "Right" })
 | --- | --- | --- | --- |
 | [Window](#window) | [Button](#button) · [Button Row](#button-row) | [Flags](#flags) | [Theme](#theme) |
 | [Home](#home) | [Toggle](#toggle) · [Slider](#slider) · [Stepper](#stepper) | [Configs](#configs) | [Coloured text](#coloured-text) |
-| [Tab](#tab) · [Sub Tab](#sub-tab) | [Dropdown](#dropdown) · [Order List](#order-list) | [Cloud Configs](#cloud-configs) | [Icons](#icons) |
-| [Groupbox](#groupbox) | [Input](#input) · [Keybind](#keybind) · [Color Picker](#color-picker) | [Notification](#notification) | [Fonts](#fonts) |
-| [Visibility](#visibility) · [Tooltips](#tooltips) | [Label](#label) · [Paragraph](#paragraph) · [Section](#section) · [Divider](#divider) | [Confirm](#confirm) | |
+| [Tab](#tab) · [Sub Tab](#sub-tab) | [Dropdown](#dropdown) · [Order List](#order-list) | [Notification](#notification) | [Icons](#icons) |
+| [Groupbox](#groupbox) | [Input](#input) · [Keybind](#keybind) · [Color Picker](#color-picker) | [Confirm](#confirm) | [Fonts](#fonts) |
+| [Visibility](#visibility) · [Tooltips](#tooltips) | [Label](#label) · [Paragraph](#paragraph) · [Section](#section) · [Divider](#divider) | | |
 | [Search](#search) | [Status](#status) · [Status List](#status-list) · [Progress](#progress) | | |
 | | [Image](#image) · [Viewport](#viewport) · [Table](#table) · [Log](#log) | | |
 
@@ -1592,106 +1592,6 @@ Requires `writefile` / `readfile`.
 | `Window:SetAutoloadMode(mode)` / `GetAutoloadMode()` | `"Global"` (all accounts) or `"Account"` (this account). |
 | `Window:OnConfigChanged(fn)` | Runs `fn` after a load, delete, import or autoload change. Returns a disconnect function. |
 | `Tab:CreateConfigManager(opts)` | Returns `Create / Save / Load / Delete / Rename / Reset / SetAutoload / ClearAutoload / ToggleAutoload / SetAutoloadMode / Export / Import / Refresh`. |
-
----
-
-## Cloud Configs
-
-> A tab for browsing, previewing, installing and publishing configs other players shared. The library draws it; your script is the backend.
-
-```lua
-local Cloud = Window:CreateCloudConfigs({
-    Name = "Cloud",
-    Tags = { "Farming", "PvP", "Safe", "Visuals" },
-    OnFetch = function(Query)
-        -- Query = { Search, Sort, Filter, Tag, Page, PageSize, Folder, UserId }
-        local ok, body = pcall(game.HttpGet, game, "https://my.api/configs?page=" .. Query.Page .. "&sort=" .. Query.Sort)
-        if not ok then
-            return nil, "Server is down" -- shown with a Try again button
-        end
-        local Data = game:GetService("HttpService"):JSONDecode(body)
-        return Data.Configs, Data.HasMore -- a list of configs, and whether there's another page
-    end,
-    OnPublish = function(Config)
-        -- Config = { Name, Description, Tags, Code, Count, Folder, Author, AuthorId, OwnerId, Streamer }
-        -- post it; return the stored config (with its Id), or false, "reason"
-    end,
-    OnFetchCode = function(Config) -- only needed when OnFetch leaves Code out
-        return game:HttpGet("https://my.api/configs/" .. Config.Id .. "/code")
-    end,
-})
-```
-
-`CreateCloudConfigs` adds its own sidebar tab, like Home. The page slides between three views: **browse**, a config's **details**, and the **publish** form. The first fetch waits until the tab is opened.
-
-**Browsing**
-
-- A search box (it waits for you to stop typing, or press Enter), a refresh button that spins while a page loads, and **Publish** on top. Press `/` to jump to the search box. Focusing it empty drops down your last six searches. Matches are highlighted in the cards, and a line above them sums up what you are looking at (*3 configs in Favorites, tagged PvP, matching "boss"*) with a **Clear filters** link.
-- Filter chips: **All**, **Favorites**, **Mine**, **Installed**, then your `Tags` (one at a time, press again to clear). A sort chip on the right cycles *Popular*, *Newest*, *Top rated* and *Most installed*, and is remembered.
-- Configs are cards in one column, or two on a wide window: name, author, when it was updated, how many settings, two lines of description, up to three tags, likes, installs and an **Install** button. A badge marks configs you've **installed**, ones with an **update** since you installed them, **yours**, and ones made for **another script**. A star marks favorites.
-- Pulsing placeholder cards while a page loads. The next page loads when you scroll near the bottom (or press **Load more**). A slow reply to an old search is thrown away. Errors show a **Try again** button; no results say why ("No configs match your search") and offer **Clear filters**.
-- **Favorites** and **Installed** are kept on this device, so they work without the backend and filter locally.
-
-**A config's page**
-
-- The full description, tags, likes and installs.
-- **Install** / **Update** / **Reinstall**, **Like**, **Favorite**, **Copy code**, and **Report** for other people's configs. Your own configs get **Edit** and **Delete** instead.
-- Every setting in the config, next to yours: the ones that would change come first with an accent dot, then the ones that match, then flags this script doesn't have. The heading sums it up: *24 settings, 5 different from yours*.
-
-**Installing** asks first, with three buttons: **Install** applies it and saves it as a config (under its own name, with ` (2)`... rather than overwriting), **Apply only** changes the current settings without saving, or **Cancel**. Installing an update overwrites the config the last install saved. A config for another `FolderName` warns that only matching settings apply. Likes show at once and roll back if `OnLike` fails.
-
-**Publishing** takes a name (40 characters), a description with a counter, up to `MaxTags` tags, and which settings to share: *Current settings* or any saved config, with a count of what's in it. It says who you publish as, and follows the Home tab's hide-name switch: with it on, `Author` is *Ouroboros User* and `AuthorId` is `nil`. `OwnerId` is always the player's UserId, so the backend can tell who owns what; keep it private. A draft stays in the form if you back out. **Edit** opens the same form filled in, with *Keep published settings* as the default, and calls `OnUpdate`.
-
-### Properties
-
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `Name` / `Desc` / `Icon` | string | `"Cloud"`, —, `"cloud"` | The tab. |
-| `Tags` | table | `{}` | Tags to filter by and to pick when publishing. |
-| `MaxTags` | number | `3` | Tags per config. |
-| `PageSize` | number | `20` | Sent to `OnFetch` as `Query.PageSize`. |
-| `Sort` | string | `"Popular"` | Starting sort until the player picks one: `"Popular"`, `"New"`, `"Top"`, `"Installs"`. |
-| `DescriptionLimit` | number | `300` | Characters in a description. |
-| `OnFetch` | function | — | `(query)` returns `configs, hasMore`, or `nil, reason`. `Query.Filter` is `"All"` or `"Mine"`. Leave it out to push results with `SetConfigs`. |
-| `OnFetchCode` | function | — | `(config)` returns the code, for lists sent without codes. |
-| `OnPublish` | function | — | `(config)` returns the stored config, `true`, or `false, reason`. Hides **Publish** when missing. |
-| `OnUpdate` | function | — | `(config, changes)` for **Edit**. `changes.Code` is `nil` when the settings are kept. |
-| `OnDelete` | function | — | `(config)` for **Delete**. Return `false, reason` to refuse. |
-| `OnLike` | function | — | `(config, liked)`. Return `false` to roll the like back. Hides **Like** when missing. |
-| `OnInstall` | function | — | `(config, savedName)` after an install, to count it. |
-| `OnReport` | function | — | `(config, reason)`. Hides **Report** when missing. |
-| `ReportReasons` | table | `{ "Broken", "Spam", "Inappropriate" }` | Choices in the report dialog. |
-| `MineFilter` | boolean | `true` | Show the **Mine** chip. |
-| `StreamerName` | string | `"Ouroboros User"` | The author name while the player's name is hidden. |
-| `SearchPlaceholder` / `EmptyText` | string | — | Text in the search box and when there are no configs. |
-
-### Configs
-
-What `OnFetch` returns, and what the callbacks get back:
-
-| Field | Description |
-| --- | --- |
-| `Id` | Unique id. Favorites and installs are kept by it. |
-| `Name` / `Description` / `Tags` | Shown on the card and page. |
-| `Author` / `AuthorId` | Who published it. A matching `AuthorId` or `OwnerId`, or `Mine = true`, makes it the player's own. |
-| `Code` | The config code (`Window:ExportConfig()` format). Can be left out and served by `OnFetchCode`. |
-| `Count` | Number of settings, worked out from `Code` when missing. |
-| `Folder` | The `FolderName` it was made for. |
-| `Installs` / `Likes` / `Liked` | Counts, and whether the player liked it. |
-| `Updated` | Unix time of the last change. Newer than when the player installed it shows **Update**. |
-
-### Handle
-
-| Member | Description |
-| --- | --- |
-| `Refresh()` / `LoadMore()` | Fetch the first page again, or the next one. |
-| `SetConfigs(list, hasMore?)` / `AddConfigs(list, hasMore?)` | Show configs pushed by the script instead of `OnFetch`. |
-| `UpdateConfig(id, changes)` / `RemoveConfig(id)` | Change or drop one config, like new like counts from a socket. |
-| `SetLoading(on)` / `SetError(text?)` | Show the placeholders, or an error with **Try again**. |
-| `Open(id)` / `OpenPublish()` / `Back()` | Jump to a config's page, the publish form, or back to the list. |
-| `GetQuery()` | The current search, sort, filter and tag. |
-| `GetFavorites()` / `GetInstalled()` | What this device kept. |
-| `.Tab` | The tab. |
 
 ---
 
