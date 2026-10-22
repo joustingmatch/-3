@@ -2059,6 +2059,49 @@ function Tab:Dropdown(opts)
         end
         return ".."
     end
+    -- Multi picks that overflow the chip scroll sideways in a loop instead
+    -- of truncating, so every selected value comes past.
+    local marqueeText = label({
+        Size = UDim2.fromScale(0, 1),
+        AutomaticSize = Enum.AutomaticSize.X,
+        TextSize = 13,
+        TextTruncate = Enum.TextTruncate.None,
+        Visible = false,
+        Parent = valueLabel,
+    })
+    local marqueeStep, marqueeOffset, marqueeWanted = nil, 0, false
+    local function updateMarquee(scroll)
+        local overflowing = scroll and valueLabel.Text ~= fullText
+        if not overflowing then
+            if marqueeStep then
+                marqueeStep:Disconnect()
+                marqueeStep = nil
+            end
+            marqueeText.Visible = false
+            valueLabel.TextTransparency = 0
+            return
+        end
+        local gap = "     •     "
+        marqueeText.Text = fullText .. gap .. fullText
+        marqueeText.TextColor3 = valueLabel.TextColor3
+        marqueeText.Visible = true
+        valueLabel.TextTransparency = 1
+        if not marqueeStep then
+            marqueeOffset = 0
+            marqueeStep = RunService.Heartbeat:Connect(function(deltaTime)
+                if not marqueeText.Parent then
+                    marqueeStep:Disconnect()
+                    marqueeStep = nil
+                    return
+                end
+                measure.Text = fullText .. gap
+                local loop = measure.TextBounds.X
+                marqueeOffset = (marqueeOffset + deltaTime * 28) % math.max(loop, 1)
+                marqueeText.Position = UDim2.fromOffset(-marqueeOffset, 0)
+                marqueeText.TextColor3 = valueLabel.TextColor3
+            end)
+        end
+    end
     local function fitChip(instant)
         if stacked then
             chip.Size = UDim2.new(1, -28, 0, chipHeight)
@@ -2098,6 +2141,7 @@ function Tab:Dropdown(opts)
                 task.delay(0.12, function()
                     pending = false
                     valueLabel.Text = trimmed()
+                    updateMarquee(marqueeWanted)
                 end)
             end
         end)
@@ -2356,16 +2400,17 @@ function Tab:Dropdown(opts)
         if #options == 0 then
             fullText = opts.EmptyText or "None"
         elseif multi then
-            -- Two names at most, then a count, so a long pick stays readable.
-            if #value > 2 then
-                fullText = tostring(value[1]) .. ", " .. tostring(value[2]) .. "  +" .. (#value - 2)
-            else
-                fullText = #value > 0 and table.concat(value, ", ") or (opts.NoneText or "None")
+            local names = {}
+            for index, item in ipairs(value) do
+                names[index] = tostring(item)
             end
+            fullText = #value > 0 and table.concat(names, ", ") or (opts.NoneText or "None")
         else
             fullText = value ~= nil and tostring(value) or (opts.NoneText or "None")
         end
         valueLabel.Text = trimmed()
+        marqueeWanted = multi and #options > 0 and #value > 1
+        updateMarquee(marqueeWanted)
         -- A picked value reads in full colour; "None" stays muted.
         local picked = #options > 0 and (if multi then #value > 0 else value ~= nil)
         tween(valueLabel, { TextColor3 = picked and Theme.Text or Theme.Muted }, animate and 0.15 or 0)
@@ -11828,10 +11873,8 @@ Tab.CreateStatuses = Tab.Statuses
 Tab.CreateStatusList = Tab.StatusList
 Tab.AddStatusList = Tab.StatusList
 
--- Image and Viewport: media cards. Image shows a picture from the same sources
--- as window backgrounds, plus "Avatar" for the player's headshot. Viewport
--- shows a 3D model or the player's avatar, turning slowly; drag it to spin it
--- by hand.
+-- Image: a media card showing a picture from the same sources as window
+-- backgrounds, plus "Avatar" for the player's headshot.
 
 function Tab:_mediaCard(opts, defaultHeight)
     opts = normalize(opts, { Title = "Name", Description = "Desc" })
@@ -12031,237 +12074,6 @@ function Tab:Image(opts)
         task.spawn(handle.SetImage, handle, opts.Image)
     end
     return finishElement(self, opts, handle, parts.Frame, "Image")
-end
-
-function Tab:Viewport(opts)
-    local parts
-    opts, parts = self:_mediaCard(opts, 180)
-    local window = self.Window
-    local media = parts.Media
-    applyIcon(parts.Placeholder, "box")
-
-    local viewport = create("ViewportFrame", {
-        Size = UDim2.fromScale(1, 1),
-        BackgroundTransparency = 1,
-        ImageTransparency = 1,
-        Ambient = opts.Ambient or Color3.fromRGB(165, 160, 175),
-        LightColor = opts.LightColor or Color3.fromRGB(255, 250, 245),
-        LightDirection = Vector3.new(-0.6, -1, -0.8),
-        ZIndex = 2,
-        Parent = media,
-    })
-    local camera = Instance.new("Camera")
-    camera.FieldOfView = math.clamp(tonumber(opts.FieldOfView) or 35, 10, 90)
-    camera.Parent = viewport
-    viewport.CurrentCamera = camera
-    local world = Instance.new("WorldModel")
-    world.Parent = viewport
-
-    local handle = {
-        Model = nil,
-        Spin = opts.Spin ~= false,
-        SpinSpeed = tonumber(opts.SpinSpeed) or 25,
-    }
-    local angle = math.rad(tonumber(opts.Angle) or 0)
-    local pitch = math.rad(tonumber(opts.Pitch) or 10)
-    local distanceScale = tonumber(opts.Distance) or 1
-    local center, distance, basis = nil, 10, CFrame.new()
-    local source = nil
-    local generation = 0
-    local dragging, lastX, resumeAt = false, 0, 0
-
-    local function place()
-        if not center then
-            return
-        end
-        local direction = basis:VectorToWorldSpace(Vector3.new(
-            math.sin(angle) * math.cos(pitch),
-            math.sin(pitch),
-            -math.cos(angle) * math.cos(pitch)
-        ))
-        camera.CFrame = CFrame.lookAt(center + direction * distance, center)
-    end
-
-    local function fit(model)
-        local cf, size
-        if model:IsA("Model") then
-            cf, size = model:GetBoundingBox()
-            basis = model:GetPivot().Rotation
-        elseif model:IsA("BasePart") then
-            cf, size = model.CFrame, model.Size
-            basis = model.CFrame.Rotation
-        else
-            return false
-        end
-        center = cf.Position
-        local radius = math.max(size.Magnitude / 2, 0.5)
-        distance = radius / math.tan(math.rad(camera.FieldOfView / 2)) * distanceScale
-        place()
-        return true
-    end
-
-    -- A copy with its scripts and sounds stripped and every part anchored.
-    local function prepare(instance)
-        local copy = instance
-        if opts.Clone ~= false then
-            local archivable = instance.Archivable
-            pcall(function()
-                instance.Archivable = true
-            end)
-            local ok, result = pcall(instance.Clone, instance)
-            pcall(function()
-                instance.Archivable = archivable
-            end)
-            copy = ok and result or nil
-        end
-        if not copy then
-            return nil
-        end
-        local function clean(object)
-            if object:IsA("LuaSourceContainer") or object:IsA("Sound") or object:IsA("ForceField") then
-                object:Destroy()
-            elseif object:IsA("BasePart") then
-                object.Anchored = true
-                object.CanCollide = false
-            end
-        end
-        for _, object in ipairs(copy:GetDescendants()) do
-            pcall(clean, object)
-        end
-        if copy:IsA("BasePart") then
-            copy.Anchored = true
-        end
-        local humanoid = copy:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-        end
-        return copy
-    end
-
-    local function resolve(value)
-        if type(value) == "function" then
-            local ok, result = pcall(value)
-            value = ok and result or nil
-        end
-        if type(value) == "string" and ({ avatar = true, player = true, character = true })[value:lower()] then
-            value = LocalPlayer
-        end
-        if typeof(value) == "Instance" and value:IsA("Player") then
-            local character = value.Character
-            if not character then
-                character = value.CharacterAdded:Wait()
-                -- Let the body parts and accessories load in.
-                task.wait(0.5)
-            end
-            value = character
-        end
-        return typeof(value) == "Instance" and value or nil
-    end
-
-    -- Yields while waiting for a character to spawn.
-    function handle:SetModel(value)
-        generation += 1
-        local current = generation
-        source = value
-        if handle.Model then
-            handle.Model:Destroy()
-            handle.Model = nil
-        end
-        center = nil
-        if value == nil then
-            tween(viewport, { ImageTransparency = 1 }, 0.2)
-            tween(parts.Placeholder, { ImageTransparency = 0.3 }, 0.2)
-            return true
-        end
-        local instance = resolve(value)
-        if generation ~= current then
-            return false, "replaced by a newer model"
-        end
-        if not instance then
-            return false, "no model to show"
-        end
-        local copy = prepare(instance)
-        if not copy then
-            return false, "could not copy the model"
-        end
-        copy.Parent = world
-        handle.Model = copy
-        if not fit(copy) then
-            copy:Destroy()
-            handle.Model = nil
-            return false, "not a Model or a part"
-        end
-        viewport.ImageTransparency = 1
-        tween(viewport, { ImageTransparency = 0 }, 0.35)
-        tween(parts.Placeholder, { ImageTransparency = 1 }, 0.2)
-        return true
-    end
-    handle.Set = handle.SetModel
-
-    function handle:Get()
-        return handle.Model
-    end
-
-    -- Copies the source again, e.g. after the character respawned or changed.
-    function handle:Refresh()
-        return handle:SetModel(source)
-    end
-
-    function handle:SetSpin(enabled)
-        handle.Spin = enabled ~= false
-    end
-
-    function handle:SetSpinSpeed(degrees)
-        handle.SpinSpeed = tonumber(degrees) or handle.SpinSpeed
-    end
-
-    function handle:SetAngle(degrees)
-        angle = math.rad(tonumber(degrees) or 0)
-        place()
-    end
-
-    function handle:SetCaption(text)
-        parts.SetCaption(text)
-    end
-
-    function handle:SetTitle(text)
-        if parts.Title then
-            parts.Title.Text = tostring(text)
-        end
-    end
-
-    media.InputBegan:Connect(function(input)
-        if isPress(input) and handle.Model then
-            dragging = true
-            lastX = pointerPosition().X
-        end
-    end)
-    window:_listen("Changed", function(input)
-        if dragging and isMove(input) then
-            local x = pointerPosition().X
-            angle -= (x - lastX) * 0.012
-            lastX = x
-            place()
-        end
-    end, handle)
-    window:_listen("Ended", function(input)
-        if dragging and isPress(input) then
-            dragging = false
-            resumeAt = os.clock() + 1.5
-        end
-    end, handle)
-    window:_listen("Render", function(deltaTime)
-        if handle.Spin and center and not dragging and os.clock() >= resumeAt and window.Open and not window.Minimized
-            and parts.Frame.Visible then
-            angle += math.rad(handle.SpinSpeed) * deltaTime
-            place()
-        end
-    end, handle)
-
-    if opts.Model ~= nil then
-        task.spawn(handle.SetModel, handle, opts.Model)
-    end
-    return finishElement(self, opts, handle, parts.Frame, "Viewport")
 end
 
 -- Table: rows under a header, sortable by clicking a column. Rank = true adds
@@ -13823,8 +13635,6 @@ Tab.AddFeed = Tab.Log
 
 Tab.CreateImage = Tab.Image
 Tab.AddImage = Tab.Image
-Tab.CreateViewport = Tab.Viewport
-Tab.AddViewport = Tab.Viewport
 Tab.CreateTable = Tab.Table
 Tab.AddTable = Tab.Table
 Tab.CreateLeaderboard = Tab.Table
@@ -19849,6 +19659,18 @@ Automation:CreateDropdown({
     end,
 })
 
+-- Picks too long for the chip scroll past in a loop.
+Automation:CreateDropdown({
+    Name = "Zones",
+    Options = { "Spawn", "Forest", "Desert", "Volcano", "Tundra", "Ocean", "Sky Island" },
+    MultipleOptions = true,
+    CurrentOption = { "Forest", "Desert", "Volcano", "Tundra", "Ocean" },
+    Flag = "AutomationZones",
+    Callback = function(Options)
+        print("[Example] zones", table.concat(Options, ", "))
+    end,
+})
+
 Automation:CreateSlider({
     Name = "Interval",
     Range = { 1, 60 },
@@ -20111,14 +19933,6 @@ Elements:CreateImage({
     Image = "Deep Violet", -- an asset id, rbxassetid:// or rbxthumb:// link, a web link, a background preset or "Avatar"
     Height = 140,
     Caption = "Images fade in once loaded",
-})
-
-Elements:CreateViewport({
-    Name = "Viewport",
-    Desc = "Drag to rotate",
-    Model = "Avatar", -- any Model or part (copied), a Player, or "Avatar"
-    Height = 200,
-    SpinSpeed = 25,
 })
 
 do

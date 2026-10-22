@@ -59,7 +59,7 @@ Settings:CreateThemeManager({ Side = "Right" })
 | [Groupbox](#groupbox) | [Input](#input) · [Keybind](#keybind) · [Color Picker](#color-picker) | [Confirm](#confirm) | [Fonts](#fonts) |
 | [Visibility](#visibility) · [Tooltips](#tooltips) | [Label](#label) · [Paragraph](#paragraph) · [Section](#section) · [Divider](#divider) | | |
 | [Search](#search) | [Status](#status) · [Status List](#status-list) · [Progress](#progress) | | |
-| | [Image](#image) · [Viewport](#viewport) · [Table](#table) · [Log](#log) | | |
+| | [Image](#image) · [Table](#table) · [Log](#log) | | |
 
 ---
 
@@ -1226,52 +1226,6 @@ A placeholder icon shows until the image has loaded, then the picture fades in. 
 | `Get()` | The current source. |
 | `SetCaption(text)` / `SetTitle(text)` | Change the caption (`nil` hides it) or the title. |
 | `SetScaleType(name)` / `SetColor(color)` | Change how it fills the card, or its tint. |
-
----
-
-## Viewport
-
-> A 3D preview: a model, a part or the player's avatar, turning slowly.
-
-```lua
-local Preview = Tab:CreateViewport({
-    Name = "Your character",
-    Model = "Avatar", -- or any Model / BasePart (it is copied), a Player, or a function returning one
-    Height = 200,
-    SpinSpeed = 25,
-})
-
-Preview:SetModel(workspace.Sword)
-```
-
-The model is copied into the card with its scripts and sounds stripped and every part anchored, so the original is never touched. The camera frames the whole model and faces its front. Drag the card sideways to turn it by hand; the spin picks up again a moment after you let go. It only spins while the window is open. `"Avatar"` waits for the character to spawn if it hasn't yet; call `Refresh()` after a respawn or an outfit change to copy it again.
-
-### Properties
-
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `Name` | string | — | Title above the preview. |
-| `Desc` | string | — | Hint text under the title. |
-| `Model` | Instance \| string \| function | — | What to show. |
-| `Height` | number | `180` | Height of the preview, 40 to 600. |
-| `Spin` | boolean | `true` | Turn slowly on its own. |
-| `SpinSpeed` | number | `25` | Degrees per second. |
-| `Angle` / `Pitch` | number | `0` / `10` | Starting turn, and how far above the model the camera sits, in degrees. |
-| `Distance` | number | `1` | Camera distance multiplier. Below 1 zooms in. |
-| `FieldOfView` | number | `35` | Camera field of view. |
-| `Clone` | boolean | `true` | `false` moves the instance itself into the card instead of a copy. |
-| `Caption` | string | — | Line over the bottom of the preview. |
-| `Ambient` / `LightColor` | Color3 | soft grey / warm white | Lighting. |
-
-### Handle
-
-| Member | Description |
-| --- | --- |
-| `.Model` | The copy on show. |
-| `SetModel(value)` / `Set(value)` | Show something else. `nil` clears it. Yields while waiting for a character; returns `ok, err`. |
-| `Refresh()` | Copy the current source again. |
-| `SetSpin(enabled)` / `SetSpinSpeed(degrees)` / `SetAngle(degrees)` | Control the turn. |
-| `SetCaption(text)` / `SetTitle(text)` | Change the caption or the title. |
 
 ---
 

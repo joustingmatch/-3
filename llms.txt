@@ -99,7 +99,6 @@ Every element takes `Name`, `Desc` (a muted hint under the name), `Tooltip` (a s
 | `Table` | `Columns` (names or `{ Name, Key, Width, Align, Format, Color, Sortable }`), `Rows`, `Rank`, `SortBy`, `MaxRows`, `Search` (built-in search box, default on), `Highlight(row)`, `Callback(row, i)`. Editable: give columns a `Type` (`Text`, `Number`, `Toggle`, `Dropdown` with `Options`, `Searchable`, `SearchAfter`, `MaxRows`), plus `OnChanged(rows)`, `NewRow`, `AllowAdd`, `AllowRemove`, `Flag` | `SetRows`, `AddRow`, `UpdateRow`, `RemoveRow`, `Clear`, `Sort`, `SetColumns`, `SetSearch(text)`, `Get` |
 | `Log` (also `Feed`) | `MaxEntries` (default 100), `MaxRows` (lines shown), `Timestamps`, `TimeFormat`, `EmptyText` | `Push(text, color?)`, `Clear`, `Get`, `SetMaxEntries`, `SetTitle` |
 | `Image` | `Image` (asset id, link, file, preset or `"Avatar"`), `Height`, `Caption`, `ScaleType` | `SetImage`, `SetCaption`, `SetTitle` |
-| `Viewport` | `Model` (Instance, `"Avatar"`, Player or function), `Height`, `SpinSpeed` | `SetModel`, `Refresh`, `SetSpin` |
 
 Status list rows are strings (one muted wrapped line) or `{ Text, Value, Tone }`. Table rows are value lists in column order or tables keyed by column `Key`; add `Highlight = true` to mark a row and `Colors = { [key or index] = color }` to colour single cells.
 
